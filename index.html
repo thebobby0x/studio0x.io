@@ -465,7 +465,130 @@
       text-decoration: none;
     }
 
-    /* ── ANIMATIONS ── */
+    /* ── FLAGSHIP ── */
+    .flagship-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+      margin-top: 32px;
+      margin-bottom: 16px;
+    }
+
+    .flagship-left { display: flex; flex-direction: column; }
+
+    /* ── LAB PREVIEW ── */
+    .lab-preview {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .lab-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .lab-preview-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .lab-live-dot {
+      width: 8px; height: 8px;
+      background: var(--accent2);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent2);
+      animation: livePulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent2); }
+      50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent2); }
+    }
+
+    .lab-rooms {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .lab-room {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lab-room-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .lab-dots {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Each dot pulses with a staggered delay to look like agents thinking */
+    .dot-openai  { background: #74aa9c; animation: dotPulse 2.2s ease-in-out infinite 0.0s; }
+    .dot-anthropic { background: #c9a96e; animation: dotPulse 2.2s ease-in-out infinite 0.3s; }
+    .dot-google  { background: #4285f4; animation: dotPulse 2.2s ease-in-out infinite 0.6s; }
+    .dot-groq    { background: #f55036; animation: dotPulse 2.2s ease-in-out infinite 0.9s; }
+    .dot-xai     { background: #a78bfa; animation: dotPulse 2.2s ease-in-out infinite 1.2s; }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+
+    .lab-room-status {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .lab-types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .lab-type-tag {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 3px 10px;
+      letter-spacing: 0.04em;
+    }
+
+    @media (max-width: 768px) {
+      .flagship-grid { grid-template-columns: 1fr; gap: 40px; }
+      .lab-rooms { grid-template-columns: 1fr 1fr; }
+    }
     .fade-in {
       opacity: 0;
       transform: translateY(20px);
@@ -560,64 +683,132 @@
 
   <div class="divider"></div>
 
-  <!-- PRODUCTS -->
+  <!-- FLAGSHIP + ALL PRODUCTS -->
   <section id="products">
     <div class="section-inner">
-      <div class="section-label fade-in">What we build</div>
-      <h2 class="section-title fade-in">Our products</h2>
-      <p class="section-body fade-in">
-        Each <span class="brand-name">studio0x</span> product is built around one idea: AI should do more when multiple models collaborate than any single model can alone.
-      </p>
 
-      <div class="products-grid">
-
-        <a href="https://singularitylab.app" target="_blank" rel="noopener" class="product-card fade-in">
-          <span class="product-tag tag-live">Live</span>
-          <div class="product-name">singularityLab</div>
-          <p class="product-desc">
-            The flagship. A multi-agent AI orchestration platform where
-            OpenAI, Anthropic, Google, Groq, xAI and more collaborate
-            in Labs — debating, synthesizing, and delivering one unified
-            response called the singularity.
-            When you have every AI available in singularityLab,
-            the next big thing will be what you build using it.
+      <!-- FLAGSHIP -->
+      <div class="section-label fade-in">Flagship product · Live now</div>
+      <div class="flagship-grid">
+        <div class="flagship-left fade-in">
+          <h2 class="section-title">singularityLab</h2>
+          <p class="section-body">
+            The world's AI tools work in silos. GPT doesn't know what
+            Claude is thinking. Gemini doesn't know what Groq found.
+            singularityLab changes that — every AI in one Lab, talking
+            to each other, building on each other's thinking, in real
+            time, on your problem.
           </p>
-          <span class="product-link">singularitylab.app →</span>
-        </a>
+          <p class="section-body" style="margin-top:16px;">
+            When you have every AI available in singularityLab, the next
+            big thing will be what you build using it.
+          </p>
+          <a href="https://singularitylab.app" class="hero-cta" target="_blank" rel="noopener" style="margin-top:32px;display:inline-flex;">
+            jack in free →
+          </a>
+        </div>
+
+        <div class="flagship-right fade-in">
+          <div class="lab-preview">
+            <div class="lab-preview-header">
+              <span class="lab-preview-label">active labs</span>
+              <span class="lab-live-dot"></span>
+            </div>
+            <div class="lab-rooms">
+              <div class="lab-room">
+                <div class="lab-room-name">C-Suite Lab</div>
+                <div class="lab-dots">
+                  <span class="dot dot-openai"></span>
+                  <span class="dot dot-anthropic"></span>
+                  <span class="dot dot-google"></span>
+                  <span class="dot dot-groq"></span>
+                </div>
+                <div class="lab-room-status">4 agents · active</div>
+              </div>
+              <div class="lab-room">
+                <div class="lab-room-name">Marketing Lab</div>
+                <div class="lab-dots">
+                  <span class="dot dot-openai"></span>
+                  <span class="dot dot-anthropic"></span>
+                  <span class="dot dot-xai"></span>
+                </div>
+                <div class="lab-room-status">3 agents · active</div>
+              </div>
+              <div class="lab-room">
+                <div class="lab-room-name">Science Lab</div>
+                <div class="lab-dots">
+                  <span class="dot dot-google"></span>
+                  <span class="dot dot-groq"></span>
+                </div>
+                <div class="lab-room-status">2 agents · active</div>
+              </div>
+              <div class="lab-room">
+                <div class="lab-room-name">Product Lab</div>
+                <div class="lab-dots">
+                  <span class="dot dot-openai"></span>
+                  <span class="dot dot-anthropic"></span>
+                  <span class="dot dot-google"></span>
+                  <span class="dot dot-groq"></span>
+                  <span class="dot dot-xai"></span>
+                </div>
+                <div class="lab-room-status">5 agents · active</div>
+              </div>
+            </div>
+            <div class="lab-types">
+              <span class="lab-type-tag">Marketing</span>
+              <span class="lab-type-tag">C-Suite</span>
+              <span class="lab-type-tag">Science</span>
+              <span class="lab-type-tag">Legal</span>
+              <span class="lab-type-tag">Finance</span>
+              <span class="lab-type-tag">Custom</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALL PRODUCTS -->
+      <div class="section-label fade-in" style="margin-top:80px;">More from studio0x</div>
+      <div class="products-grid">
 
         <div class="product-card fade-in">
           <span class="product-tag tag-dev">In Development</span>
           <div class="product-name">podiumSelect</div>
-          <p class="product-desc">
-            A hyper-luxury AI concierge platform for ultra-high-net-worth
-            travelers attending FIFA World Cup 2026, F1, and global
-            sporting events. Powered by the singularityLab engine.
-            One request. Every detail handled.
-          </p>
+          <p class="product-desc">A hyper-luxury AI concierge for UHNW travelers at FIFA World Cup 2026, F1, and global sporting events. Powered by the singularityLab engine. One request. Every detail handled.</p>
           <span class="product-link">Coming soon</span>
         </div>
 
         <div class="product-card fade-in">
           <span class="product-tag tag-dev">In Development</span>
           <div class="product-name">eventOS</div>
-          <p class="product-desc">
-            An AI-native operating system for live events and
-            experiential activations — managing everything from
-            guest experience to real-time logistics, powered by
-            multi-agent intelligence.
-          </p>
+          <p class="product-desc">From a single meeting to a World Cup-scale production — eventOS is the all-in-one AI platform for event planners who are done stitching together tools. Plan. Collaborate. Execute.</p>
           <span class="product-link">Coming soon</span>
         </div>
 
         <div class="product-card fade-in">
           <span class="product-tag tag-dev">In Development</span>
           <div class="product-name">footyEXP</div>
-          <p class="product-desc">
-            A digital fan experience platform built for the global
-            football community. Bringing AI-powered engagement,
-            gamification, and fan journeys to clubs, tournaments,
-            and activations worldwide.
-          </p>
+          <p class="product-desc">Digital passport. Activity stamps. Physical keepsakes. footyEXP turns match day into a full journey — for fans, brands, and tournament operators. Built for the World Cup era.</p>
+          <span class="product-link">Coming soon · WC26-ready</span>
+        </div>
+
+        <div class="product-card fade-in">
+          <span class="product-tag tag-dev">In Development</span>
+          <div class="product-name">humanOS</div>
+          <p class="product-desc">Your body produces more data than any dashboard can process. humanOS organizes it, interprets it, and turns it into a personal health protocol — with AI that knows you, not just your numbers.</p>
+          <span class="product-link">Coming soon</span>
+        </div>
+
+        <div class="product-card fade-in">
+          <span class="product-tag tag-dev">In Development</span>
+          <div class="product-name">wealthOS</div>
+          <p class="product-desc">Most people make their most important financial decisions with the least access to expertise. wealthOS changes that — putting institutional-grade insight into a personal, conversational interface.</p>
+          <span class="product-link">Coming soon</span>
+        </div>
+
+        <div class="product-card fade-in">
+          <span class="product-tag tag-dev">In Development</span>
+          <div class="product-name">footy dome</div>
+          <p class="product-desc">A physical and digital home for the beautiful game — combining arcade experiences, fan activation, and real-time competition tracking. More than a venue. A destination.</p>
           <span class="product-link">Coming soon</span>
         </div>
 
