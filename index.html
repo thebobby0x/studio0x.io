@@ -1,943 +1,907 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>studio0x — AI-native platforms for the next era</title>
-  <meta name="description" content="studio0x LLC builds AI-native platforms that give humans the full power of every AI model. Founded by Robert H. Kelley Jr. in Sarasota, FL." />
-  <meta property="og:title" content="studio0x — AI-native platforms" />
-  <meta property="og:description" content="We build AI-native platforms for the next era of human-AI collaboration." />
-  <meta property="og:url" content="https://studio0x.io" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #07080a;
-      --bg2:      #0d0f12;
-      --bg3:      #131619;
-      --border:   rgba(255,255,255,0.07);
-      --text:     #e8eaed;
-      --muted:    #6b7280;
-      --accent:   #7c6af7;
-      --accent2:  #4fd1c5;
-      --danger:   #f97316;
-      --font-display: 'Syne', sans-serif;
-      --font-mono:    'DM Mono', monospace;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-display);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    /* ── NOISE OVERLAY ── */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.4;
-    }
-
-    /* ── NAV ── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 48px;
-      background: rgba(7,8,10,0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-logo {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .nav-logo span { color: var(--accent); }
-
-    /* Force zero to render as zero, not letter-o, across all brand name instances */
-    .brand-name {
-      font-family: var(--font-mono);
-      font-variant-numeric: slashed-zero;
-      letter-spacing: -0.02em;
-    }
-
-    .nav-logo-sub {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 0.55rem;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-top: 1px;
-    }
-
-    .nav-links {
-      display: flex; gap: 32px; list-style: none;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 500;
-      letter-spacing: 0.02em;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover { color: var(--text); }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      padding: 120px 48px 80px;
-      text-align: center;
-      overflow: hidden;
-    }
-
-    .hero-grid {
-      position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
-      background-size: 64px 64px;
-      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
-    }
-
-    .hero-glow {
-      position: absolute;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
-      top: -100px; left: 50%; transform: translateX(-50%);
-      pointer-events: none;
-    }
-
-    .hero-inner {
-      position: relative; z-index: 1;
-      max-width: 820px;
-    }
-
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px;
-      background: rgba(124,106,247,0.1);
-      border: 1px solid rgba(124,106,247,0.25);
-      border-radius: 100px;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--accent);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 32px;
-    }
-
-    .hero-badge::before {
-      content: '';
-      width: 6px; height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: pulse 2s ease infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
-    }
-
-    .hero h1 {
-      font-size: clamp(2.8rem, 6vw, 5rem);
-      font-weight: 800;
-      line-height: 1.06;
-      letter-spacing: -0.04em;
-      margin-bottom: 24px;
-    }
-
-    .hero h1 em {
-      font-style: normal;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero-sub {
-      font-size: 1.15rem;
-      color: var(--muted);
-      max-width: 540px;
-      margin: 0 auto 48px;
-      line-height: 1.7;
-      font-weight: 400;
-    }
-
-    .hero-cta {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 14px 28px;
-      background: var(--accent);
-      color: #fff;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 0.95rem;
-      letter-spacing: -0.01em;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-
-    .hero-cta:hover { opacity: 0.88; transform: translateY(-1px); }
-
-    /* ── SECTION BASE ── */
-    section {
-      position: relative; z-index: 1;
-      padding: 96px 48px;
-    }
-
-    .section-inner {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 16px;
-    }
-
-    .section-title {
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin-bottom: 20px;
-    }
-
-    .section-body {
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.75;
-      max-width: 640px;
-    }
-
-    /* ── DIVIDER ── */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 0 48px;
-    }
-
-    /* ── MISSION ── */
-    .mission {
-      background: var(--bg2);
-    }
-
-    .mission-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: start;
-      margin-top: 56px;
-    }
-
-    .mission-stat {
-      border-left: 2px solid var(--accent);
-      padding-left: 24px;
-    }
-
-    .mission-stat-num {
-      font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      line-height: 1;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .mission-stat-label {
-      color: var(--muted);
-      font-size: 0.875rem;
-      margin-top: 6px;
-    }
-
-    /* ── PRODUCTS ── */
-    .products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      margin-top: 56px;
-    }
-
-    .product-card {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
-      transition: border-color 0.2s, transform 0.2s;
-      text-decoration: none;
-      display: flex; flex-direction: column; gap: 16px;
-    }
-
-    .product-card:hover {
-      border-color: rgba(124,106,247,0.3);
-      transform: translateY(-2px);
-    }
-
-    .product-tag {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 3px 10px;
-      border-radius: 100px;
-      display: inline-block;
-      width: fit-content;
-    }
-
-    .tag-live {
-      background: rgba(79,209,197,0.12);
-      color: var(--accent2);
-      border: 1px solid rgba(79,209,197,0.2);
-    }
-
-    .tag-dev {
-      background: rgba(249,115,22,0.1);
-      color: var(--danger);
-      border: 1px solid rgba(249,115,22,0.2);
-    }
-
-    .product-name {
-      font-size: 1.4rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: var(--text);
-    }
-
-    .product-desc {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.65;
-      flex: 1;
-    }
-
-    .product-link {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--accent);
-      letter-spacing: 0.04em;
-    }
-
-    /* ── COMPANY ── */
-    .company {
-      background: var(--bg2);
-    }
-
-    .company-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 48px;
-      margin-top: 56px;
-    }
-
-    .company-block {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
-    }
-
-    .company-block h3 {
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 20px;
-    }
-
-    .company-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
-    }
-
-    .company-row:last-child { border-bottom: none; }
-
-    .company-row-label {
-      color: var(--muted);
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-    }
-
-    .company-row-value {
-      color: var(--text);
-      font-weight: 600;
-      text-align: right;
-    }
-
-    .company-row-value a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .company-row-value a:hover {
-      text-decoration: underline;
-    }
-
-    /* ── CONTACT ── */
-    .contact-inner {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 24px;
-    }
-
-    .contact-inner .section-body {
-      max-width: 480px;
-      text-align: center;
-    }
-
-    .contact-email {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 16px 32px;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-family: var(--font-mono);
-      font-size: 1rem;
-      color: var(--text);
-      text-decoration: none;
-      transition: border-color 0.2s;
-    }
-
-    .contact-email:hover { border-color: rgba(124,106,247,0.4); }
-
-    /* ── FOOTER ── */
-    footer {
-      position: relative; z-index: 1;
-      padding: 32px 48px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    .footer-copy {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    .footer-copy strong { color: var(--text); }
-
-    .footer-right {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    .footer-right a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    /* ── FLAGSHIP ── */
-    .flagship-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: center;
-      margin-top: 32px;
-      margin-bottom: 16px;
-    }
-
-    .flagship-left { display: flex; flex-direction: column; }
-
-    /* ── LAB PREVIEW ── */
-    .lab-preview {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-    }
-
-    .lab-preview-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-
-    .lab-preview-label {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .lab-live-dot {
-      width: 8px; height: 8px;
-      background: var(--accent2);
-      border-radius: 50%;
-      box-shadow: 0 0 6px var(--accent2);
-      animation: livePulse 1.8s ease-in-out infinite;
-    }
-
-    @keyframes livePulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent2); }
-      50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent2); }
-    }
-
-    .lab-rooms {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .lab-room {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .lab-room-name {
-      font-size: 0.82rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--text);
-    }
-
-    .lab-dots {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-    }
-
-    .dot {
-      width: 9px; height: 9px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    /* Each dot pulses with a staggered delay to look like agents thinking */
-    .dot-openai  { background: #74aa9c; animation: dotPulse 2.2s ease-in-out infinite 0.0s; }
-    .dot-anthropic { background: #c9a96e; animation: dotPulse 2.2s ease-in-out infinite 0.3s; }
-    .dot-google  { background: #4285f4; animation: dotPulse 2.2s ease-in-out infinite 0.6s; }
-    .dot-groq    { background: #f55036; animation: dotPulse 2.2s ease-in-out infinite 0.9s; }
-    .dot-xai     { background: #a78bfa; animation: dotPulse 2.2s ease-in-out infinite 1.2s; }
-
-    @keyframes dotPulse {
-      0%, 100% { opacity: 0.35; transform: scale(0.85); }
-      50% { opacity: 1; transform: scale(1.15); }
-    }
-
-    .lab-room-status {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-    }
-
-    .lab-types {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .lab-type-tag {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      color: var(--muted);
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 3px 10px;
-      letter-spacing: 0.04em;
-    }
-
-    @media (max-width: 768px) {
-      .flagship-grid { grid-template-columns: 1fr; gap: 40px; }
-      .lab-rooms { grid-template-columns: 1fr 1fr; }
-    }
-    .fade-in {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
-    }
-
-    .fade-in.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 768px) {
-      nav { padding: 16px 24px; }
-      .nav-links { display: none; }
-      section { padding: 64px 24px; }
-      .hero { padding: 100px 24px 64px; }
-      .mission-grid,
-      .company-grid { grid-template-columns: 1fr; gap: 32px; }
-      .divider { margin: 0 24px; }
-      footer { padding: 24px; flex-direction: column; text-align: center; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>studio0x — AI-native platforms for the next era</title>
+<meta name="description" content="studio0x LLC builds AI-native platforms that give humans the full power of every AI model. Founded by Robert H. Kelley Jr. in Sarasota, FL." />
+<meta property="og:title" content="studio0x — AI-native platforms" />
+<meta property="og:description" content="We build AI-native platforms for the next era of human-AI collaboration." />
+<meta property="og:url" content="https://studio0x.io" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+--bg: #07080a;
+--bg2: #0d0f12;
+--bg3: #131619;
+--border: rgba(255,255,255,0.07);
+--text: #e8eaed;
+--muted: #6b7280;
+--accent: #7c6af7;
+--accent2: #4fd1c5;
+--danger: #f97316;
+--font-display: 'Syne', sans-serif;
+--font-mono: 'DM Mono', monospace;
+}
+html { scroll-behavior: smooth; }
+body {
+background: var(--bg);
+color: var(--text);
+font-family: var(--font-display);
+line-height: 1.6;
+-webkit-font-smoothing: antialiased;
+overflow-x: hidden;
+}
+/* ── NOISE OVERLAY ── */
+body::before {
+content: '';
+position: fixed; inset: 0;
+background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+pointer-events: none;
+z-index: 0;
+opacity: 0.4;
+}
+/* ── NAV ── */
+nav {
+position: fixed; top: 0; left: 0; right: 0;
+z-index: 100;
+display: flex; align-items: center; justify-content: space-between;
+padding: 20px 48px;
+background: rgba(7,8,10,0.85);
+backdrop-filter: blur(20px);
+border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+font-size: 1.1rem;
+font-weight: 700;
+letter-spacing: -0.02em;
+color: var(--text);
+text-decoration: none;
+}
+.nav-logo span { color: var(--accent); }
+/* Force zero to render as zero, not letter-o, across all brand name instances */
+.brand-name {
+font-family: var(--font-mono);
+font-variant-numeric: slashed-zero;
+letter-spacing: -0.02em;
+}
+.nav-logo-sub {
+display: block;
+font-family: var(--font-mono);
+font-size: 0.55rem;
+letter-spacing: 0.1em;
+color: var(--muted);
+text-transform: uppercase;
+margin-top: 1px;
+}
+.nav-links {
+display: flex; gap: 32px; list-style: none;
+}
+.nav-links a {
+color: var(--muted);
+text-decoration: none;
+font-size: 0.875rem;
+font-weight: 500;
+letter-spacing: 0.02em;
+transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+/* ── HERO ── */
+.hero {
+position: relative;
+min-height: 100vh;
+display: flex; align-items: center; justify-content: center;
+padding: 120px 48px 80px;
+text-align: center;
+overflow: hidden;
+}
+.hero-grid {
+position: absolute; inset: 0;
+background-image:
+linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+background-size: 64px 64px;
+mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+.hero-glow {
+position: absolute;
+width: 600px; height: 600px;
+background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
+top: -100px; left: 50%; transform: translateX(-50%);
+pointer-events: none;
+}
+.hero-inner {
+position: relative; z-index: 1;
+max-width: 820px;
+}
+.hero-badge {
+display: inline-flex; align-items: center; gap: 8px;
+padding: 6px 14px;
+background: rgba(124,106,247,0.1);
+border: 1px solid rgba(124,106,247,0.25);
+border-radius: 100px;
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--accent);
+letter-spacing: 0.08em;
+text-transform: uppercase;
+margin-bottom: 32px;
+}
+.hero-badge::before {
+content: '';
+width: 6px; height: 6px;
+background: var(--accent);
+border-radius: 50%;
+animation: pulse 2s ease infinite;
+}
+@keyframes pulse {
+0%, 100% { opacity: 1; transform: scale(1); }
+50% { opacity: 0.4; transform: scale(0.8); }
+}
+.hero h1 {
+font-size: clamp(2.8rem, 6vw, 5rem);
+font-weight: 800;
+line-height: 1.06;
+letter-spacing: -0.04em;
+margin-bottom: 24px;
+}
+.hero h1 em {
+font-style: normal;
+background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+}
+.hero-sub {
+font-size: 1.15rem;
+color: var(--muted);
+max-width: 540px;
+margin: 0 auto 40px;
+line-height: 1.7;
+font-weight: 400;
+}
+/* ── HERO STAT LINE ── */
+.hero-stats {
+display: flex;
+flex-wrap: wrap;
+align-items: center;
+justify-content: center;
+gap: 10px 18px;
+margin: 0 auto 44px;
+max-width: 720px;
+font-family: var(--font-mono);
+font-size: 0.82rem;
+letter-spacing: 0.02em;
+color: var(--text);
+}
+.hero-stats .stat strong {
+color: var(--accent2);
+font-weight: 500;
+}
+.hero-stats .sep {
+color: var(--muted);
+opacity: 0.5;
+}
+.hero-stats .singularity {
+color: var(--accent);
+font-weight: 500;
+}
+.hero-cta {
+display: inline-flex; align-items: center; gap: 10px;
+padding: 14px 28px;
+background: var(--accent);
+color: #fff;
+border-radius: 8px;
+text-decoration: none;
+font-weight: 700;
+font-size: 0.95rem;
+letter-spacing: -0.01em;
+transition: opacity 0.2s, transform 0.2s;
+}
+.hero-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+.cta-subline {
+display: block;
+margin-top: 14px;
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+letter-spacing: 0.03em;
+}
+/* ── SECTION BASE ── */
+section {
+position: relative; z-index: 1;
+padding: 96px 48px;
+}
+.section-inner {
+max-width: 1100px;
+margin: 0 auto;
+}
+.section-label {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+letter-spacing: 0.14em;
+text-transform: uppercase;
+color: var(--accent);
+margin-bottom: 16px;
+}
+.section-title {
+font-size: clamp(2rem, 4vw, 3rem);
+font-weight: 800;
+letter-spacing: -0.03em;
+line-height: 1.1;
+margin-bottom: 20px;
+}
+.section-body {
+color: var(--muted);
+font-size: 1.05rem;
+line-height: 1.75;
+max-width: 640px;
+}
+/* ── DIVIDER ── */
+.divider {
+height: 1px;
+background: var(--border);
+margin: 0 48px;
+}
+/* ── MISSION ── */
+.mission {
+background: var(--bg2);
+}
+.mission-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 64px;
+align-items: start;
+margin-top: 56px;
+}
+.mission-stat {
+border-left: 2px solid var(--accent);
+padding-left: 24px;
+}
+.mission-stat-num {
+font-size: 2.8rem;
+font-weight: 800;
+letter-spacing: -0.04em;
+line-height: 1;
+background: linear-gradient(135deg, var(--accent), var(--accent2));
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+}
+.mission-stat-label {
+color: var(--muted);
+font-size: 0.875rem;
+margin-top: 6px;
+}
+/* ── PRODUCTS ── */
+.products-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+gap: 24px;
+margin-top: 56px;
+}
+.product-card {
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 32px;
+transition: border-color 0.2s, transform 0.2s;
+text-decoration: none;
+display: flex; flex-direction: column; gap: 16px;
+}
+.product-card:hover {
+border-color: rgba(124,106,247,0.3);
+transform: translateY(-2px);
+}
+.product-tag {
+font-family: var(--font-mono);
+font-size: 0.7rem;
+letter-spacing: 0.1em;
+text-transform: uppercase;
+padding: 3px 10px;
+border-radius: 100px;
+display: inline-block;
+width: fit-content;
+}
+.tag-live {
+background: rgba(79,209,197,0.12);
+color: var(--accent2);
+border: 1px solid rgba(79,209,197,0.2);
+}
+.tag-next {
+background: rgba(124,106,247,0.12);
+color: var(--accent);
+border: 1px solid rgba(124,106,247,0.25);
+}
+.tag-dev {
+background: rgba(249,115,22,0.1);
+color: var(--danger);
+border: 1px solid rgba(249,115,22,0.2);
+}
+.product-name {
+font-size: 1.4rem;
+font-weight: 800;
+letter-spacing: -0.03em;
+color: var(--text);
+}
+.product-desc {
+font-size: 0.9rem;
+color: var(--muted);
+line-height: 1.65;
+flex: 1;
+}
+.product-link {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--accent);
+letter-spacing: 0.04em;
+}
+/* ── COMPANY ── */
+.company {
+background: var(--bg2);
+}
+.company-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 48px;
+margin-top: 56px;
+}
+.company-block {
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 32px;
+}
+.company-block h3 {
+font-size: 0.75rem;
+font-family: var(--font-mono);
+letter-spacing: 0.12em;
+text-transform: uppercase;
+color: var(--accent);
+margin-bottom: 20px;
+}
+.company-row {
+display: flex;
+justify-content: space-between;
+align-items: baseline;
+padding: 12px 0;
+border-bottom: 1px solid var(--border);
+font-size: 0.9rem;
+}
+.company-row:last-child { border-bottom: none; }
+.company-row-label {
+color: var(--muted);
+font-family: var(--font-mono);
+font-size: 0.78rem;
+}
+.company-row-value {
+color: var(--text);
+font-weight: 600;
+text-align: right;
+}
+.company-row-value a {
+color: var(--accent);
+text-decoration: none;
+}
+.company-row-value a:hover {
+text-decoration: underline;
+}
+/* ── CONTACT ── */
+.contact-inner {
+display: flex;
+flex-direction: column;
+align-items: center;
+text-align: center;
+gap: 24px;
+}
+.contact-inner .section-body {
+max-width: 480px;
+text-align: center;
+}
+.contact-email {
+display: inline-flex; align-items: center; gap: 10px;
+padding: 16px 32px;
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 8px;
+font-family: var(--font-mono);
+font-size: 1rem;
+color: var(--text);
+text-decoration: none;
+transition: border-color 0.2s;
+}
+.contact-email:hover { border-color: rgba(124,106,247,0.4); }
+/* ── FOOTER ── */
+footer {
+position: relative; z-index: 1;
+padding: 32px 48px;
+border-top: 1px solid var(--border);
+display: flex;
+align-items: center;
+justify-content: space-between;
+flex-wrap: wrap;
+gap: 16px;
+}
+.footer-copy {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+}
+.footer-copy strong { color: var(--text); }
+.footer-right {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+}
+.footer-right a {
+color: var(--accent);
+text-decoration: none;
+}
+/* ── FLAGSHIP ── */
+.flagship-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 64px;
+align-items: center;
+margin-top: 32px;
+margin-bottom: 16px;
+}
+.flagship-left { display: flex; flex-direction: column; }
+/* ── LAB PREVIEW ── */
+.lab-preview {
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 16px;
+padding: 28px;
+}
+.lab-preview-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+margin-bottom: 20px;
+}
+.lab-preview-label {
+font-family: var(--font-mono);
+font-size: 0.7rem;
+letter-spacing: 0.12em;
+text-transform: uppercase;
+color: var(--muted);
+}
+.lab-live-dot {
+width: 8px; height: 8px;
+background: var(--accent2);
+border-radius: 50%;
+box-shadow: 0 0 6px var(--accent2);
+animation: livePulse 1.8s ease-in-out infinite;
+}
+@keyframes livePulse {
+0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent2); }
+50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent2); }
+}
+.lab-rooms {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 12px;
+margin-bottom: 20px;
+}
+.lab-room {
+background: var(--bg2);
+border: 1px solid var(--border);
+border-radius: 10px;
+padding: 14px 16px;
+display: flex;
+flex-direction: column;
+gap: 8px;
+}
+.lab-room-name {
+font-size: 0.82rem;
+font-weight: 700;
+letter-spacing: -0.01em;
+color: var(--text);
+}
+.lab-dots {
+display: flex;
+gap: 5px;
+align-items: center;
+}
+.dot {
+width: 9px; height: 9px;
+border-radius: 50%;
+display: inline-block;
+}
+/* Each dot pulses with a staggered delay to look like agents thinking */
+.dot-openai { background: #74aa9c; animation: dotPulse 2.2s ease-in-out infinite 0.0s; }
+.dot-anthropic { background: #c9a96e; animation: dotPulse 2.2s ease-in-out infinite 0.3s; }
+.dot-google { background: #4285f4; animation: dotPulse 2.2s ease-in-out infinite 0.6s; }
+.dot-groq { background: #f55036; animation: dotPulse 2.2s ease-in-out infinite 0.9s; }
+.dot-xai { background: #a78bfa; animation: dotPulse 2.2s ease-in-out infinite 1.2s; }
+@keyframes dotPulse {
+0%, 100% { opacity: 0.35; transform: scale(0.85); }
+50% { opacity: 1; transform: scale(1.15); }
+}
+.lab-room-status {
+font-family: var(--font-mono);
+font-size: 0.68rem;
+color: var(--muted);
+letter-spacing: 0.04em;
+}
+.lab-types {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+}
+.lab-type-tag {
+font-family: var(--font-mono);
+font-size: 0.68rem;
+color: var(--muted);
+background: var(--bg2);
+border: 1px solid var(--border);
+border-radius: 100px;
+padding: 3px 10px;
+letter-spacing: 0.04em;
+}
+/* ── FLAGSHIP NOTE (honest capability line) ── */
+.flagship-note {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+color: var(--muted);
+letter-spacing: 0.02em;
+margin-top: 20px;
+padding-top: 16px;
+border-top: 1px solid var(--border);
+line-height: 1.6;
+}
+.flagship-note strong { color: var(--text); font-weight: 500; }
+@media (max-width: 768px) {
+.flagship-grid { grid-template-columns: 1fr; gap: 40px; }
+.lab-rooms { grid-template-columns: 1fr 1fr; }
+}
+.fade-in {
+opacity: 0;
+transform: translateY(20px);
+transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in.visible {
+opacity: 1;
+transform: translateY(0);
+}
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+nav { padding: 16px 24px; }
+.nav-links { display: none; }
+section { padding: 64px 24px; }
+.hero { padding: 100px 24px 64px; }
+.mission-grid,
+.company-grid { grid-template-columns: 1fr; gap: 32px; }
+.divider { margin: 0 24px; }
+footer { padding: 24px; flex-direction: column; text-align: center; }
+.hero-stats { font-size: 0.74rem; gap: 8px 12px; }
+}
+</style>
 </head>
 <body>
+<!-- NAV -->
+<nav>
+<a href="#" class="nav-logo brand-name">studio<span>0x</span></a>
+<ul class="nav-links">
+<li><a href="#mission">About</a></li>
+<li><a href="#products">Products</a></li>
+<li><a href="#company">Company</a></li>
+<li><a href="#contact">Contact</a></li>
+</ul>
+</nav>
 
-  <!-- NAV -->
-  <nav>
-    <a href="#" class="nav-logo brand-name">studio<span>0x</span></a>
-    <ul class="nav-links">
-      <li><a href="#mission">About</a></li>
-      <li><a href="#products">Products</a></li>
-      <li><a href="#company">Company</a></li>
-      <li><a href="#contact">Contact</a></li>
-    </ul>
-  </nav>
+<!-- HERO -->
+<section class="hero">
+<div class="hero-grid"></div>
+<div class="hero-glow"></div>
+<div class="hero-inner fade-in visible">
+<div class="hero-badge">AI-native platforms</div>
+<h1>We build platforms for<br/><em>the next era of AI.</em></h1>
+<p class="hero-sub">
+<span class="brand-name">studio0x</span> creates tools that give humans the full power of every
+AI model — not one, not some, but all of them working together.
+</p>
+<div class="hero-stats">
+<span class="stat"><strong>7+</strong> frontier AI providers</span>
+<span class="sep">·</span>
+<span class="stat"><strong>60+</strong> trained expert agents</span>
+<span class="sep">·</span>
+<span class="stat">one unified intelligence — <span class="singularity">the singularity</span></span>
+</div>
+<a href="https://singularitylab.app" class="hero-cta" target="_blank" rel="noopener">
+Jack in now →
+</a>
+<span class="cta-subline">Limited offer: $5 platform credit — good for 30 days of play.</span>
+</div>
+</section>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-grid"></div>
-    <div class="hero-glow"></div>
-    <div class="hero-inner fade-in visible">
-      <div class="hero-badge">AI-native platforms</div>
-      <h1>We build platforms for<br/><em>the next era of AI.</em></h1>
-      <p class="hero-sub">
-        <span class="brand-name">studio0x</span> creates tools that give humans the full power of every
-        AI model — not one, not some, but all of them working together.
-      </p>
-      <a href="https://singularitylab.app" class="hero-cta" target="_blank" rel="noopener">
-        Try singularityLab →
-      </a>
-    </div>
-  </section>
+<div class="divider"></div>
 
-  <div class="divider"></div>
+<!-- MISSION -->
+<section class="mission" id="mission">
+<div class="section-inner">
+<div class="section-label fade-in">Our mission</div>
+<h2 class="section-title fade-in">
+AI shouldn't be a walled garden.<br/>It should be a superpower.
+</h2>
+<p class="section-body fade-in">
+We build AI-native platforms that put every capable model on the
+planet in the hands of everyday people — founders, researchers,
+creators, and builders who refuse to be limited to one AI's
+perspective. Our products are built for humans who want to work
+with all of AI, not just part of it.
+</p>
+<div class="mission-grid">
+<div class="mission-stat fade-in">
+<div class="mission-stat-num">7+</div>
+<div class="mission-stat-label">Frontier AI providers integrated</div>
+</div>
+<div class="mission-stat fade-in">
+<div class="mission-stat-num">60+</div>
+<div class="mission-stat-label">Trained expert agents available</div>
+</div>
+<div class="mission-stat fade-in">
+<div class="mission-stat-num">$4.09</div>
+<div class="mission-stat-label">Cost to run a full C-Suite AI simulation</div>
+</div>
+<div class="mission-stat fade-in">
+<div class="mission-stat-num">52min</div>
+<div class="mission-stat-label">Time to produce two complete business plans</div>
+</div>
+</div>
+</div>
+</section>
 
-  <!-- MISSION -->
-  <section class="mission" id="mission">
-    <div class="section-inner">
-      <div class="section-label fade-in">Our mission</div>
-      <h2 class="section-title fade-in">
-        AI shouldn't be a walled garden.<br/>It should be a superpower.
-      </h2>
-      <p class="section-body fade-in">
-        We build AI-native platforms that put every capable model on the
-        planet in the hands of everyday people — founders, researchers,
-        creators, and builders who refuse to be limited to one AI's
-        perspective. Our products are built for humans who want to work
-        with all of AI, not just part of it.
-      </p>
+<div class="divider"></div>
 
-      <div class="mission-grid">
-        <div class="mission-stat fade-in">
-          <div class="mission-stat-num">7+</div>
-          <div class="mission-stat-label">Live AI providers integrated</div>
-        </div>
-        <div class="mission-stat fade-in">
-          <div class="mission-stat-num">80+</div>
-          <div class="mission-stat-label">Agent templates available</div>
-        </div>
-        <div class="mission-stat fade-in">
-          <div class="mission-stat-num">$4.09</div>
-          <div class="mission-stat-label">Cost to run a full C-Suite AI simulation</div>
-        </div>
-        <div class="mission-stat fade-in">
-          <div class="mission-stat-num">52min</div>
-          <div class="mission-stat-label">Time to produce two complete business plans</div>
-        </div>
-      </div>
-    </div>
-  </section>
+<!-- FLAGSHIP + ALL PRODUCTS -->
+<section id="products">
+<div class="section-inner">
+<!-- FLAGSHIP -->
+<div class="section-label fade-in">Flagship product · Live now</div>
+<div class="flagship-grid">
+<div class="flagship-left fade-in">
+<h2 class="section-title">singularityLab</h2>
+<p class="section-body">
+The world's AI tools work in silos. GPT doesn't know what
+Claude is thinking. Gemini doesn't know what Groq found.
+singularityLab changes that — every AI in one Lab, talking
+to each other, building on each other's thinking, in real
+time, on your problem.
+</p>
+<p class="section-body" style="margin-top:16px;">
+When you have every AI available in singularityLab, the next
+big thing will be what you build using it.
+</p>
+<a href="https://singularitylab.app" class="hero-cta" target="_blank" rel="noopener" style="margin-top:32px;display:inline-flex;">
+jack in free →
+</a>
+</div>
+<div class="flagship-right fade-in">
+<div class="lab-preview">
+<div class="lab-preview-header">
+<span class="lab-preview-label">active labs</span>
+<span class="lab-live-dot"></span>
+</div>
+<div class="lab-rooms">
+<div class="lab-room">
+<div class="lab-room-name">C-Suite Lab</div>
+<div class="lab-dots">
+<span class="dot dot-openai"></span>
+<span class="dot dot-anthropic"></span>
+<span class="dot dot-google"></span>
+<span class="dot dot-groq"></span>
+</div>
+<div class="lab-room-status">4 agents · active</div>
+</div>
+<div class="lab-room">
+<div class="lab-room-name">Marketing Lab</div>
+<div class="lab-dots">
+<span class="dot dot-openai"></span>
+<span class="dot dot-anthropic"></span>
+<span class="dot dot-xai"></span>
+</div>
+<div class="lab-room-status">3 agents · active</div>
+</div>
+<div class="lab-room">
+<div class="lab-room-name">Science Lab</div>
+<div class="lab-dots">
+<span class="dot dot-google"></span>
+<span class="dot dot-groq"></span>
+</div>
+<div class="lab-room-status">2 agents · active</div>
+</div>
+<div class="lab-room">
+<div class="lab-room-name">Product Lab</div>
+<div class="lab-dots">
+<span class="dot dot-openai"></span>
+<span class="dot dot-anthropic"></span>
+<span class="dot dot-google"></span>
+<span class="dot dot-groq"></span>
+<span class="dot dot-xai"></span>
+</div>
+<div class="lab-room-status">5 agents · active</div>
+</div>
+</div>
+<div class="lab-types">
+<span class="lab-type-tag">Marketing</span>
+<span class="lab-type-tag">C-Suite</span>
+<span class="lab-type-tag">Science</span>
+<span class="lab-type-tag">Legal</span>
+<span class="lab-type-tag">Finance</span>
+<span class="lab-type-tag">Custom</span>
+</div>
+<div class="flagship-note">
+<strong>Highly trained models using the most relevant knowledge.</strong>
+Live web access coming soon.
+</div>
+</div>
+</div>
+</div>
 
-  <div class="divider"></div>
+<!-- ALL PRODUCTS -->
+<div class="section-label fade-in" style="margin-top:80px;">More from studio0x</div>
+<div class="products-grid">
+<div class="product-card fade-in">
+<span class="product-tag tag-next">Launching Next</span>
+<div class="product-name">eventOS</div>
+<p class="product-desc">From a single meeting to a tournament-scale production — eventOS is the all-in-one AI platform for event planners who are done stitching together tools. Plan. Collaborate. Execute.</p>
+<span class="product-link">Launching next</span>
+</div>
+<div class="product-card fade-in">
+<span class="product-tag tag-next">Launching Next</span>
+<div class="product-name">podiumSelect</div>
+<p class="product-desc">A hyper-luxury AI concierge for UHNW travelers at the world's biggest sporting moments — major tournaments and F1. Powered by the singularityLab engine. One request. Every detail handled.</p>
+<span class="product-link">Launching next</span>
+</div>
+<div class="product-card fade-in">
+<span class="product-tag tag-dev">In Development</span>
+<div class="product-name">humanOS</div>
+<p class="product-desc">Your body produces more data than any dashboard can process. humanOS organizes it, interprets it, and turns it into a personal health companion — with AI that knows you, not just your numbers.</p>
+<span class="product-link">In development</span>
+</div>
+<div class="product-card fade-in">
+<span class="product-tag tag-dev">In Development</span>
+<div class="product-name">wealthOS</div>
+<p class="product-desc">Most people make their most important financial decisions with the least access to expertise. wealthOS changes that — a personal, conversational interface that helps you think through money with clarity.</p>
+<span class="product-link">In development</span>
+</div>
+<div class="product-card fade-in">
+<span class="product-tag tag-dev">In Development</span>
+<div class="product-name">footyEXP</div>
+<p class="product-desc">Digital passport. Activity stamps. Physical keepsakes. footyEXP turns match day into a full journey — for fans, brands, and tournament operators. Built for the global football era.</p>
+<span class="product-link">In development</span>
+</div>
+<div class="product-card fade-in">
+<span class="product-tag tag-dev">In Development</span>
+<div class="product-name">footy dome</div>
+<p class="product-desc">A physical and digital home for the beautiful game — combining arcade experiences, fan activation, and real-time competition tracking. More than a venue. A destination.</p>
+<span class="product-link">In development</span>
+</div>
+</div>
+</div>
+</section>
 
-  <!-- FLAGSHIP + ALL PRODUCTS -->
-  <section id="products">
-    <div class="section-inner">
+<div class="divider"></div>
 
-      <!-- FLAGSHIP -->
-      <div class="section-label fade-in">Flagship product · Live now</div>
-      <div class="flagship-grid">
-        <div class="flagship-left fade-in">
-          <h2 class="section-title">singularityLab</h2>
-          <p class="section-body">
-            The world's AI tools work in silos. GPT doesn't know what
-            Claude is thinking. Gemini doesn't know what Groq found.
-            singularityLab changes that — every AI in one Lab, talking
-            to each other, building on each other's thinking, in real
-            time, on your problem.
-          </p>
-          <p class="section-body" style="margin-top:16px;">
-            When you have every AI available in singularityLab, the next
-            big thing will be what you build using it.
-          </p>
-          <a href="https://singularitylab.app" class="hero-cta" target="_blank" rel="noopener" style="margin-top:32px;display:inline-flex;">
-            jack in free →
-          </a>
-        </div>
+<!-- COMPANY -->
+<section class="company" id="company">
+<div class="section-inner">
+<div class="section-label fade-in">The company</div>
+<h2 class="section-title fade-in brand-name">studio0x LLC</h2>
+<p class="section-body fade-in">
+<span class="brand-name">studio0x</span> is an AI company founded in Sarasota, Florida, focused
+on building evolutionary intelligence tools for humans who want
+to work with all of AI — not just part of it. We are a registered
+US limited liability company building the next generation of
+AI-native products.
+</p>
+<div class="company-grid">
+<div class="company-block fade-in">
+<h3>Legal &amp; Registration</h3>
+<div class="company-row">
+<span class="company-row-label">Legal name</span>
+<span class="company-row-value brand-name">studio0x LLC</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Entity type</span>
+<span class="company-row-value">Limited Liability Company</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">EIN</span>
+<span class="company-row-value">42-1902785</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Jurisdiction</span>
+<span class="company-row-value">United States</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Founded</span>
+<span class="company-row-value">2026</span>
+</div>
+</div>
+<div class="company-block fade-in">
+<h3>Team &amp; Location</h3>
+<div class="company-row">
+<span class="company-row-label">Founder</span>
+<span class="company-row-value">Robert H. Kelley Jr.</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Role</span>
+<span class="company-row-value">Founder &amp; CEO</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Location</span>
+<span class="company-row-value">Sarasota, FL</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Address</span>
+<span class="company-row-value">5350 Desoto Rd, Unit 1329,<br/>Sarasota, FL 34235</span>
+</div>
+<div class="company-row">
+<span class="company-row-label">Contact</span>
+<span class="company-row-value">
+<a href="mailto:b@studio0x.io">b@studio0x.io</a>
+</span>
+</div>
+</div>
+</div>
+</div>
+</section>
 
-        <div class="flagship-right fade-in">
-          <div class="lab-preview">
-            <div class="lab-preview-header">
-              <span class="lab-preview-label">active labs</span>
-              <span class="lab-live-dot"></span>
-            </div>
-            <div class="lab-rooms">
-              <div class="lab-room">
-                <div class="lab-room-name">C-Suite Lab</div>
-                <div class="lab-dots">
-                  <span class="dot dot-openai"></span>
-                  <span class="dot dot-anthropic"></span>
-                  <span class="dot dot-google"></span>
-                  <span class="dot dot-groq"></span>
-                </div>
-                <div class="lab-room-status">4 agents · active</div>
-              </div>
-              <div class="lab-room">
-                <div class="lab-room-name">Marketing Lab</div>
-                <div class="lab-dots">
-                  <span class="dot dot-openai"></span>
-                  <span class="dot dot-anthropic"></span>
-                  <span class="dot dot-xai"></span>
-                </div>
-                <div class="lab-room-status">3 agents · active</div>
-              </div>
-              <div class="lab-room">
-                <div class="lab-room-name">Science Lab</div>
-                <div class="lab-dots">
-                  <span class="dot dot-google"></span>
-                  <span class="dot dot-groq"></span>
-                </div>
-                <div class="lab-room-status">2 agents · active</div>
-              </div>
-              <div class="lab-room">
-                <div class="lab-room-name">Product Lab</div>
-                <div class="lab-dots">
-                  <span class="dot dot-openai"></span>
-                  <span class="dot dot-anthropic"></span>
-                  <span class="dot dot-google"></span>
-                  <span class="dot dot-groq"></span>
-                  <span class="dot dot-xai"></span>
-                </div>
-                <div class="lab-room-status">5 agents · active</div>
-              </div>
-            </div>
-            <div class="lab-types">
-              <span class="lab-type-tag">Marketing</span>
-              <span class="lab-type-tag">C-Suite</span>
-              <span class="lab-type-tag">Science</span>
-              <span class="lab-type-tag">Legal</span>
-              <span class="lab-type-tag">Finance</span>
-              <span class="lab-type-tag">Custom</span>
-            </div>
-          </div>
-        </div>
-      </div>
+<div class="divider"></div>
 
-      <!-- ALL PRODUCTS -->
-      <div class="section-label fade-in" style="margin-top:80px;">More from studio0x</div>
-      <div class="products-grid">
+<!-- CONTACT -->
+<section id="contact">
+<div class="section-inner">
+<div class="contact-inner">
+<div class="section-label fade-in">Get in touch</div>
+<h2 class="section-title fade-in">Let's build something.</h2>
+<p class="section-body fade-in">
+Partnerships, press, investor inquiries, or just want to see
+what singularityLab can do for your team — we'd love to hear
+from you.
+</p>
+<a href="mailto:b@studio0x.io" class="contact-email fade-in">
+✉ b@studio0x.io
+</a>
+<a href="tel:3219784128" class="contact-email fade-in" style="font-size:0.875rem;">
+📞 321.978.4128
+</a>
+</div>
+</div>
+</section>
 
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">podiumSelect</div>
-          <p class="product-desc">A hyper-luxury AI concierge for UHNW travelers at FIFA World Cup 2026, F1, and global sporting events. Powered by the singularityLab engine. One request. Every detail handled.</p>
-          <span class="product-link">Coming soon</span>
-        </div>
+<!-- FOOTER -->
+<footer>
+<div class="footer-copy">
+© 2026 <strong class="brand-name">studio0x LLC</strong> · All rights reserved ·
+EIN 42-1902785 · Sarasota, FL 34235
+</div>
+<div class="footer-right">
+<a href="https://singularitylab.app" target="_blank" rel="noopener">singularityLab</a>
+&nbsp;·&nbsp;
+<a href="mailto:b@studio0x.io">b@studio0x.io</a>
+</div>
+</footer>
 
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">eventOS</div>
-          <p class="product-desc">From a single meeting to a World Cup-scale production — eventOS is the all-in-one AI platform for event planners who are done stitching together tools. Plan. Collaborate. Execute.</p>
-          <span class="product-link">Coming soon</span>
-        </div>
-
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">footyEXP</div>
-          <p class="product-desc">Digital passport. Activity stamps. Physical keepsakes. footyEXP turns match day into a full journey — for fans, brands, and tournament operators. Built for the World Cup era.</p>
-          <span class="product-link">Coming soon · WC26-ready</span>
-        </div>
-
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">humanOS</div>
-          <p class="product-desc">Your body produces more data than any dashboard can process. humanOS organizes it, interprets it, and turns it into a personal health protocol — with AI that knows you, not just your numbers.</p>
-          <span class="product-link">Coming soon</span>
-        </div>
-
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">wealthOS</div>
-          <p class="product-desc">Most people make their most important financial decisions with the least access to expertise. wealthOS changes that — putting institutional-grade insight into a personal, conversational interface.</p>
-          <span class="product-link">Coming soon</span>
-        </div>
-
-        <div class="product-card fade-in">
-          <span class="product-tag tag-dev">In Development</span>
-          <div class="product-name">footy dome</div>
-          <p class="product-desc">A physical and digital home for the beautiful game — combining arcade experiences, fan activation, and real-time competition tracking. More than a venue. A destination.</p>
-          <span class="product-link">Coming soon</span>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- COMPANY -->
-  <section class="company" id="company">
-    <div class="section-inner">
-      <div class="section-label fade-in">The company</div>
-      <h2 class="section-title fade-in brand-name">studio0x LLC</h2>
-      <p class="section-body fade-in">
-        <span class="brand-name">studio0x</span> is an AI company founded in Sarasota, Florida, focused
-        on building evolutionary intelligence tools for humans who want
-        to work with all of AI — not just part of it. We are a registered
-        US limited liability company building the next generation of
-        AI-native products.
-      </p>
-
-      <div class="company-grid">
-
-        <div class="company-block fade-in">
-          <h3>Legal &amp; Registration</h3>
-          <div class="company-row">
-            <span class="company-row-label">Legal name</span>
-            <span class="company-row-value brand-name">studio0x LLC</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Entity type</span>
-            <span class="company-row-value">Limited Liability Company</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">EIN</span>
-            <span class="company-row-value">42-1902785</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Jurisdiction</span>
-            <span class="company-row-value">United States</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Founded</span>
-            <span class="company-row-value">2026</span>
-          </div>
-        </div>
-
-        <div class="company-block fade-in">
-          <h3>Team &amp; Location</h3>
-          <div class="company-row">
-            <span class="company-row-label">Founder</span>
-            <span class="company-row-value">Robert H. Kelley Jr.</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Role</span>
-            <span class="company-row-value">Founder &amp; CEO</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Location</span>
-            <span class="company-row-value">Sarasota, FL</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Address</span>
-            <span class="company-row-value">5350 Desoto Rd, Sarasota, FL</span>
-          </div>
-          <div class="company-row">
-            <span class="company-row-label">Contact</span>
-            <span class="company-row-value">
-              <a href="mailto:b@studio0x.io">b@studio0x.io</a>
-            </span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- CONTACT -->
-  <section id="contact">
-    <div class="section-inner">
-      <div class="contact-inner">
-        <div class="section-label fade-in">Get in touch</div>
-        <h2 class="section-title fade-in">Let's build something.</h2>
-        <p class="section-body fade-in">
-          Partnerships, press, investor inquiries, or just want to see
-          what singularityLab can do for your team — we'd love to hear
-          from you.
-        </p>
-        <a href="mailto:b@studio0x.io" class="contact-email fade-in">
-          ✉ b@studio0x.io
-        </a>
-        <a href="tel:3219784128" class="contact-email fade-in" style="font-size:0.875rem;">
-          📞 321.978.4128
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer>
-    <div class="footer-copy">
-      © 2026 <strong class="brand-name">studio0x LLC</strong> · All rights reserved ·
-      EIN 42-1902785 · Sarasota, FL
-    </div>
-    <div class="footer-right">
-      <a href="https://singularitylab.app" target="_blank" rel="noopener">singularityLab</a>
-      &nbsp;·&nbsp;
-      <a href="mailto:b@studio0x.io">b@studio0x.io</a>
-    </div>
-  </footer>
-
-  <script>
-    // Scroll-triggered fade-ins
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry, i) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => entry.target.classList.add('visible'), i * 80);
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.fade-in').forEach(el => {
-      if (!el.classList.contains('visible')) observer.observe(el);
-    });
-  </script>
-
+<script>
+// Scroll-triggered fade-ins
+const observer = new IntersectionObserver((entries) => {
+entries.forEach((entry, i) => {
+if (entry.isIntersecting) {
+setTimeout(() => entry.target.classList.add('visible'), i * 80);
+observer.unobserve(entry.target);
+}
+});
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(el => {
+if (!el.classList.contains('visible')) observer.observe(el);
+});
+</script>
 </body>
 </html>
