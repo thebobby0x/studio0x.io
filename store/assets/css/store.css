@@ -122,6 +122,10 @@ h1.page { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing:
 .faq-item { border-top: 1px solid var(--border); padding: 18px 0; }
 .faq-q { font-weight: 700; }
 .faq-a { color: var(--muted); margin-top: 6px; }
+.testimonials { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.testimonial { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 0; }
+.testimonial blockquote { font-size: .98rem; line-height: 1.6; }
+.testimonial figcaption { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; margin-top: 12px; }
 
 /* ── FORMS / ADMIN ── */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
