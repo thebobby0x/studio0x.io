@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { data: ents } = await supabase
       .from("entitlements")
-      .select("id, name, asset_path, download_token, expires_at")
+      .select("id, name, asset_path, download_token, expires_at, download_count")
       .eq("order_id", order.id);
 
     const items = [];
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         .createSignedUrl(e.asset_path, SIGNED_URL_TTL, { download: true });
       items.push({ name: e.name, url: signed?.signedUrl ?? null, expires_at: e.expires_at });
       await supabase.from("entitlements")
-        .update({ download_count: (e as any).download_count ?? 0 })
+        .update({ download_count: ((e as any).download_count ?? 0) + 1 })
         .eq("id", e.id);
     }
 

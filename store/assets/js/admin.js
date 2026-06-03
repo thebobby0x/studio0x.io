@@ -273,15 +273,174 @@ async function loadOrders() {
     </tr>`).join("") || `<tr><td colspan="4" class="muted center">No orders yet.</td></tr>`}</tbody></table></div>`;
 }
 
-// ── AI AGENTS (Phase 2 scaffold) ───────────────────────────────────
+// ── AI CREATORS (Phase 2) ──────────────────────────────────────────
+// Agent CRUD + "Generate a product with AI" + recent jobs.
 async function loadAI() {
-  const { data } = await supabase.from("ai_agents").select("*").order("created_at", { ascending: false });
   const pane = document.getElementById("tab-ai");
+  const [{ data: agents }, { data: products }, { data: jobs }] = await Promise.all([
+    supabase.from("ai_agents").select("*").order("created_at", { ascending: false }),
+    supabase.from("products").select("id,name,slug,is_active").order("created_at", { ascending: false }),
+    supabase.from("ai_jobs").select("*").order("created_at", { ascending: false }).limit(10),
+  ]);
+  const agentList = agents || [];
+  const creators = agentList.filter((a) => a.kind === "creator");
+
   pane.innerHTML = `
-    <h2 style="font-size:1.3rem;margin-bottom:6px;">AI agents</h2>
-    <p class="muted" style="margin-bottom:18px;">Niche-trained creators &amp; social experts. Generation pipeline ships in Phase 2 — see <span class="mono">docs/ROADMAP.md</span>.</p>
-    <div class="panel"><table><thead><tr><th>Name</th><th>Kind</th><th>Niche</th><th>Model</th><th>Status</th></tr></thead>
-    <tbody>${(data || []).map((a) => `<tr><td><strong>${esc(a.name)}</strong></td><td>${a.kind}</td><td>${esc(a.niche || "—")}</td><td class="mono" style="font-size:.78rem;">${esc(a.model)}</td><td><span class="pill ${a.is_active ? "ok" : "warn"}">${a.is_active ? "ready" : "off"}</span></td></tr>`).join("") || `<tr><td colspan="5" class="muted center">No agents yet.</td></tr>`}</tbody></table></div>`;
+    <h2 style="font-size:1.3rem;margin-bottom:6px;">AI creators</h2>
+    <p class="muted" style="margin-bottom:18px;">Niche-trained agents generate <strong>hidden draft</strong> products you review before going live. Requires the <span class="mono">ANTHROPIC_API_KEY</span> function secret — see <span class="mono">docs/ROADMAP.md</span>.</p>
+
+    <!-- Generate panel -->
+    <div class="panel" style="margin-bottom:22px;">
+      <h3 style="margin-bottom:14px;">Generate a product with AI</h3>
+      ${creators.length === 0
+        ? `<p class="muted">Create a <strong>creator</strong> agent below first.</p>`
+        : `
+      <div class="field"><label>Creator agent</label>
+        <select id="gen-agent">${creators.map((a) => `<option value="${a.id}">${esc(a.name)}${a.niche ? " · " + esc(a.niche) : ""}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label>Brief — what should it make?</label>
+        <textarea id="gen-brief" placeholder="e.g. A 10-step checklist for launching a Shopify store, aimed at first-time founders."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;align-items:center;">
+        <button class="btn" id="gen-run">Generate draft</button>
+        <span id="gen-msg" class="muted" style="font-size:.85rem;"></span>
+      </div>
+      <div id="gen-result" style="margin-top:14px;"></div>`}
+    </div>
+
+    <!-- Agents CRUD -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:1.1rem;">Agents (${agentList.length})</h3>
+      <button class="btn" id="new-agent">+ New agent</button>
+    </div>
+    <div id="agent-form-wrap"></div>
+    <div class="panel" style="margin-bottom:22px;"><table><thead><tr><th>Name</th><th>Kind</th><th>Niche</th><th>Model</th><th>Status</th><th></th></tr></thead>
+    <tbody>${agentList.map((a) => `<tr>
+      <td><strong>${esc(a.name)}</strong></td><td>${a.kind}</td><td>${esc(a.niche || "—")}</td>
+      <td class="mono" style="font-size:.78rem;">${esc(a.model)}</td>
+      <td><span class="pill ${a.is_active ? "ok" : "warn"}">${a.is_active ? "ready" : "off"}</span></td>
+      <td><button class="btn btn-ghost edit-agent" data-id="${a.id}" style="padding:6px 12px;font-size:.8rem;">Edit</button></td>
+    </tr>`).join("") || `<tr><td colspan="6" class="muted center">No agents yet.</td></tr>`}</tbody></table></div>
+
+    <!-- Recent jobs -->
+    <h3 style="font-size:1.1rem;margin-bottom:14px;">Recent AI jobs</h3>
+    <div class="panel"><table><thead><tr><th>When</th><th>Type</th><th>Status</th></tr></thead>
+    <tbody>${(jobs || []).map((j) => `<tr>
+      <td class="mono" style="font-size:.78rem;">${new Date(j.created_at).toLocaleString()}</td>
+      <td>${esc(j.job_type || "—")}</td>
+      <td><span class="pill ${j.status === "done" ? "ok" : j.status === "error" ? "warn" : ""}">${j.status}</span>${j.status === "error" && j.error ? ` <span class="muted" style="font-size:.75rem;">${esc(j.error)}</span>` : ""}</td>
+    </tr>`).join("") || `<tr><td colspan="3" class="muted center">No jobs yet.</td></tr>`}</tbody></table></div>`;
+
+  document.getElementById("new-agent").addEventListener("click", () => agentForm());
+  pane.querySelectorAll(".edit-agent").forEach((b) =>
+    b.addEventListener("click", () => agentForm(agentList.find((a) => a.id === b.dataset.id))));
+
+  const genRun = document.getElementById("gen-run");
+  if (genRun) genRun.addEventListener("click", generateProduct);
+}
+
+function agentForm(a = null) {
+  const wrap = document.getElementById("agent-form-wrap");
+  const kinds = ["creator", "social"];
+  wrap.innerHTML = `
+    <div class="panel" style="margin-bottom:18px;">
+      <h3 style="margin-bottom:16px;">${a ? "Edit" : "New"} agent</h3>
+      <div class="row2">
+        <div class="field"><label>Name</label><input id="ag-name" value="${esc(a?.name || "")}"/></div>
+        <div class="field"><label>Niche</label><input id="ag-niche" value="${esc(a?.niche || "")}" placeholder="e.g. fitness, real-estate"/></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Kind</label><select id="ag-kind">${kinds.map((k) => `<option ${a?.kind === k ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+        <div class="field"><label>Model</label><input id="ag-model" value="${esc(a?.model || "claude-opus-4-8")}"/></div>
+      </div>
+      <div class="field"><label>System prompt</label><textarea id="ag-prompt" rows="5" placeholder="You are a world-class …">${esc(a?.system_prompt || "")}</textarea></div>
+      <div class="field"><label>Active</label><select id="ag-active"><option value="true" ${a?.is_active !== false ? "selected" : ""}>Yes</option><option value="false" ${a?.is_active === false ? "selected" : ""}>No</option></select></div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn" id="save-agent">${a ? "Save" : "Create"}</button>
+        <button class="btn btn-ghost" id="cancel-agent">Cancel</button>
+        <span id="agent-msg" class="muted" style="align-self:center;font-size:.85rem;"></span>
+      </div>
+    </div>`;
+  document.getElementById("cancel-agent").addEventListener("click", () => wrap.innerHTML = "");
+  document.getElementById("save-agent").addEventListener("click", () => saveAgent(a));
+  wrap.scrollIntoView({ behavior: "smooth" });
+}
+
+async function saveAgent(existing) {
+  const msg = document.getElementById("agent-msg");
+  msg.textContent = "Saving…";
+  try {
+    const name = document.getElementById("ag-name").value.trim();
+    if (!name) throw new Error("Name required");
+    const row = {
+      name,
+      niche: document.getElementById("ag-niche").value.trim() || null,
+      kind: document.getElementById("ag-kind").value,
+      model: document.getElementById("ag-model").value.trim() || "claude-opus-4-8",
+      system_prompt: document.getElementById("ag-prompt").value.trim() || null,
+      is_active: document.getElementById("ag-active").value === "true",
+    };
+    if (existing?.id) {
+      const { error } = await supabase.from("ai_agents").update(row).eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("ai_agents").insert(row);
+      if (error) throw error;
+    }
+    msg.textContent = "Saved ✓";
+    document.getElementById("agent-form-wrap").innerHTML = "";
+    loadAI();
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+}
+
+async function generateProduct() {
+  const msg = document.getElementById("gen-msg");
+  const result = document.getElementById("gen-result");
+  result.innerHTML = "";
+  const agentId = document.getElementById("gen-agent").value;
+  const brief = document.getElementById("gen-brief").value.trim();
+  if (!brief) { msg.textContent = "Add a brief first."; return; }
+  msg.textContent = "Generating… this can take ~30s.";
+  try {
+    // verify_jwt on this function requires the user's own access token —
+    // the shared callFn() sends only the anon key, which won't pass the
+    // admin check, so we fetch directly with the session token here.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not signed in.");
+    const res = await fetch(`${window.STORE_CONFIG.functionsBase}/ai-create-product`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ agentId, brief }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    // Refresh both lists, then re-render the success notice (loadAI rebuilds
+    // the pane, so we inject the result afterward to keep it visible).
+    loadProducts();
+    await loadAI();
+    const msg2 = document.getElementById("gen-msg");
+    const result2 = document.getElementById("gen-result");
+    if (msg2) msg2.textContent = "Done ✓";
+    if (result2) {
+      result2.innerHTML = `
+        <div class="panel" style="border-color:var(--mint);">
+          <p style="margin-bottom:6px;">Draft created: <strong>${esc(data.slug)}</strong> <span class="pill warn">hidden</span></p>
+          <p class="muted" style="font-size:.85rem;">Review it in the <strong>Products</strong> tab, then set it active to publish.</p>
+          <button class="btn btn-ghost" id="goto-products" style="margin-top:10px;padding:6px 14px;font-size:.8rem;">Open Products tab</button>
+        </div>`;
+      const goto = document.getElementById("goto-products");
+      if (goto) goto.addEventListener("click", () => {
+        const tab = document.querySelector('.tab[data-tab="products"]');
+        if (tab) tab.click();
+      });
+    }
+  } catch (e) {
+    msg.textContent = "Error: " + e.message;
+  }
 }
 
 // Resume session if already signed in.

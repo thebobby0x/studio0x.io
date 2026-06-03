@@ -9,23 +9,34 @@
 - **Super-admin console**: products, file uploads, add-ons, orders, revenue.
 - Row Level Security throughout; private asset bucket; public image bucket.
 
-## Phase 2 — AI creators (niche-trained)
+## Phase 2 — AI creators (niche-trained) — in progress / shipped ✅
 
-The data model is already in place (`ai_agents`, `ai_jobs`). The plan:
+The data model is already in place (`ai_agents`, `ai_jobs`). Status:
 
-- An admin clicks **"Generate with AI"** on a product, picks a niche agent.
-- An edge function (`ai-create-product`) calls the **Claude API** with the
-  agent's `system_prompt` + brief, returning structured content (outline,
-  copy, bullets, file body).
-- For real files: render the content to PDF/CSV/PPTX in the function (or a
-  worker), upload to `product-assets`, and set the product's `asset_path`.
-- Each generation is tracked as an `ai_jobs` row (`queued → running → done`).
+- ✅ **Admin agent CRUD** in the AI tab — create/edit creator & social agents
+  (name, kind, niche, model, system prompt, active).
+- ✅ **"Generate a product with AI"** panel — pick a creator agent + brief and
+  call the `ai-create-product` edge function (with the admin's JWT).
+- ✅ Edge function `ai-create-product` calls the **Claude API** with the
+  agent's `system_prompt` (prompt-cached) + brief, returning structured
+  content (name, tagline, type, bullets, description, markdown body).
+- ✅ Generated content becomes a **hidden draft product** (`is_active = false`,
+  `price_cents = 0`); the markdown `body` is uploaded to the private
+  `product-assets` bucket and set as `asset_path`.
+- ✅ Each generation is tracked as an `ai_jobs` row (`running → done | error`),
+  surfaced in a recent-jobs table in the admin AI tab.
+- ⏳ Next: render the body to real files (PDF/CSV/PPTX) in the function or a
+  worker instead of raw markdown.
 - Suggested agents: Deck Designer, List Builder, Template Smith, Prompt
   Curator, Course Author — each with a tuned `system_prompt` + niche.
 
-**External setup needed:** an `ANTHROPIC_API_KEY` function secret. Prompt
-caching should be enabled on the system prompt to cut cost (see the
-`claude-api` skill).
+**External setup needed:** set an `ANTHROPIC_API_KEY` **Supabase function
+secret** (`supabase secrets set ANTHROPIC_API_KEY=…`), then deploy with
+`supabase functions deploy ai-create-product`. Prompt caching is enabled on
+the agent's system prompt to cut cost (see the `claude-api` skill).
+
+> Note: AI-generated products start as **hidden drafts** so an admin can
+> review (and price) them before they go live in the storefront.
 
 ## Phase 3 — AI social-media experts + funnels
 

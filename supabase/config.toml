@@ -13,3 +13,8 @@ verify_jwt = false
 [functions.get-order]
 # Success page polls this anonymously with the Stripe session_id.
 verify_jwt = false
+
+[functions.ai-create-product]
+# Phase 2 AI creator pipeline. Requires a valid Supabase JWT; the function
+# further checks the caller is an admin before generating draft products.
+verify_jwt = true
