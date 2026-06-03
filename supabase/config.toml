@@ -1,0 +1,15 @@
+# Supabase local/CLI config for the studio0x market backend.
+# project_id is set when you run `supabase link --project-ref <ref>`.
+project_id = "studio0x-market"
+
+[functions.create-checkout-session]
+# Storefront calls this anonymously (no login required to buy).
+verify_jwt = false
+
+[functions.stripe-webhook]
+# Stripe calls this; we verify the Stripe signature instead of a JWT.
+verify_jwt = false
+
+[functions.get-order]
+# Success page polls this anonymously with the Stripe session_id.
+verify_jwt = false

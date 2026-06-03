@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — studio0x market</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./assets/css/store.css" />
+<script src="./assets/js/config.js"></script>
+</head>
+<body>
+<nav>
+  <a href="./index.html" class="nav-logo brand-name">studio<span>0x</span> <span style="color:var(--muted);font-weight:500;font-size:.85rem;">admin</span></a>
+  <div class="nav-links">
+    <a href="./index.html">View store</a>
+    <a href="#" id="logout" class="hidden">Sign out</a>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<main class="wrap-narrow" id="login-view">
+  <div class="eyebrow">Super admin</div>
+  <h1 class="page">Sign in</h1>
+  <p class="sub">Admin access only. New admins are granted by setting <span class="mono">role='superadmin'</span> on a profile.</p>
+  <div class="panel" style="margin-top:28px;">
+    <div id="not-configured" class="banner hidden">⚙️ Add your Supabase keys in <span class="mono">config.js</span> first.</div>
+    <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" /></div>
+    <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" /></div>
+    <button class="btn btn-block" id="login-btn">Sign in →</button>
+    <p id="login-msg" class="muted center" style="margin-top:14px;font-size:.85rem;"></p>
+  </div>
+</main>
+
+<!-- DASHBOARD -->
+<main class="wrap hidden" id="dash">
+  <div class="eyebrow">Super admin · <span id="who"></span></div>
+  <h1 class="page" style="font-size:2rem;">Dashboard</h1>
+  <div class="tabs" style="margin-top:24px;">
+    <div class="tab active" data-tab="products">Products</div>
+    <div class="tab" data-tab="addons">Add-ons</div>
+    <div class="tab" data-tab="orders">Orders</div>
+    <div class="tab" data-tab="ai">AI agents</div>
+  </div>
+  <div id="tab-products" class="tab-pane"></div>
+  <div id="tab-addons" class="tab-pane hidden"></div>
+  <div id="tab-orders" class="tab-pane hidden"></div>
+  <div id="tab-ai" class="tab-pane hidden"></div>
+</main>
+
+<footer>© <span id="yr"></span> <span class="brand-name">studio0x LLC</span> · admin console</footer>
+
+<script type="module" src="./assets/js/admin.js"></script>
+</body>
+</html>

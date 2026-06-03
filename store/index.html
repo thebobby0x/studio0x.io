@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>studio0x market — premium digital assets</title>
+<meta name="description" content="Premium digital assets — templates, decks, prompt libraries, and more. Instant delivery." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./assets/css/store.css" />
+<script src="./assets/js/config.js"></script>
+</head>
+<body>
+<nav>
+  <a href="./index.html" class="nav-logo brand-name">studio<span>0x</span> market</a>
+  <div class="nav-links">
+    <a href="#products">Products</a>
+    <a href="./admin.html">Admin</a>
+    <a class="btn" href="#products">Browse →</a>
+  </div>
+</nav>
+
+<header class="wrap">
+  <div class="eyebrow">Digital assets · instant delivery</div>
+  <h1 class="page">Buy it. Download it.<br/>Use it today.</h1>
+  <p class="sub" id="tagline">Premium templates, decks, prompt libraries, and toolkits — delivered the second you pay.</p>
+</header>
+
+<section class="wrap" id="products" style="padding-top:0;">
+  <div id="not-configured" class="banner hidden">
+    ⚙️ Storefront not connected yet. Add your Supabase URL + anon key in
+    <span class="mono">store/assets/js/config.js</span>, then refresh. Showing nothing until then.
+  </div>
+  <div id="state" class="center muted" style="padding:60px 0;">
+    <div class="spinner" style="margin:0 auto 16px;"></div>Loading products…
+  </div>
+  <div id="grid" class="grid"></div>
+</section>
+
+<footer>
+  © <span id="yr"></span> <span class="brand-name">studio0x LLC</span> · Secure checkout by Stripe ·
+  <a href="mailto:b@studio0x.io" style="color:var(--accent);text-decoration:none;">b@studio0x.io</a>
+</footer>
+
+<script type="module" src="./assets/js/store.js"></script>
+</body>
+</html>
