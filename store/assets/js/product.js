@@ -40,6 +40,8 @@ function render() {
   const landing = p.landing || {};
   const bullets = Array.isArray(landing.bullets) ? landing.bullets : [];
   const faqs = Array.isArray(landing.faq) ? landing.faq : [];
+  const testimonials = Array.isArray(landing.testimonials) ? landing.testimonials : [];
+  const guarantee = landing.guarantee || "30-day no-questions money-back guarantee.";
   const ctaLabel = landing.cta || "Get instant access";
 
   const cover = p.cover_image_url
@@ -57,9 +59,11 @@ function render() {
         <div class="product-media" style="margin-top:28px;">${cover}</div>
         ${bullets.length ? `<ul class="bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
         ${p.description ? `<div class="section"><h2>What's inside</h2><p class="prose">${esc(p.description)}</p></div>` : ""}
+        ${testimonials.length ? `<div class="section"><h2>Loved by buyers</h2><div class="testimonials">${testimonials.map((t) => `<figure class="testimonial"><blockquote>"${esc(t.quote)}"</blockquote><figcaption>— ${esc(t.name)}${t.role ? `, ${esc(t.role)}` : ""}</figcaption></figure>`).join("")}</div></div>` : ""}
         ${faqs.length ? `<div class="section"><h2>FAQ</h2>${faqs.map((f) => `<div class="faq-item"><div class="faq-q">${esc(f.q)}</div><div class="faq-a">${esc(f.a)}</div></div>`).join("")}</div>` : ""}
         <div class="section center">
           <a class="btn" href="#buy">${esc(ctaLabel)} →</a>
+          <div class="guarantee" style="margin-top:14px;">✅ ${esc(guarantee)}</div>
         </div>
       </div>
 
@@ -70,6 +74,7 @@ function render() {
           <div class="total-row"><span class="label">Total today</span><span class="amt" id="total">${money(p.price_cents)}</span></div>
           <button class="btn btn-block" id="buy-btn">${esc(ctaLabel)} →</button>
           <div class="guarantee">🔒 Secure Stripe checkout · instant delivery · ${PRODUCT.currency.toUpperCase()}</div>
+          <div class="guarantee" style="color:var(--mint);">✅ ${esc(guarantee)}</div>
         </div>
       </aside>
     </div>`;
