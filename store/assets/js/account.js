@@ -26,6 +26,18 @@ const PROVIDERS = [
   { key: "tiktok", name: "TikTok" },
 ];
 
+// "Doer" actions — each maps to an action-run action + the provider it needs.
+const ACTIONS = [
+  { action: "save_to_drive", label: "Save to Google Drive", need: "google" },
+  { action: "gmail_draft", label: "Draft in Gmail", need: "google" },
+  { action: "post_to_x", label: "Post to X", need: "x" },
+];
+
+const providerName = (key) => {
+  const p = PROVIDERS.find((x) => x.key === key);
+  return p ? p.name : key;
+};
+
 // ── TOAST / BANNER ─────────────────────────────────────────────────
 function showToast(msg, kind = "ok") {
   toastArea.innerHTML = `<div class="account-toast ${kind === "error" ? "error" : "ok"}">${esc(msg)}</div>`;
@@ -116,12 +128,15 @@ async function gate() {
 
 // ── TABS ───────────────────────────────────────────────────────────
 function initTabs() {
-  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-    t.classList.add("active");
-    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.add("hidden"));
-    document.getElementById("tab-" + t.dataset.tab).classList.remove("hidden");
-  }));
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+}
+
+// Programmatic tab switch — same effect as clicking a tab.
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+  document.querySelectorAll(".tab-pane").forEach((p) => p.classList.add("hidden"));
+  const pane = document.getElementById("tab-" + name);
+  if (pane) pane.classList.remove("hidden");
 }
 
 // Customer-authed fetch: sends the user's own access token (not the anon key).
@@ -154,6 +169,7 @@ async function loadDownloads() {
   }
   const orders = data.orders || [];
   const items = data.items || [];
+  const products = data.products || [];
 
   if (orders.length === 0 && items.length === 0) {
     pane.innerHTML = `
@@ -182,13 +198,105 @@ async function loadDownloads() {
       <td><span class="pill ${["paid", "fulfilled"].includes(o.status) ? "ok" : "warn"}">${esc(o.status || "—")}</span></td>
     </tr>`).join("") || `<tr><td colspan="3" class="muted center">No orders yet.</td></tr>`}</tbody></table></div>`;
 
+  // Which providers are connected? (used to gate the action buttons)
+  const connected = new Set();
+  const { data: connRows } = await supabase
+    .from("customer_connections")
+    .select("provider, status");
+  for (const r of connRows || []) {
+    if (r.status === "connected") connected.add(r.provider);
+  }
+
+  const actionsHtml = renderActionsSection(products, connected);
+
   pane.innerHTML = `
     <h2 style="font-size:1.3rem;margin-bottom:6px;">My downloads</h2>
     <p class="muted" style="margin-bottom:18px;">Your purchased files. Download links are personal — don't share them.</p>
     <h3 style="font-size:1.05rem;margin-bottom:12px;">Files</h3>
     ${itemsHtml}
+    ${actionsHtml}
     <h3 style="font-size:1.05rem;margin-bottom:12px;">Order history</h3>
     ${ordersHtml}`;
+
+  wireActionButtons(pane, connected);
+}
+
+// ── TAKE ACTION (doer buttons) ─────────────────────────────────────
+function renderActionsSection(products, connected) {
+  let body;
+  if (!products.length) {
+    body = `<div class="panel center" style="padding:28px 24px;"><p class="muted">Buy a kit to unlock one-click actions.</p></div>`;
+  } else {
+    body = `<div class="action-list">${products.map((p) => `
+      <div class="action-card">
+        <div class="action-card-name">${esc(p.name)}</div>
+        <div class="action-btns">
+          ${ACTIONS.map((a) => {
+            const ok = connected.has(a.need);
+            return `<button class="btn btn-sm action-btn${ok ? "" : " needs-connect"}"
+              data-action="${a.action}" data-product="${esc(p.id)}" data-need="${a.need}">${esc(a.label)}</button>`;
+          }).join("")}
+        </div>
+        <div class="action-msg muted" id="action-msg-${esc(p.id)}"></div>
+      </div>`).join("")}</div>`;
+  }
+  return `
+    <h3 style="font-size:1.05rem;margin:24px 0 6px;">Take action with your kits</h3>
+    <p class="muted" style="margin-bottom:12px;font-size:.85rem;">Let studio0x act on your behalf — one click, using your connected accounts.</p>
+    ${body}`;
+}
+
+function wireActionButtons(pane, connected) {
+  pane.querySelectorAll(".action-btn").forEach((b) =>
+    b.addEventListener("click", () => runAction(b, connected)));
+}
+
+async function runAction(btn, connected) {
+  const action = btn.dataset.action;
+  const productId = btn.dataset.product;
+  const need = btn.dataset.need;
+  const msg = document.getElementById("action-msg-" + productId);
+
+  // Not connected yet — guide them to the Connections tab instead of acting.
+  if (!connected.has(need)) {
+    if (msg) {
+      msg.innerHTML = `Connect ${esc(providerName(need))} first <a href="#" class="action-connect-link">→</a>`;
+      const link = msg.querySelector(".action-connect-link");
+      if (link) link.addEventListener("click", (e) => { e.preventDefault(); switchTab("connections"); });
+    }
+    return;
+  }
+
+  if (msg) msg.textContent = "";
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Working…";
+  try {
+    const res = await fetch(`${window.STORE_CONFIG.functionsBase}/action-run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ""}`,
+      },
+      body: JSON.stringify({ action, productId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.error === "not_connected") {
+      showToast(`Connect ${providerName(data.need || need)} first.`, "error");
+      switchTab("connections");
+      return;
+    }
+    if (!res.ok || data.error) {
+      showToast(data.error || `Action failed (${res.status})`, "error");
+      return;
+    }
+    showToast(data.message || "Done ✓", "ok");
+  } catch (e) {
+    showToast("Error: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 // ── CONNECTIONS ────────────────────────────────────────────────────

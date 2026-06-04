@@ -45,7 +45,21 @@ Deno.serve(async (req) => {
         .createSignedUrl(e.asset_path, TTL, { download: true });
       items.push({ name: e.name, url: signed?.signedUrl ?? null, expires_at: e.expires_at });
     }
-    return json({ orders: orders ?? [], items });
+
+    // Distinct purchased products (for per-product "doer" actions).
+    let products: any[] = [];
+    const orderIds = (orders ?? []).map((o) => o.id);
+    if (orderIds.length) {
+      const { data: oi } = await admin
+        .from("order_items").select("product_id").eq("item_type", "product").in("order_id", orderIds);
+      const pids = [...new Set((oi ?? []).map((x) => x.product_id).filter(Boolean))];
+      if (pids.length) {
+        const { data: ps } = await admin.from("products").select("id, name, slug, editable_paths").in("id", pids);
+        products = (ps ?? []).map((p) => ({ id: p.id, name: p.name, slug: p.slug, has_editable: (p.editable_paths ?? []).length > 0 }));
+      }
+    }
+
+    return json({ orders: orders ?? [], items, products });
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
