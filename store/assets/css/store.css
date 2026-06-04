@@ -148,6 +148,22 @@ th { font-family: var(--font-mono); font-size: .7rem; letter-spacing: .08em; tex
 .pill.ok { color: var(--ok); border-color: rgba(152,255,217,.4); }
 .pill.warn { color: var(--danger); border-color: rgba(255,103,31,.4); }
 
+/* ── KPI DASHBOARD ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+.kpi {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px 22px; display: flex; flex-direction: column; gap: 6px;
+}
+.kpi-num { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.kpi-label { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* ── COPYABLE CODE BOX (temp passwords, tokens) ── */
+.codebox {
+  font-family: var(--font-mono); font-size: .95rem; color: var(--mint);
+  background: var(--bg3); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 12px 14px; user-select: all; word-break: break-all;
+}
+
 /* ── UTIL ── */
 .muted { color: var(--muted); }
 .center { text-align: center; }

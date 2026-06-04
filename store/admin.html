@@ -39,15 +39,23 @@
   <div class="eyebrow">Super admin · <span id="who"></span></div>
   <h1 class="page" style="font-size:2rem;">Dashboard</h1>
   <div class="tabs" style="margin-top:24px;">
-    <div class="tab active" data-tab="products">Products</div>
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="products">Products</div>
     <div class="tab" data-tab="addons">Add-ons</div>
     <div class="tab" data-tab="orders">Orders</div>
+    <div class="tab" data-tab="customers">Customers</div>
     <div class="tab" data-tab="ai">AI agents</div>
+    <div class="tab" data-tab="team" id="tab-btn-team">Team</div>
+    <div class="tab" data-tab="account">Account</div>
   </div>
-  <div id="tab-products" class="tab-pane"></div>
+  <div id="tab-overview" class="tab-pane"></div>
+  <div id="tab-products" class="tab-pane hidden"></div>
   <div id="tab-addons" class="tab-pane hidden"></div>
   <div id="tab-orders" class="tab-pane hidden"></div>
+  <div id="tab-customers" class="tab-pane hidden"></div>
   <div id="tab-ai" class="tab-pane hidden"></div>
+  <div id="tab-team" class="tab-pane hidden"></div>
+  <div id="tab-account" class="tab-pane hidden"></div>
 </main>
 
 <footer>© <span id="yr"></span> <span class="brand-name">studio0x LLC</span> · admin console</footer>

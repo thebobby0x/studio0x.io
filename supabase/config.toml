@@ -18,3 +18,8 @@ verify_jwt = false
 # Phase 2 AI creator pipeline. Requires a valid Supabase JWT; the function
 # further checks the caller is an admin before generating draft products.
 verify_jwt = true
+
+[functions.admin-create-user]
+# Team management. Requires a valid Supabase JWT; the function further checks
+# the caller is a superadmin before creating a new admin/superadmin teammate.
+verify_jwt = true
