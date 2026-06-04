@@ -369,3 +369,27 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
   .conn-action { order: 2; flex-basis: 100%; }
   .conn-action .btn { width: 100%; justify-content: center; }
 }
+
+/* "Take action" — doer buttons in My Downloads */
+.action-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+.action-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.action-card-name { font-weight: 700; font-size: .98rem; }
+.action-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.action-msg { font-size: .78rem; }
+.action-msg:empty { display: none; }
+.action-msg .action-connect-link { color: var(--accent); text-decoration: none; font-weight: 700; }
+.action-msg .action-connect-link:hover { text-decoration: underline; }
+
+/* "needs connect" state — softer than a hard-disabled button, still on-brand */
+.action-btn.needs-connect {
+  background: transparent; color: var(--accent);
+  border: 1px dashed var(--border-strong);
+}
+.action-btn.needs-connect:hover { border-color: var(--accent); opacity: 1; }
+
+@media (max-width: 560px) {
+  .action-btns .btn { flex: 1 1 100%; justify-content: center; }
+}
