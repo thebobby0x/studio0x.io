@@ -99,16 +99,16 @@ Deno.serve(async (req) => {
     // JSON; call B returns the long deliverable as plain markdown.
     const nicheLine = agent.niche ? `Niche: ${agent.niche}\n` : "";
 
-    // Call A — metadata. Prefill the assistant turn with "{" to force JSON.
+    // Call A — compact metadata as JSON (small enough not to truncate).
     const metaText = await callClaude(model, systemPrompt, 1500,
       `${nicheLine}Brief from the marketplace admin:\n${brief.trim()}\n\n` +
-      `Return ONLY a JSON object (no prose, no code fences) with exactly these keys: ` +
+      `Return ONLY a JSON object — nothing before or after it, no prose, no code fences — ` +
+      `with exactly these keys: ` +
       `"name" (catchy product name), "tagline" (one-line hook), ` +
       `"type" (one of: ${PRODUCT_TYPES.join(" | ")}), ` +
       `"bullets" (array of 3-6 short value bullets), ` +
-      `"description" (1-3 paragraph product description).`,
-      "{");
-    const parsed = parseJsonLoose("{" + metaText);
+      `"description" (1-3 paragraph product description).`);
+    const parsed = parseJsonLoose(metaText);
 
     const genName = String(parsed.name || "").trim() || `AI draft — ${new Date().toISOString().slice(0, 10)}`;
     const genTagline = String(parsed.tagline || "").trim();
@@ -204,13 +204,11 @@ Deno.serve(async (req) => {
 });
 
 // Single Claude Messages call. The system prompt is sent as a cached block
-// so repeated calls (and call B after call A) reuse it cheaply. An optional
-// `prefill` seeds the assistant turn (e.g. "{") to force a JSON start.
+// so repeated calls (call B after call A) reuse it cheaply.
 async function callClaude(
-  model: string, systemPrompt: string, maxTokens: number, userText: string, prefill?: string,
+  model: string, systemPrompt: string, maxTokens: number, userText: string,
 ): Promise<string> {
   const messages: any[] = [{ role: "user", content: userText }];
-  if (prefill) messages.push({ role: "assistant", content: prefill });
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
