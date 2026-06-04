@@ -325,3 +325,47 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
   .nav-links { gap: 14px; }
   .mobile-buybar { display: flex; }
 }
+
+/* ── ACCOUNT PORTAL ── */
+.account-card { max-width: 460px; }
+
+/* Toast / banner for ?connected / ?error returns */
+.account-toast {
+  border-radius: 10px; padding: 14px 18px; font-size: .9rem; margin-bottom: 20px;
+  font-family: var(--font-display);
+}
+.account-toast.ok {
+  background: rgba(152,255,217,.08); border: 1px solid rgba(152,255,217,.35); color: var(--mint);
+}
+.account-toast.error {
+  background: rgba(255,103,31,.1); border: 1px solid rgba(255,103,31,.35); color: #ffd9c7;
+}
+
+/* Connection rows */
+.conn-list { display: flex; flex-direction: column; gap: 12px; }
+.conn-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px;
+}
+.conn-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg3); border: 1px solid var(--border-strong);
+}
+.conn-dot.on { background: var(--mint); border-color: var(--mint); box-shadow: 0 0 8px rgba(152,255,217,.5); }
+.conn-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.conn-name { font-weight: 700; font-size: .98rem; }
+.conn-note { font-family: var(--font-mono); font-size: .76rem; }
+.conn-msg { font-size: .78rem; }
+.conn-msg:empty { display: none; }
+.conn-status { flex-shrink: 0; }
+.conn-action { flex-shrink: 0; }
+
+@media (max-width: 560px) {
+  .conn-row { flex-wrap: wrap; }
+  .conn-info { flex-basis: 100%; order: 1; }
+  .conn-dot { order: 0; }
+  .conn-status { order: 0; margin-left: auto; }
+  .conn-action { order: 2; flex-basis: 100%; }
+  .conn-action .btn { width: 100%; justify-content: center; }
+}
