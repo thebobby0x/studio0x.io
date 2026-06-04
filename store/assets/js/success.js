@@ -37,7 +37,7 @@ function render(data) {
       ${it.url ? `<a class="btn" href="${it.url}" download>Download ↓</a>` : `<span class="muted">preparing…</span>`}
     </div>`).join("");
   box.innerHTML = `
-    ${data.email ? `<p class="muted" style="margin-bottom:10px;">Linked to <strong style="color:var(--text)">${esc(data.email)}</strong> — bookmark this page to return to your files anytime.</p>` : ""}
+    ${data.email ? `<p class="muted" style="margin-bottom:10px;">Linked to <strong class="mono" style="color:var(--text)">${esc(data.email)}</strong> — bookmark this page to return to your files anytime.</p>` : ""}
     ${list}
     <p class="guarantee" style="margin-top:16px;">Links refresh each time you open this page (they expire after 1 hour for security).</p>`;
 }

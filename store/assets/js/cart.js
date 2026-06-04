@@ -103,7 +103,13 @@ async function loadBumps() {
       .select("*")
       .eq("is_global", true)
       .eq("is_active", true);
-    BUMPS = data || [];
+    // Order bumps: "Editable Files" (grants_editable) first, then ascending price.
+    BUMPS = (data || []).sort((a, b) => {
+      const ea = a.grants_editable ? 0 : 1;
+      const eb = b.grants_editable ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      return (a.price_cents || 0) - (b.price_cents || 0);
+    });
   } catch {
     BUMPS = [];
   }

@@ -43,7 +43,14 @@ Deno.serve(async (req) => {
     for (const e of ents ?? []) {
       const { data: signed } = await admin.storage.from("product-assets")
         .createSignedUrl(e.asset_path, TTL, { download: true });
-      items.push({ name: e.name, url: signed?.signedUrl ?? null, expires_at: e.expires_at });
+      const ext = (e.asset_path.split(".").pop() || "").toLowerCase();
+      items.push({
+        name: e.name,
+        url: signed?.signedUrl ?? null,
+        product_id: (e.asset_path.split("/")[0]) || null,
+        kind: ext === "pdf" ? "PDF" : ext === "docx" ? "DOCX" : ext === "md" ? "Markdown" : ext.toUpperCase() || "File",
+        expires_at: e.expires_at,
+      });
     }
 
     // Distinct purchased products (for per-product "doer" actions).
