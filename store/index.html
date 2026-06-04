@@ -18,13 +18,24 @@
     <a href="#products">Products</a>
     <a href="./admin.html">Admin</a>
     <a class="btn" href="#products">Browse →</a>
+    <span id="cart-mount" class="cart-mount"></span>
   </div>
 </nav>
 
-<header class="wrap">
-  <div class="eyebrow">Digital assets · instant delivery</div>
-  <h1 class="page">Buy it. Download it.<br/>Use it today.</h1>
-  <p class="sub" id="tagline">Premium templates, decks, prompt libraries, and toolkits — delivered the second you pay.</p>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow brand-name">studio<span>0x</span> market · instant delivery</div>
+    <h1 class="hero-title">Buy it. Download it.<br/>Use it today.</h1>
+    <p class="sub hero-sub" id="tagline">Premium templates, decks, prompt libraries, and toolkits — delivered the second you pay.</p>
+    <div class="hero-cta">
+      <a class="btn" href="#products">Browse products →</a>
+    </div>
+    <ul class="trust-row" aria-label="What you get">
+      <li>⚡ Instant delivery</li>
+      <li>🔒 Secure Stripe checkout</li>
+      <li>✅ Money-back guarantee</li>
+    </ul>
+  </div>
 </header>
 
 <section class="wrap" id="products" style="padding-top:0;">
@@ -35,6 +46,13 @@
   <div id="state" class="center muted" style="padding:60px 0;">
     <div class="spinner" style="margin:0 auto 16px;"></div>Loading products…
   </div>
+
+  <section id="featured-section" class="featured hidden">
+    <div class="eyebrow">Featured</div>
+    <div id="featured-grid" class="grid"></div>
+  </section>
+
+  <div id="filters" class="filter-row hidden"></div>
   <div id="grid" class="grid"></div>
 </section>
 

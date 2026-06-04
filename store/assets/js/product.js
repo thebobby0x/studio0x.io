@@ -1,8 +1,11 @@
 import { supabase, money, callFn, qs, configured } from "./supabase-client.js";
+import { addItem, openDrawer, mountCartToggle } from "./cart.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
 const slug = qs("slug");
 const contentEl = document.getElementById("content");
+
+mountCartToggle(document.getElementById("cart-mount"));
 
 let PRODUCT = null;
 let ADDONS = [];
@@ -44,22 +47,26 @@ function render() {
   document.getElementById("meta-desc").setAttribute("content", p.seo_description || p.tagline || "");
   const landing = p.landing || {};
   const bullets = Array.isArray(landing.bullets) ? landing.bullets : [];
+  const tags = Array.isArray(landing.tags) ? landing.tags : [];
   const faqs = Array.isArray(landing.faq) ? landing.faq : [];
   const testimonials = Array.isArray(landing.testimonials) ? landing.testimonials : [];
   const guarantee = landing.guarantee || "30-day no-questions money-back guarantee.";
   const ctaLabel = landing.cta || "Get instant access";
 
   const cover = p.cover_image_url
-    ? `<img src="${p.cover_image_url}" alt="${esc(p.name)}"/>`
-    : `<span class="ph">${p.type}</span>`;
+    ? `<img src="${esc(p.cover_image_url)}" alt="${esc(p.name)}"/>`
+    : `<span class="ph">${esc(p.type)}</span>`;
   const compare = p.compare_at_cents && p.compare_at_cents > p.price_cents
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";
+  const tagChips = tags.length
+    ? `<div class="tag-chips">${tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>` : "";
 
   contentEl.innerHTML = `
     <div class="product-hero">
       <div>
-        <div class="eyebrow">${p.type} · instant download</div>
+        <div class="eyebrow">${esc(p.type)} · instant download</div>
         <h1 class="page">${esc(p.name)}</h1>
+        ${tagChips}
         <p class="sub">${esc(p.tagline || "")}</p>
         <div class="product-media" style="margin-top:28px;">${cover}</div>
         ${bullets.length ? `<ul class="bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
@@ -78,10 +85,21 @@ function render() {
           ${ADDONS.length ? `<div class="bump-badge">★ Add these — most buyers do</div><div class="addons" id="addons">${ADDONS.map(addonRow).join("")}</div>` : ""}
           <div class="total-row"><span class="label">Total today</span><span class="amt" id="total">${money(p.price_cents)}</span></div>
           <button class="btn btn-block" id="buy-btn">${esc(ctaLabel)} →</button>
-          <div class="guarantee">🔒 Secure Stripe checkout · instant delivery · ${PRODUCT.currency.toUpperCase()}</div>
+          <button class="btn btn-ghost btn-block" id="add-cart-btn" style="margin-top:10px;">Add to cart</button>
+          <div class="trust-badges">
+            <span>⚡ Instant delivery</span>
+            <span>🔒 Secure checkout</span>
+            <span>✅ Guarantee</span>
+          </div>
+          <div class="guarantee">${PRODUCT.currency.toUpperCase()} · instant delivery</div>
           <div class="guarantee" style="color:var(--mint);">✅ ${esc(guarantee)}</div>
         </div>
       </aside>
+    </div>
+
+    <div class="mobile-buybar" id="mobile-buybar" aria-hidden="true">
+      <span class="mobile-buybar-price">${money(p.price_cents)}</span>
+      <button class="btn" id="mobile-buy-btn">${esc(ctaLabel)} →</button>
     </div>`;
 
   // Wire add-on toggles
@@ -98,6 +116,26 @@ function render() {
   });
 
   document.getElementById("buy-btn").addEventListener("click", checkout);
+  document.getElementById("mobile-buy-btn").addEventListener("click", checkout);
+  document.getElementById("add-cart-btn").addEventListener("click", () => {
+    addItem(PRODUCT);
+    openDrawer();
+  });
+
+  setupMobileBar();
+}
+
+function setupMobileBar() {
+  const bar = document.getElementById("mobile-buybar");
+  const buyBox = document.querySelector(".buy-box");
+  if (!bar || !buyBox || !("IntersectionObserver" in window)) return;
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      bar.classList.toggle("show", !entry.isIntersecting);
+      bar.setAttribute("aria-hidden", entry.isIntersecting ? "true" : "false");
+    });
+  }, { threshold: 0 });
+  io.observe(buyBox);
 }
 
 function addonRow(a) {
@@ -120,10 +158,12 @@ function updateTotal() {
 
 async function checkout() {
   const btn = document.getElementById("buy-btn");
-  btn.disabled = true; btn.textContent = "Redirecting to secure checkout…";
+  const mbtn = document.getElementById("mobile-buy-btn");
+  [btn, mbtn].forEach((b) => { if (b) { b.disabled = true; } });
+  if (btn) btn.textContent = "Redirecting to secure checkout…";
   try {
     const { url } = await callFn("create-checkout-session", {
-      productId: PRODUCT.id,
+      productIds: [PRODUCT.id],
       addonIds: [...selected],
       successUrl: `${location.origin}${location.pathname.replace("product.html", "success.html")}`,
       cancelUrl: location.href,
@@ -131,7 +171,8 @@ async function checkout() {
     if (!url) throw new Error("No checkout URL returned");
     location.href = url;
   } catch (e) {
-    btn.disabled = false; btn.textContent = "Try again →";
+    [btn, mbtn].forEach((b) => { if (b) b.disabled = false; });
+    if (btn) btn.textContent = "Try again →";
     alert("Checkout error: " + e.message);
   }
 }

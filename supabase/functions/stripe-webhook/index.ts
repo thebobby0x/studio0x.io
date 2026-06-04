@@ -54,9 +54,10 @@ Deno.serve(async (req) => {
 
 async function fulfill(session: Stripe.Checkout.Session) {
   const email = session.customer_details?.email ?? session.customer_email ?? null;
-  const productId = session.metadata?.product_id ?? null;
-  const addonIds = (session.metadata?.addon_ids ?? "")
-    .split(",").map((s) => s.trim()).filter(Boolean);
+  const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  // Supports cart (product_ids) and legacy single (product_id).
+  const productIds = csv(session.metadata?.product_ids ?? session.metadata?.product_id ?? "");
+  const addonIds = csv(session.metadata?.addon_ids ?? "");
 
   // Idempotent: one order per checkout session.
   const { data: order } = await supabase
@@ -84,13 +85,13 @@ async function fulfill(session: Stripe.Checkout.Session) {
   const items: any[] = [];
   const entitlements: any[] = [];
 
-  // Load the product once (need name + editable_paths for the editable upsell).
-  let product: any = null;
-  if (productId) {
-    const { data: p } = await supabase
-      .from("products").select("id, name, price_cents, asset_path, editable_paths").eq("id", productId).single();
-    product = p;
-    if (p) {
+  // Load all purchased products (cart) — need names + editable_paths.
+  let products: any[] = [];
+  if (productIds.length) {
+    const { data } = await supabase
+      .from("products").select("id, name, price_cents, asset_path, editable_paths").in("id", productIds);
+    products = data ?? [];
+    for (const p of products) {
       items.push({ order_id: order.id, item_type: "product", product_id: p.id, name: p.name, price_cents: p.price_cents, asset_path: p.asset_path });
       if (p.asset_path) entitlements.push({ order_id: order.id, customer_email: email, asset_path: p.asset_path, name: p.name });
       await supabase.rpc("increment_sales", { p_id: p.id }).then(() => {}, () => {});
@@ -103,10 +104,13 @@ async function fulfill(session: Stripe.Checkout.Session) {
     for (const a of as ?? []) {
       items.push({ order_id: order.id, item_type: "addon", addon_id: a.id, name: a.name, price_cents: a.price_cents, asset_path: a.asset_path });
       if (a.grants_editable) {
-        // The "Editable Files" upgrade unlocks the product's editable sources.
-        for (const path of (product?.editable_paths ?? [])) {
-          const ext = (path.split(".").pop() || "file").toUpperCase();
-          entitlements.push({ order_id: order.id, customer_email: email, asset_path: path, name: `${product?.name ?? "Product"} — editable (${ext})` });
+        // The "Editable Files" upgrade unlocks the editable sources for every
+        // purchased product in this order.
+        for (const p of products) {
+          for (const path of (p.editable_paths ?? [])) {
+            const ext = (path.split(".").pop() || "file").toUpperCase();
+            entitlements.push({ order_id: order.id, customer_email: email, asset_path: path, name: `${p.name} — editable (${ext})` });
+          }
         }
       } else if (a.asset_path) {
         entitlements.push({ order_id: order.id, customer_email: email, asset_path: a.asset_path, name: a.name });
