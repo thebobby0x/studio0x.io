@@ -93,57 +93,22 @@ Deno.serve(async (req) => {
     const systemPrompt = agent.system_prompt ||
       "You are a world-class digital-product creator. Produce polished, sellable content.";
 
-    // --- 3. Call the Anthropic Messages API ---------------------------
-    const userMessage = [
-      agent.niche ? `Niche: ${agent.niche}` : null,
-      `Brief from the marketplace admin:\n${brief.trim()}`,
-      "",
-      "Create a complete, sellable digital product based on the brief.",
-      "Respond with STRICT JSON ONLY (no markdown, no prose, no code fences) using exactly these keys:",
-      `{`,
-      `  "name": string,            // catchy product name`,
-      `  "tagline": string,         // one-line hook`,
-      `  "type": string,            // one of: ${PRODUCT_TYPES.join(" | ")}`,
-      `  "bullets": string[],       // 3-6 value bullets for the landing page`,
-      `  "description": string,     // 1-3 paragraph product description`,
-      `  "body": string             // the FULL deliverable content as markdown`,
-      `}`,
-    ].filter(Boolean).join("\n");
+    // --- 3. Generate with Claude (two calls for robustness) ----------
+    // Big deliverables don't fit reliably inside one JSON blob (the body
+    // gets truncated mid-string). So: call A returns compact metadata as
+    // JSON; call B returns the long deliverable as plain markdown.
+    const nicheLine = agent.niche ? `Niche: ${agent.niche}\n` : "";
 
-    const aiResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4000,
-        // Frozen system prompt cached for cost savings across generations.
-        system: [{
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        }],
-        messages: [{ role: "user", content: userMessage }],
-      }),
-    });
-
-    if (!aiResp.ok) {
-      const errText = await aiResp.text().catch(() => "");
-      throw new Error(`Anthropic API error (${aiResp.status}): ${errText.slice(0, 500)}`);
-    }
-
-    const aiData = await aiResp.json();
-    const rawText = (aiData.content ?? [])
-      .filter((b: any) => b.type === "text")
-      .map((b: any) => b.text)
-      .join("")
-      .trim();
-    if (!rawText) throw new Error("empty response from model");
-
-    const parsed = parseJsonLoose(rawText);
+    // Call A — metadata. Prefill the assistant turn with "{" to force JSON.
+    const metaText = await callClaude(model, systemPrompt, 1500,
+      `${nicheLine}Brief from the marketplace admin:\n${brief.trim()}\n\n` +
+      `Return ONLY a JSON object (no prose, no code fences) with exactly these keys: ` +
+      `"name" (catchy product name), "tagline" (one-line hook), ` +
+      `"type" (one of: ${PRODUCT_TYPES.join(" | ")}), ` +
+      `"bullets" (array of 3-6 short value bullets), ` +
+      `"description" (1-3 paragraph product description).`,
+      "{");
+    const parsed = parseJsonLoose("{" + metaText);
 
     const genName = String(parsed.name || "").trim() || `AI draft — ${new Date().toISOString().slice(0, 10)}`;
     const genTagline = String(parsed.tagline || "").trim();
@@ -152,8 +117,14 @@ Deno.serve(async (req) => {
       ? parsed.bullets.map((b: any) => String(b).trim()).filter(Boolean)
       : [];
     const genDescription = String(parsed.description || "").trim();
-    const genBody = String(parsed.body || "").trim();
-    if (!genBody) throw new Error("model returned no 'body' content");
+
+    // Call B — the full deliverable as plain markdown (system prompt is a
+    // cache hit from call A, so this is cheaper).
+    const genBody = (await callClaude(model, systemPrompt, 8000,
+      `${nicheLine}Brief:\n${brief.trim()}\n\n` +
+      `Write the COMPLETE, ready-to-sell deliverable for the product "${genName}" as polished Markdown. ` +
+      `Make it genuinely useful and substantial. Output only the document — no preamble, no commentary.`)).trim();
+    if (!genBody) throw new Error("model returned no body content");
 
     // --- 4. Create or update the product as a DRAFT -------------------
     let targetProductId = productId;
@@ -231,6 +202,37 @@ Deno.serve(async (req) => {
     return json({ jobId, status: "error", error: message }, 500);
   }
 });
+
+// Single Claude Messages call. The system prompt is sent as a cached block
+// so repeated calls (and call B after call A) reuse it cheaply. An optional
+// `prefill` seeds the assistant turn (e.g. "{") to force a JSON start.
+async function callClaude(
+  model: string, systemPrompt: string, maxTokens: number, userText: string, prefill?: string,
+): Promise<string> {
+  const messages: any[] = [{ role: "user", content: userText }];
+  if (prefill) messages.push({ role: "assistant", content: prefill });
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      messages,
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Anthropic API error (${resp.status}): ${errText.slice(0, 500)}`);
+  }
+  const data = await resp.json();
+  return (data.content ?? [])
+    .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+}
 
 // Parse model JSON robustly — strip code fences and grab the outer object.
 function parseJsonLoose(text: string): any {
