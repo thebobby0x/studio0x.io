@@ -84,9 +84,12 @@ async function fulfill(session: Stripe.Checkout.Session) {
   const items: any[] = [];
   const entitlements: any[] = [];
 
+  // Load the product once (need name + editable_paths for the editable upsell).
+  let product: any = null;
   if (productId) {
     const { data: p } = await supabase
-      .from("products").select("id, name, price_cents, asset_path").eq("id", productId).single();
+      .from("products").select("id, name, price_cents, asset_path, editable_paths").eq("id", productId).single();
+    product = p;
     if (p) {
       items.push({ order_id: order.id, item_type: "product", product_id: p.id, name: p.name, price_cents: p.price_cents, asset_path: p.asset_path });
       if (p.asset_path) entitlements.push({ order_id: order.id, customer_email: email, asset_path: p.asset_path, name: p.name });
@@ -96,10 +99,18 @@ async function fulfill(session: Stripe.Checkout.Session) {
 
   if (addonIds.length) {
     const { data: as } = await supabase
-      .from("addons").select("id, name, price_cents, asset_path").in("id", addonIds);
+      .from("addons").select("id, name, price_cents, asset_path, grants_editable").in("id", addonIds);
     for (const a of as ?? []) {
       items.push({ order_id: order.id, item_type: "addon", addon_id: a.id, name: a.name, price_cents: a.price_cents, asset_path: a.asset_path });
-      if (a.asset_path) entitlements.push({ order_id: order.id, customer_email: email, asset_path: a.asset_path, name: a.name });
+      if (a.grants_editable) {
+        // The "Editable Files" upgrade unlocks the product's editable sources.
+        for (const path of (product?.editable_paths ?? [])) {
+          const ext = (path.split(".").pop() || "file").toUpperCase();
+          entitlements.push({ order_id: order.id, customer_email: email, asset_path: path, name: `${product?.name ?? "Product"} — editable (${ext})` });
+        }
+      } else if (a.asset_path) {
+        entitlements.push({ order_id: order.id, customer_email: email, asset_path: a.asset_path, name: a.name });
+      }
     }
   }
 

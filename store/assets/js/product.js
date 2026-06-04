@@ -30,6 +30,11 @@ async function load() {
   (globals || []).forEach((a) => map.set(a.id, a));
   ADDONS = [...map.values()];
 
+  // Only offer the "Editable Files" upgrade on products that actually have
+  // editable sources (e.g. AI-generated ones), so nobody pays for nothing.
+  const hasEditable = Array.isArray(product.editable_paths) && product.editable_paths.length > 0;
+  if (!hasEditable) ADDONS = ADDONS.filter((a) => !a.grants_editable);
+
   render();
 }
 
