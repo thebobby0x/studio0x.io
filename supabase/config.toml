@@ -19,6 +19,18 @@ verify_jwt = false
 # further checks the caller is an admin before generating draft products.
 verify_jwt = true
 
+[functions.get-my-downloads]
+# Customer "My downloads": identified by the caller's JWT email.
+verify_jwt = true
+
+[functions.oauth-start]
+# Begins a customer OAuth connection; requires the customer's JWT.
+verify_jwt = true
+
+[functions.oauth-callback]
+# OAuth provider redirect target; authenticated by the handshake state, not a JWT.
+verify_jwt = false
+
 [functions.admin-create-user]
 # Team management. Requires a valid Supabase JWT; the function further checks
 # the caller is a superadmin before creating a new admin/superadmin teammate.

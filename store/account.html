@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Account — studio0x market</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./assets/css/store.css" />
+<script src="./assets/js/config.js"></script>
+</head>
+<body>
+<nav>
+  <a href="./index.html" class="nav-logo brand-name">studio<span>0x</span> market</a>
+  <div class="nav-links">
+    <a href="./index.html">All products</a>
+    <a href="./account.html">Account</a>
+    <a href="#" id="logout" class="hidden">Sign out</a>
+  </div>
+</nav>
+
+<!-- Toast / banner area for ?connected / ?error returns -->
+<div id="toast-area" class="wrap-narrow" style="padding-bottom:0;"></div>
+
+<!-- LOGIN / SIGNUP -->
+<main class="wrap-narrow" id="login-view">
+  <div class="eyebrow">Your account</div>
+  <h1 class="page" id="auth-title">Log in</h1>
+  <p class="sub" id="auth-sub">Access your downloads and connected services.</p>
+  <div class="panel account-card" style="margin-top:28px;">
+    <div id="not-configured" class="banner hidden">⚙️ Storefront not connected yet. Add your Supabase keys in <span class="mono">config.js</span> first.</div>
+    <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" /></div>
+    <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" /></div>
+    <button class="btn btn-block" id="auth-btn">Log in →</button>
+    <p id="auth-msg" class="muted center" style="margin-top:14px;font-size:.85rem;"></p>
+    <p class="center" style="margin-top:14px;font-size:.85rem;">
+      <span id="auth-toggle-text" class="muted">New here?</span>
+      <a href="#" id="auth-toggle" style="color:var(--accent);text-decoration:none;">Create an account</a>
+    </p>
+  </div>
+</main>
+
+<!-- DASHBOARD -->
+<main class="wrap hidden" id="dash">
+  <div class="eyebrow">Your account · <span id="who"></span></div>
+  <h1 class="page" style="font-size:2rem;">My studio0x</h1>
+  <div class="tabs" style="margin-top:24px;">
+    <div class="tab active" data-tab="downloads">My Downloads</div>
+    <div class="tab" data-tab="connections">Connections</div>
+    <div class="tab" data-tab="account">Account</div>
+  </div>
+  <div id="tab-downloads" class="tab-pane"></div>
+  <div id="tab-connections" class="tab-pane hidden"></div>
+  <div id="tab-account" class="tab-pane hidden"></div>
+</main>
+
+<footer>
+  © <span id="yr"></span> <span class="brand-name">studio0x LLC</span> · Secure checkout by Stripe ·
+  <a href="mailto:b@studio0x.io" style="color:var(--accent);text-decoration:none;">b@studio0x.io</a>
+</footer>
+
+<script type="module" src="./assets/js/account.js"></script>
+</body>
+</html>
