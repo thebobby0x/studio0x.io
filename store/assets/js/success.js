@@ -37,9 +37,9 @@ function render(data) {
       ${it.url ? `<a class="btn" href="${it.url}" download>Download ↓</a>` : `<span class="muted">preparing…</span>`}
     </div>`).join("");
   box.innerHTML = `
-    ${data.email ? `<p class="muted" style="margin-bottom:10px;">Receipt &amp; links sent to <strong style="color:var(--text)">${esc(data.email)}</strong></p>` : ""}
+    ${data.email ? `<p class="muted" style="margin-bottom:10px;">Linked to <strong style="color:var(--text)">${esc(data.email)}</strong> — bookmark this page to return to your files anytime.</p>` : ""}
     ${list}
-    <p class="guarantee" style="margin-top:16px;">Links expire in 1 hour for security — re-open this page anytime to refresh them.</p>`;
+    <p class="guarantee" style="margin-top:16px;">Links refresh each time you open this page (they expire after 1 hour for security).</p>`;
 }
 
 const esc = (s) => (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

@@ -107,5 +107,43 @@ async function fulfill(session: Stripe.Checkout.Session) {
   if (entitlements.length) await supabase.from("entitlements").insert(entitlements);
   await supabase.from("orders").update({ status: "fulfilled" }).eq("id", order.id);
 
-  // TODO (Phase 1.1): email the download links via Resend/SendGrid.
+  // Best-effort delivery email (skips silently if RESEND_API_KEY is unset).
+  if (email) await sendDeliveryEmail(email, session.id, items);
+}
+
+// Sends a branded "your downloads are ready" email via Resend. Links back to
+// the success page (which re-issues fresh signed URLs) rather than emailing
+// expiring links directly. No-ops if RESEND_API_KEY is not configured.
+async function sendDeliveryEmail(email: string, sessionId: string, items: any[]) {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) return;
+  const from = Deno.env.get("FROM_EMAIL") ?? "studio0x market <onboarding@resend.dev>";
+  const origin = (Deno.env.get("ALLOWED_ORIGIN") ?? "https://studio0x.io").split(",")[0].trim();
+  const link = `${origin}/store/success.html?session_id=${sessionId}`;
+  const names = items.filter((i) => i.item_type === "product" || i.asset_path)
+    .map((i) => `<li>${escapeHtml(i.name ?? "Your file")}</li>`).join("");
+  const html = `
+    <div style="font-family:system-ui,Arial,sans-serif;max-width:520px;margin:0 auto;color:#231F20;">
+      <h2 style="letter-spacing:-0.02em;">Thank you — your downloads are ready 🎉</h2>
+      <p>Your purchase from <strong>studio0x market</strong> is complete.</p>
+      ${names ? `<p>Included:</p><ul>${names}</ul>` : ""}
+      <p style="margin:28px 0;">
+        <a href="${link}" style="background:#F7B5CD;color:#231F20;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:700;display:inline-block;">Get your downloads →</a>
+      </p>
+      <p style="color:#777;font-size:13px;">Bookmark that page to return to your files anytime. Questions? Reply to this email.</p>
+    </div>`;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [email], subject: "Your studio0x market downloads", html }),
+    });
+    if (!res.ok) console.error("resend send failed", res.status, await res.text().catch(() => ""));
+  } catch (e) {
+    console.error("resend error", e);
+  }
+}
+
+function escapeHtml(s: string) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
