@@ -227,7 +227,8 @@ async function renderCover(opts: { title: string; eyebrow: string; subtitle: str
     px += pw + 18;
   }
 
-  const wordStudio = `<text x="${pad}" y="180" font-family="Syne" font-weight="800" font-size="48" fill="#ffffff" style="font-feature-settings: 'zero' 1; font-variant-numeric: slashed-zero;">studio<tspan fill="#F03D77">0x</tspan></text>`;
+  // "0" in DM Mono (slashed, unmistakable zero), enlarged + pink; "x" in Syne pink.
+  const wordStudio = `<text x="${pad}" y="180" font-family="Syne" font-weight="800" font-size="48" fill="#ffffff">studio<tspan font-family="DM Mono" font-weight="500" font-size="58" fill="#F03D77">0</tspan><tspan fill="#F03D77">x</tspan></text>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     <rect width="${W}" height="${H}" fill="#1a1718"/>
     <rect x="0" y="0" width="${W}" height="8" fill="#F03D77"/>
