@@ -38,6 +38,9 @@ async function load() {
   const hasEditable = Array.isArray(product.editable_paths) && product.editable_paths.length > 0;
   if (!hasEditable) ADDONS = ADDONS.filter((a) => !a.grants_editable);
 
+  // Order bumps: "Editable Files" (grants_editable) first, then by ascending price.
+  ADDONS.sort(addonSort);
+
   render();
 }
 
@@ -178,5 +181,13 @@ async function checkout() {
 }
 
 const esc = (s) => (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Add-on ordering: editable-files bump first, then ascending price.
+function addonSort(a, b) {
+  const ea = a.grants_editable ? 0 : 1;
+  const eb = b.grants_editable ? 0 : 1;
+  if (ea !== eb) return ea - eb;
+  return (a.price_cents || 0) - (b.price_cents || 0);
+}
 
 load();

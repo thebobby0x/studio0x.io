@@ -26,8 +26,11 @@ body {
   -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh;
 }
 a { color: inherit; }
+/* Safety net: render every zero as a slashed-zero so the brand "studio0x"
+   and customer emails never misread as "studiooX" / double-o. */
+body { font-variant-numeric: slashed-zero; }
 .brand-name { font-family: var(--font-mono); font-variant-numeric: slashed-zero; letter-spacing: -0.02em; }
-.mono { font-family: var(--font-mono); }
+.mono { font-family: var(--font-mono); font-variant-numeric: slashed-zero; }
 
 /* ── NAV ── */
 nav {
@@ -392,4 +395,19 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
 
 @media (max-width: 560px) {
   .action-btns .btn { flex: 1 1 100%; justify-content: center; }
+}
+
+/* ── MY DOWNLOADS — per-product file cards ── */
+.dl-cards { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+.dl-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 20px;
+}
+.dl-card-title { font-weight: 800; font-size: 1.02rem; letter-spacing: -0.02em; margin-bottom: 12px; }
+.dl-files { display: flex; flex-wrap: wrap; gap: 10px; }
+.dl-files .pill.warn { align-self: center; }
+.dl-note { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); margin-bottom: 24px; }
+
+@media (max-width: 560px) {
+  .dl-files .btn { flex: 1 1 100%; justify-content: center; }
 }

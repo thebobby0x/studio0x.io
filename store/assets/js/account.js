@@ -114,6 +114,7 @@ async function gate() {
   dash.classList.remove("hidden");
   document.getElementById("logout").classList.remove("hidden");
   document.getElementById("who").textContent = user.email;
+  document.getElementById("who").classList.add("mono");
 
   initTabs();
   document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
@@ -182,13 +183,7 @@ async function loadDownloads() {
   }
 
   const itemsHtml = items.length
-    ? `<div class="panel" style="margin-bottom:22px;"><table><thead><tr><th>Item</th><th></th></tr></thead>
-       <tbody>${items.map((it) => `<tr>
-         <td><strong>${esc(it.name)}</strong>${it.expires_at ? `<br/><span class="muted mono" style="font-size:.72rem;">link expires ${new Date(it.expires_at).toLocaleString()}</span>` : ""}</td>
-         <td style="text-align:right;">${it.url
-           ? `<a class="btn btn-sm" href="${esc(it.url)}">Download</a>`
-           : `<span class="pill warn">preparing…</span>`}</td>
-       </tr>`).join("")}</tbody></table></div>`
+    ? renderDownloadCards(items, products)
     : `<div class="panel" style="margin-bottom:22px;"><p class="muted center" style="padding:14px 0;">No downloadable items yet — they appear here once your order is processed.</p></div>`;
 
   const ordersHtml = `<div class="panel"><table><thead><tr><th>Date</th><th>Total</th><th>Status</th></tr></thead>
@@ -214,6 +209,7 @@ async function loadDownloads() {
     <p class="muted" style="margin-bottom:18px;">Your purchased files. Download links are personal — don't share them.</p>
     <h3 style="font-size:1.05rem;margin-bottom:12px;">Files</h3>
     ${itemsHtml}
+    <p class="dl-note">Your download links refresh every time you open this page — they never go stale.</p>
     ${actionsHtml}
     <h3 style="font-size:1.05rem;margin-bottom:12px;">Order history</h3>
     ${ordersHtml}`;
@@ -242,7 +238,7 @@ function renderActionsSection(products, connected) {
   }
   return `
     <h3 style="font-size:1.05rem;margin:24px 0 6px;">Take action with your kits</h3>
-    <p class="muted" style="margin-bottom:12px;font-size:.85rem;">Let studio0x act on your behalf — one click, using your connected accounts.</p>
+    <p class="muted" style="margin-bottom:12px;font-size:.85rem;">Let <span class="brand-name">studio0x</span> act on your behalf — one click, using your connected accounts.</p>
     ${body}`;
 }
 
@@ -314,7 +310,7 @@ async function loadConnections() {
 
   pane.innerHTML = `
     <h2 style="font-size:1.3rem;margin-bottom:6px;">Connections</h2>
-    <p class="muted" style="margin-bottom:8px;">Connect your accounts so studio0x can act on your behalf — save files to Drive, draft emails, post updates — once you buy a kit.</p>
+    <p class="muted" style="margin-bottom:8px;">Connect your accounts so <span class="brand-name">studio0x</span> can act on your behalf — save files to Drive, draft emails, post updates — once you buy a kit.</p>
     <p class="muted" style="font-size:.8rem;margin-bottom:20px;">You stay in control: disconnect any service at any time.</p>
     <div class="conn-list">
       ${PROVIDERS.map((p) => renderConnRow(p, connByProvider.get(p.key))).join("")}
@@ -392,7 +388,7 @@ function loadAccount() {
   pane.innerHTML = `
     <h2 style="font-size:1.3rem;margin-bottom:18px;">Account</h2>
     <div class="panel" style="margin-bottom:22px;">
-      <div class="field"><label>Signed in as</label><input value="${esc(CURRENT_USER?.email || "")}" readonly/></div>
+      <div class="field"><label>Signed in as</label><input class="mono" value="${esc(CURRENT_USER?.email || "")}" readonly/></div>
     </div>
     <div class="panel" style="margin-bottom:22px;">
       <h3 style="margin-bottom:14px;">Change password</h3>
