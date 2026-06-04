@@ -217,6 +217,50 @@ async function loadDownloads() {
   wireActionButtons(pane, connected);
 }
 
+// Human-friendly label for a file's `kind` (falls back to uppercasing it).
+function kindLabel(kind) {
+  if (!kind) return "Download";
+  const map = { pdf: "PDF", docx: "DOCX", doc: "DOC", md: "Markdown", markdown: "Markdown", zip: "ZIP", txt: "Text", csv: "CSV", pptx: "PPTX", xlsx: "XLSX" };
+  const k = String(kind).toLowerCase();
+  return map[k] || String(kind).toUpperCase();
+}
+
+// One card per product: product name header + a row of its files as Download
+// buttons. Items whose product_id isn't a known product go under "Other files".
+function renderDownloadCards(items, products) {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const groups = new Map(); // product_id (or "__other") → { name, items: [] }
+
+  for (const it of items) {
+    const prod = byId.get(it.product_id);
+    const key = prod ? it.product_id : "__other";
+    if (!groups.has(key)) {
+      groups.set(key, { name: prod ? prod.name : "Other files", items: [] });
+    }
+    groups.get(key).items.push(it);
+  }
+
+  // Render known products in their incoming order, then the "Other files" card last.
+  const ordered = [...groups.entries()].sort((a, b) => {
+    if (a[0] === "__other") return 1;
+    if (b[0] === "__other") return -1;
+    return 0;
+  });
+
+  const cards = ordered.map(([, g]) => {
+    const files = g.items.map((it) => it.url
+      ? `<a class="btn btn-sm" href="${esc(it.url)}">${esc(kindLabel(it.kind))} ↓</a>`
+      : `<span class="pill warn">preparing…</span>`).join("");
+    return `
+      <div class="dl-card">
+        <div class="dl-card-title">${esc(g.name)}</div>
+        <div class="dl-files">${files}</div>
+      </div>`;
+  }).join("");
+
+  return `<div class="dl-cards">${cards}</div>`;
+}
+
 // ── TAKE ACTION (doer buttons) ─────────────────────────────────────
 function renderActionsSection(products, connected) {
   let body;
@@ -288,7 +332,7 @@ async function runAction(btn, connected) {
     }
     showToast(data.message || "Done ✓", "ok");
   } catch (e) {
-    showToast("Error: " + e.message, "error");
+    showToast("Couldn't complete that action right now — please try again.", "error");
   } finally {
     btn.disabled = false;
     btn.textContent = original;
@@ -370,7 +414,7 @@ async function connectProvider(key) {
     }
     if (msg) msg.textContent = "Couldn't start connection.";
   } catch (e) {
-    if (msg) msg.textContent = "Error: " + e.message;
+    if (msg) msg.textContent = "Couldn't start the connection right now — please try again in a moment.";
   }
 }
 
