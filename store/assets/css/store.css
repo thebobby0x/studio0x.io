@@ -435,10 +435,39 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
 .brand-card-name { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -0.02em; color: var(--card-accent, var(--accent)); }
 .brand-card-tag { font-size: .85rem; color: var(--muted); }
 
-/* ── PROVENANCE BADGE (product page) ── */
+/* ── PROVENANCE BADGE (product page) — prominent trust mark under <h1> ── */
 .provenance {
-  font-family: var(--font-mono); font-size: .72rem; letter-spacing: .03em;
-  color: var(--muted); margin: 6px 0 12px;
+  display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 8px;
+  margin: 14px 0 18px; padding: 9px 16px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 100px; line-height: 1.3;
 }
-.provenance strong { color: var(--accent); font-weight: 500; }
-.provenance .brand-name { color: var(--muted); }
+.provenance-made {
+  font-family: var(--font-display); font-size: 1rem; font-weight: 700;
+  letter-spacing: -0.01em; color: var(--text);
+}
+.provenance-engine {
+  color: var(--accent); font-weight: 800;
+}
+.provenance-by {
+  font-family: var(--font-mono); font-size: .74rem; letter-spacing: .02em;
+  color: var(--muted);
+}
+.provenance-by .brand-name { color: var(--accent); }
+
+/* ── ENGINE SECTIONS (brand storefront split) ── */
+.engine-section { margin-top: 48px; }
+.engine-section:first-child { margin-top: 28px; }
+.engine-section h2 {
+  font-family: var(--font-display); font-weight: 800; font-size: 1.5rem;
+  letter-spacing: -0.02em; color: var(--text); margin-bottom: 6px;
+}
+.engine-section h2 .engine-name {
+  color: var(--accent);
+}
+.engine-blurb {
+  color: var(--muted); font-size: .95rem; margin-bottom: 22px;
+  max-width: 60ch;
+}
+.engine-grid { margin-top: 0; }

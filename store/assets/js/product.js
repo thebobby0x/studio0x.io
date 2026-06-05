@@ -95,7 +95,7 @@ function render() {
     ? `<div class="tag-chips">${tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>` : "";
   const engineName = ENGINE_NAMES[p.engine];
   const provenance = engineName
-    ? `<div class="provenance">Made with <strong>${esc(engineName)}</strong> · by <span class="brand-name">studio0x</span></div>` : "";
+    ? `<div class="provenance"><span class="provenance-made">Made with <span class="provenance-engine">${esc(engineName)}</span></span><span class="provenance-by">· by <span class="brand-name">studio0x</span></span></div>` : "";
 
   contentEl.innerHTML = `
     <div class="product-hero">
