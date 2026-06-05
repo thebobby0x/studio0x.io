@@ -5,7 +5,35 @@ document.getElementById("yr").textContent = new Date().getFullYear();
 const slug = qs("slug");
 const contentEl = document.getElementById("content");
 
+// Active brand: ?brand= param (or set inline by a per-brand page).
+const BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get("brand") || null;
+const brandQ = BRAND_KEY ? `?brand=${encodeURIComponent(BRAND_KEY)}` : "";
+
+// Engine key → display name for the provenance badge.
+const ENGINE_NAMES = { contentos: "contentOS", templatevault: "templateVault" };
+
 mountCartToggle(document.getElementById("cart-mount"));
+
+// Brand-aware nav: theme accent + logo, and keep ?brand= on back links.
+async function applyBrand() {
+  document.querySelectorAll('a[href="./index.html"]').forEach((a) => { a.href = `./index.html${brandQ}`; });
+  if (!BRAND_KEY) return;
+  try {
+    const { data: brand } = await supabase
+      .from("brands").select("*").eq("key", BRAND_KEY).maybeSingle();
+    if (!brand) return;
+    const root = document.documentElement.style;
+    if (brand.accent) root.setProperty("--accent", brand.accent);
+    if (brand.accent2) root.setProperty("--accent2", brand.accent2);
+    const logo = document.querySelector(".nav-logo");
+    if (logo) {
+      logo.classList.remove("brand-name");
+      logo.innerHTML =
+        `<span class="brand-display">${esc(brand.name)}</span>` +
+        ` <span class="brand-by">by <span class="brand-name">studio0x</span></span>`;
+    }
+  } catch { /* leave default chrome */ }
+}
 
 let PRODUCT = null;
 let ADDONS = [];
@@ -17,6 +45,8 @@ async function load() {
     return;
   }
   if (!slug) { contentEl.innerHTML = `<p class="muted">No product specified.</p>`; return; }
+
+  applyBrand();
 
   const { data: product, error } = await supabase
     .from("products").select("*").eq("slug", slug).eq("is_active", true).single();
@@ -63,12 +93,16 @@ function render() {
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";
   const tagChips = tags.length
     ? `<div class="tag-chips">${tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>` : "";
+  const engineName = ENGINE_NAMES[p.engine];
+  const provenance = engineName
+    ? `<div class="provenance">Made with <strong>${esc(engineName)}</strong> · by <span class="brand-name">studio0x</span></div>` : "";
 
   contentEl.innerHTML = `
     <div class="product-hero">
       <div>
         <div class="eyebrow">${esc(p.type)} · instant download</div>
         <h1 class="page">${esc(p.name)}</h1>
+        ${provenance}
         ${tagChips}
         <p class="sub">${esc(p.tagline || "")}</p>
         <div class="product-media" style="margin-top:28px;">${cover}</div>

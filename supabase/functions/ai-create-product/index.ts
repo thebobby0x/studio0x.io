@@ -53,11 +53,13 @@ Deno.serve(async (req) => {
   const { data: profile } = await caller.from("profiles").select("role").eq("id", user.id).single();
   if (!profile || !["admin", "superadmin"].includes(profile.role)) return json({ error: "admin access required" }, 403);
 
-  let body: { agentId?: string; brief?: string; productId?: string };
+  let body: { agentId?: string; brief?: string; productId?: string; brand?: string; engine?: string };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
-  const { agentId, brief, productId } = body;
+  const { agentId, brief, productId, brand, engine } = body;
   if (!agentId) return json({ error: "agentId required" }, 400);
   if (!brief || !brief.trim()) return json({ error: "brief required" }, 400);
+  const prodBrand = brand ?? null;
+  const prodEngine = engine || "contentos"; // provenance: contentos | templatevault
 
   const { data: job, error: jobErr } = await admin
     .from("ai_jobs").insert({ agent_id: agentId, product_id: productId ?? null, job_type: "generate_product", status: "running", input: body })
@@ -105,7 +107,7 @@ Deno.serve(async (req) => {
     const landing = { bullets: genBullets, tags: genTags, cta: "Get instant access" };
     if (targetProductId) {
       const { error: upErr } = await admin.from("products").update({
-        name: genName, tagline: genTagline, description: genDescription, type: genType, landing, is_active: false, updated_at: new Date().toISOString(),
+        name: genName, tagline: genTagline, description: genDescription, type: genType, landing, brand: prodBrand, engine: prodEngine, is_active: false, updated_at: new Date().toISOString(),
       }).eq("id", targetProductId);
       if (upErr) throw upErr;
       const { data: existing } = await admin.from("products").select("slug").eq("id", targetProductId).single();
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
     } else {
       slug = await uniqueSlug(genName);
       const { data: created, error: insErr } = await admin.from("products").insert({
-        slug, name: genName, tagline: genTagline, description: genDescription, type: genType, price_cents: 0, landing, is_active: false, created_by: user.id,
+        slug, name: genName, tagline: genTagline, description: genDescription, type: genType, price_cents: 0, landing, brand: prodBrand, engine: prodEngine, is_active: false, created_by: user.id,
       }).select("id").single();
       if (insErr || !created) throw insErr || new Error("could not create product");
       targetProductId = created.id;
