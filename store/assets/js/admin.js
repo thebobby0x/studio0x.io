@@ -1,6 +1,8 @@
 import { supabase, money, configured } from "./supabase-client.js";
+import { mountThemeToggle } from "./theme.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
+mountThemeToggle(document.querySelector(".nav-links"));
 
 const loginView = document.getElementById("login-view");
 const dash = document.getElementById("dash");

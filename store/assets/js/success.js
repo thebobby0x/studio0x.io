@@ -1,6 +1,8 @@
 import { callFn, money, qs, configured } from "./supabase-client.js";
+import { mountThemeToggle } from "./theme.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
+mountThemeToggle(document.querySelector(".nav-links"));
 const sessionId = qs("session_id");
 const box = document.getElementById("downloads");
 const stateEl = document.getElementById("state");

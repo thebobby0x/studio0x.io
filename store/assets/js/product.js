@@ -1,5 +1,6 @@
 import { supabase, money, callFn, qs, configured } from "./supabase-client.js";
 import { addItem, openDrawer, mountCartToggle } from "./cart.js";
+import { mountThemeToggle } from "./theme.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
 const slug = qs("slug");
@@ -13,6 +14,7 @@ const brandQ = BRAND_KEY ? `?brand=${encodeURIComponent(BRAND_KEY)}` : "";
 const ENGINE_NAMES = { contentos: "contentOS", templatevault: "templateVault" };
 
 mountCartToggle(document.getElementById("cart-mount"));
+mountThemeToggle(document.querySelector(".nav-links"));
 
 // Brand-aware nav: theme accent + logo, and keep ?brand= on back links.
 async function applyBrand() {
@@ -86,8 +88,9 @@ function render() {
   const guarantee = landing.guarantee || "30-day no-questions money-back guarantee.";
   const ctaLabel = landing.cta || "Get instant access";
 
-  const cover = p.cover_image_url
-    ? `<img src="${esc(p.cover_image_url)}" alt="${esc(p.name)}"/>`
+  const coverSrc = p.photo_url || p.cover_image_url;
+  const cover = coverSrc
+    ? `<img src="${esc(coverSrc)}" alt="${esc(p.name)}"/>`
     : `<span class="ph">${esc(p.type)}</span>`;
   const compare = p.compare_at_cents && p.compare_at_cents > p.price_cents
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";

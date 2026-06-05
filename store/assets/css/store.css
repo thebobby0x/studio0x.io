@@ -14,16 +14,37 @@
   --accent2: #00A3E0;    /* Miami blue */
   --mint: #98FFD9;
   --ink: #231F20;
+  --accent-ink: var(--ink); /* text that sits on an --accent fill */
   --danger: #FF671F;
   --ok: #98FFD9;
+  --nav-bg: rgba(26,23,24,0.85);
+  --bar-bg: rgba(33,29,30,0.96);
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
+}
+/* Light theme — toggled via <html data-theme="light">; remembered per visitor.
+   Keeps the Syne/DM-Mono identity, swaps the ink palette for a clean light one. */
+html[data-theme="light"] {
+  --bg: #f5f6f8;
+  --bg2: #ffffff;
+  --bg3: #ffffff;
+  --border: #e7e7ec;
+  --border-strong: #d4d4dc;
+  --text: #17141a;
+  --muted: #6b6770;
+  --accent: #E0407A;     /* deeper pink for contrast on light */
+  --accent2: #0089bd;
+  --ink: #231F20;
+  --accent-ink: #ffffff; /* white text on the deeper pink/brand fills */
+  --nav-bg: rgba(255,255,255,0.82);
+  --bar-bg: rgba(255,255,255,0.96);
 }
 html { scroll-behavior: smooth; }
 body {
   background: var(--bg); color: var(--text);
   font-family: var(--font-display); line-height: 1.6;
   -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh;
+  transition: background .25s ease, color .25s ease;
 }
 a { color: inherit; }
 /* Safety net: render every zero as a slashed-zero so the brand "studio0x"
@@ -37,7 +58,7 @@ nav {
   position: sticky; top: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 32px;
-  background: rgba(26,23,24,0.85); backdrop-filter: blur(20px);
+  background: var(--nav-bg); backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
 }
 .nav-logo { font-size: 1.05rem; font-weight: 700; text-decoration: none; color: var(--text); }
@@ -57,7 +78,7 @@ h1.page { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing:
 .btn {
   display: inline-flex; align-items: center; gap: 10px;
   padding: 14px 26px; border-radius: 8px; border: none; cursor: pointer;
-  background: var(--accent); color: var(--ink);
+  background: var(--accent); color: var(--accent-ink);
   font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
   text-decoration: none; transition: transform .15s, opacity .15s;
 }
@@ -68,14 +89,15 @@ h1.page { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing:
 .btn-blue { background: var(--accent2); color: #fff; }
 
 /* ── PRODUCT GRID ── */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; margin-top: 40px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 20px; margin-top: 40px; }
 .card {
   background: var(--bg3); border: 1px solid var(--border); border-radius: 14px;
   overflow: hidden; text-decoration: none; color: inherit;
-  display: flex; flex-direction: column; transition: border-color .2s, transform .2s;
+  display: flex; flex-direction: column;
+  transition: border-color .2s, transform .2s, box-shadow .2s, background .25s;
 }
-.card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
-.card-cover { aspect-ratio: 16/10; background: linear-gradient(135deg, var(--bg2), var(--bg3)); display: flex; align-items: center; justify-content: center; }
+.card:hover { border-color: var(--border-strong); transform: translateY(-3px); box-shadow: 0 10px 30px rgba(20,16,26,.14); }
+.card-cover { aspect-ratio: 1/1; background: linear-gradient(135deg, var(--bg2), var(--bg3)); display: flex; align-items: center; justify-content: center; }
 .card-cover img { width: 100%; height: 100%; object-fit: cover; }
 .card-cover .ph { font-family: var(--font-mono); color: var(--muted); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; }
 .card-body { padding: 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
@@ -212,7 +234,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
   transition: color .15s, border-color .15s, background .15s; width: auto;
 }
 .filter-chip:hover { color: var(--text); border-color: var(--border-strong); }
-.filter-chip.active { color: var(--ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.filter-chip.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 .filter-row + .grid { margin-top: 22px; }
 
 /* ── CARD POLISH ── */
@@ -227,6 +249,39 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
 .card-actions { display: flex; gap: 8px; margin-top: 14px; }
 .card-actions .btn { flex: 1; }
 .btn-sm { padding: 9px 14px; font-size: .82rem; border-radius: 8px; }
+
+/* ── NAV CONTROLS: theme + view toggles ── */
+.nav-ctrl { display: inline-flex; align-items: center; gap: 8px; }
+.icon-btn {
+  display: inline-grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 10px; border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text); cursor: pointer; font-size: 1rem; line-height: 1;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.icon-btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); transform: translateY(-1px); }
+.view-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.view-seg button {
+  width: 38px; height: 38px; border: 0; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 1rem; line-height: 1; transition: background .15s, color .15s;
+}
+.view-seg button.active { background: var(--accent); color: var(--accent-ink); }
+@media (max-width: 560px) { .view-seg { display: none; } }
+
+/* ── LIST VIEW (toggled on <body data-view="list">) ── */
+body[data-view="list"] .grid { grid-template-columns: 1fr; gap: 12px; }
+body[data-view="list"] .card { flex-direction: row; align-items: stretch; }
+body[data-view="list"] .card-cover { width: 150px; flex: 0 0 150px; aspect-ratio: 1/1; }
+body[data-view="list"] .card-body { flex-direction: row; align-items: center; gap: 20px; flex-wrap: wrap; }
+body[data-view="list"] .card-body > .tag { order: 0; }
+body[data-view="list"] .card-name { order: 1; flex: 1 1 200px; }
+body[data-view="list"] .card-tagline { order: 4; flex: 1 1 100%; }
+body[data-view="list"] .price-row { order: 2; margin: 0; }
+body[data-view="list"] .card-actions { order: 3; margin: 0; flex: 0 0 auto; }
+body[data-view="list"] .card-actions .btn { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  body[data-view="list"] .card-cover { width: 96px; flex-basis: 96px; }
+  body[data-view="list"] .card-body { gap: 10px; }
+}
 
 /* ── TAG CHIPS (landing) ── */
 .tag-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
@@ -253,7 +308,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
 .cart-icon { font-size: 1.05rem; }
 .cart-badge {
   position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px;
-  background: var(--accent); color: var(--ink); border-radius: 100px;
+  background: var(--accent); color: var(--accent-ink); border-radius: 100px;
   font-family: var(--font-mono); font-size: .68rem; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center;
 }
@@ -312,7 +367,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 150;
   display: none; align-items: center; justify-content: space-between; gap: 14px;
   padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
-  background: rgba(33,29,30,0.96); backdrop-filter: blur(16px);
+  background: var(--bar-bg); backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-strong);
   transform: translateY(110%); transition: transform .25s ease;
 }
