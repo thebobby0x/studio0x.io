@@ -411,3 +411,34 @@ footer { border-top: 1px solid var(--border); padding: 28px 32px; text-align: ce
 @media (max-width: 560px) {
   .dl-files .btn { flex: 1 1 100%; justify-content: center; }
 }
+
+/* ── BRAND-AWARE: nav "by studio0x" treatment ── */
+.brand-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; }
+.brand-by {
+  font-family: var(--font-mono); font-size: .62rem; letter-spacing: .04em;
+  color: var(--muted); font-weight: 400; margin-left: 4px;
+}
+.brand-by .brand-name { color: var(--accent); }
+
+/* ── BRAND DIRECTORY (umbrella store) ── */
+.brand-dir-section { margin-top: 40px; }
+.brand-dir-section .eyebrow { margin-bottom: 16px; }
+.brand-dir { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.brand-card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-left: 3px solid var(--card-accent, var(--accent));
+  border-radius: 12px; padding: 20px 22px; text-decoration: none; color: inherit;
+  transition: border-color .2s, transform .2s, background .2s;
+}
+.brand-card:hover { transform: translateY(-3px); border-color: var(--border-strong); border-left-color: var(--card-accent, var(--accent)); }
+.brand-card-name { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -0.02em; color: var(--card-accent, var(--accent)); }
+.brand-card-tag { font-size: .85rem; color: var(--muted); }
+
+/* ── PROVENANCE BADGE (product page) ── */
+.provenance {
+  font-family: var(--font-mono); font-size: .72rem; letter-spacing: .03em;
+  color: var(--muted); margin: 6px 0 12px;
+}
+.provenance strong { color: var(--accent); font-weight: 500; }
+.provenance .brand-name { color: var(--muted); }
