@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>studio0x market — preview</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="./assets/js/config.js"></script>
+<style>
+/* =====================================================================
+   PREVIEW — Humble-Bundle-inspired direction (self-contained, isolated).
+   Light default + dark toggle · square image tiles · grid/list · clean grid.
+   ===================================================================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --raised:#ffffff;
+  --text:#17141a; --muted:#6b6770; --line:#e7e7ec;
+  --accent:#F03D77; --accent-ink:#ffffff; --mint:#0bb98c;
+  --shadow:0 1px 2px rgba(20,16,26,.06), 0 8px 24px rgba(20,16,26,.06);
+  --font:'Inter',system-ui,sans-serif; --display:'Syne',sans-serif; --mono:'DM Mono',monospace;
+  --radius:14px;
+}
+html[data-theme="dark"]{
+  --bg:#1a1718; --surface:#211d1e; --raised:#2a2526;
+  --text:#ffffff; --muted:#b8a9ad; --line:rgba(247,181,205,.12);
+  --accent:#F7B5CD; --accent-ink:#231F20; --mint:#98FFD9;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.brand-name{font-family:var(--mono);font-variant-numeric:slashed-zero;letter-spacing:-.02em}
+img{display:block}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 28px;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.logo{font-family:var(--display);font-weight:800;font-size:1.15rem;letter-spacing:-.02em}
+.logo .z{color:var(--accent)}
+.logo small{display:block;font-family:var(--mono);font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+.nav-right{display:flex;align-items:center;gap:10px}
+.icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--text);cursor:pointer;font-size:1rem;transition:border-color .15s,transform .1s}
+.icon-btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{width:42px;height:40px;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1rem}
+.seg button.active{background:var(--accent);color:var(--accent-ink)}
+
+/* hero banner */
+.hero{max-width:1180px;margin:0 auto;padding:40px 28px 8px}
+.hero .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.hero h1{font-family:var(--display);font-size:clamp(2rem,4.5vw,3.1rem);font-weight:800;letter-spacing:-.03em;line-height:1.04}
+.hero p{color:var(--muted);max-width:560px;margin-top:12px}
+
+/* layout */
+.wrap{max-width:1180px;margin:0 auto;padding:28px}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px}
+.section-head h2{font-family:var(--display);font-weight:800;letter-spacing:-.02em;font-size:1.3rem}
+.count{color:var(--muted);font-family:var(--mono);font-size:.8rem}
+
+/* GRID of square tiles */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s,border-color .15s}
+.tile:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
+  box-shadow:0 10px 30px rgba(20,16,26,.14)}
+.tile-img{position:relative;aspect-ratio:1/1;background:var(--raised);overflow:hidden}
+.tile-img img{width:100%;height:100%;object-fit:cover;object-position:center}
+.tile-img .ph{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.1em}
+.badge{position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;
+  padding:4px 8px;border-radius:6px;background:color-mix(in srgb,var(--accent) 90%,#000);color:#fff;font-weight:600}
+.tile-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.tile-type{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tile-name{font-family:var(--display);font-weight:800;font-size:1.02rem;letter-spacing:-.02em;line-height:1.15}
+.tile-tag{font-size:.84rem;color:var(--muted);flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
+.price{display:flex;align-items:baseline;gap:8px}
+.price .now{font-weight:800;font-size:1.1rem}
+.price .was{color:var(--muted);text-decoration:line-through;font-size:.85rem}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:9px;border:0;cursor:pointer;
+  background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:.85rem;font-family:var(--font)}
+.btn:hover{opacity:.92}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+
+/* LIST view */
+.grid.list{grid-template-columns:1fr;gap:12px}
+.grid.list .tile{flex-direction:row;align-items:stretch}
+.grid.list .tile-img{width:140px;flex:0 0 140px;aspect-ratio:1/1}
+.grid.list .tile-body{flex-direction:row;align-items:center;gap:18px;padding:14px 18px}
+.grid.list .tile-main{flex:1;display:flex;flex-direction:column;gap:4px}
+.grid.list .tile-foot{margin:0;flex:0 0 auto;flex-direction:column;align-items:flex-end;gap:8px}
+.grid.list .tile-tag{-webkit-line-clamp:1}
+@media(max-width:640px){.grid.list .tile-img{width:96px;flex-basis:96px}.grid.list .tile-body{flex-direction:column;align-items:flex-start;gap:8px}.grid.list .tile-foot{flex-direction:row;align-self:stretch;justify-content:space-between}}
+
+footer{border-top:1px solid var(--line);margin-top:40px;padding:24px 28px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.75rem}
+.note{max-width:1180px;margin:0 auto;padding:0 28px}
+.note .chip{display:inline-block;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:100px;padding:4px 12px;font-size:.78rem;font-weight:600;margin-bottom:8px}
+</style>
+</head>
+<body>
+<nav>
+  <a href="#" class="logo">studio<span class="z">0x</span> market<small>preview · humbleBundle-style</small></a>
+  <div class="nav-right">
+    <div class="seg" id="view-seg" title="View">
+      <button data-view="grid" class="active" aria-label="Grid view">▦</button>
+      <button data-view="list" aria-label="List view">☰</button>
+    </div>
+    <button class="icon-btn" id="theme-btn" title="Toggle light / dark">🌙</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">Premium digital kits · instant delivery</div>
+  <h1>Done-for-you kits that<br/>do the work for you.</h1>
+  <p>Templates, decks, prompts & playbooks — square-tile preview with light/dark and grid/list, in the Humble Bundle spirit.</p>
+</header>
+
+<div class="note">
+  <p style="margin-top:18px;"><span class="chip">PREVIEW</span> &nbsp;<span style="color:var(--muted);font-size:.9rem;">Names shown auto-formatted to the camelCase rule (e.g. “openHouse Closer OS”). One example to gauge direction — not yet applied site-wide.</span></p>
+</div>
+
+<main class="wrap">
+  <div class="section-head">
+    <h2>All kits</h2>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="state" style="padding:50px 0;text-align:center;color:var(--muted)">Loading…</div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>© <span id="yr"></span> <span class="brand-name">studio0x LLC</span> · preview build</footer>
+
+<script type="module">
+import { supabase, money, configured } from "./assets/js/supabase-client.js";
+document.getElementById("yr").textContent = new Date().getFullYear();
+
+const gridEl = document.getElementById("grid");
+const stateEl = document.getElementById("state");
+const countEl = document.getElementById("count");
+
+// ── camelCase product-name rule: word1 lowercased-first + word2 capitalized,
+//    joined with no space; remaining words kept spaced. ───────────────
+function camelify(name){
+  const parts = String(name || "").trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  const w1 = parts[0].charAt(0).toLowerCase() + parts[0].slice(1);
+  const w2 = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+  return [w1 + w2, ...parts.slice(2)].join(" ");
+}
+const esc = (s) => (s||"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ── Theme toggle (persisted) ────────────────────────────────────────
+const root = document.documentElement;
+const savedTheme = localStorage.getItem("s0x_theme") || "light";
+root.setAttribute("data-theme", savedTheme);
+const themeBtn = document.getElementById("theme-btn");
+const paintTheme = () => themeBtn.textContent = root.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
+paintTheme();
+themeBtn.addEventListener("click", () => {
+  root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  localStorage.setItem("s0x_theme", root.getAttribute("data-theme"));
+  paintTheme();
+});
+
+// ── View toggle (grid / list, persisted) ────────────────────────────
+const savedView = localStorage.getItem("s0x_view") || "grid";
+if (savedView === "list") gridEl.classList.add("list");
+document.querySelectorAll("#view-seg button").forEach((b) => {
+  b.classList.toggle("active", b.dataset.view === savedView);
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#view-seg button").forEach((x) => x.classList.toggle("active", x === b));
+    gridEl.classList.toggle("list", b.dataset.view === "list");
+    localStorage.setItem("s0x_view", b.dataset.view);
+  });
+});
+
+const ENGINE = { contentos: "contentOS", templatevault: "templateVault" };
+
+function tile(p){
+  const img = p.cover_image_url
+    ? `<img src="${esc(p.cover_image_url)}" alt="${esc(p.name)}" loading="lazy"/>`
+    : `<span class="ph">${esc(p.type||"kit")}</span>`;
+  const eng = ENGINE[p.engine] ? `<span class="badge">${esc(ENGINE[p.engine])}</span>` : "";
+  const was = p.compare_at_cents && p.compare_at_cents > p.price_cents
+    ? `<span class="was">${money(p.compare_at_cents)}</span>` : "";
+  return `
+    <article class="tile">
+      <div class="tile-img">${img}${eng}</div>
+      <div class="tile-body">
+        <div class="tile-main">
+          <span class="tile-type">${esc(p.type||"kit")}</span>
+          <h3 class="tile-name">${esc(camelify(p.name))}</h3>
+          <p class="tile-tag">${esc(p.tagline||"")}</p>
+        </div>
+        <div class="tile-foot">
+          <span class="price"><span class="now">${money(p.price_cents)}</span>${was}</span>
+          <button class="btn">Add to cart</button>
+        </div>
+      </div>
+    </article>`;
+}
+
+async function load(){
+  if (!configured()){ stateEl.textContent = "Storefront not connected."; return; }
+  const { data, error } = await supabase
+    .from("products")
+    .select("name,tagline,type,engine,price_cents,compare_at_cents,cover_image_url,is_featured")
+    .eq("is_active", true)
+    .order("is_featured", { ascending:false })
+    .order("created_at", { ascending:false })
+    .limit(18);
+  if (error){ stateEl.textContent = error.message; return; }
+  if (!data || !data.length){ stateEl.textContent = "No products."; return; }
+  stateEl.remove();
+  countEl.textContent = `${data.length} kits`;
+  gridEl.innerHTML = data.map(tile).join("");
+}
+load();
+</script>
+</body>
+</html>
