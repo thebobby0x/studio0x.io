@@ -20,6 +20,12 @@ const featuredGrid = document.getElementById("featured-grid");
 let PRODUCTS = [];
 let activeType = "all";
 
+// Engine key → display name + blurb for the brand-page engine sections.
+const ENGINES = [
+  { key: "contentos", name: "contentOS", blurb: "AI-written content kits — done-for-you copy, scripts & playbooks." },
+  { key: "templatevault", name: "templateVault", blurb: "Reusable, fill-in templates — ready to customize and use." },
+];
+
 // Apply a brand's theme + copy to the umbrella page chrome.
 async function applyBrand() {
   if (!BRAND_KEY) return;
@@ -89,7 +95,7 @@ async function load() {
   try {
     let query = supabase
       .from("products")
-      .select("id,slug,name,tagline,type,price_cents,compare_at_cents,cover_image_url,is_featured")
+      .select("id,slug,name,tagline,type,engine,price_cents,compare_at_cents,cover_image_url,is_featured")
       .eq("is_active", true);
     if (BRAND_KEY) query = query.eq("brand", BRAND_KEY);
     const { data, error } = await query
@@ -105,8 +111,12 @@ async function load() {
     PRODUCTS = data;
 
     renderFeatured();
-    renderFilters();
-    renderGrid();
+    if (BRAND_KEY) {
+      renderEngineSections();
+    } else {
+      renderFilters();
+      renderGrid();
+    }
   } catch (e) {
     stateEl.innerHTML = `<span class="muted">Couldn't load products: ${escapeHtml(e.message)}</span>`;
   }
@@ -139,6 +149,28 @@ function renderFilters() {
 function renderGrid() {
   const list = activeType === "all" ? PRODUCTS : PRODUCTS.filter((p) => p.type === activeType);
   gridEl.innerHTML = list.map(card).join("");
+  wireCards(gridEl);
+}
+
+// Brand page: replace the single grid with two engine-labeled sections.
+// Products are fetched once (above) and partitioned by engine here.
+function renderEngineSections() {
+  filtersEl.classList.add("hidden");
+  filtersEl.innerHTML = "";
+  gridEl.innerHTML = "";
+
+  const sections = ENGINES.map((eng) => {
+    const list = PRODUCTS.filter((p) => p.engine === eng.key);
+    if (!list.length) return "";
+    return `
+      <section class="engine-section" data-engine="${escapeHtml(eng.key)}">
+        <h2>Made with <span class="engine-name">${escapeHtml(eng.name)}</span></h2>
+        <p class="engine-blurb">${escapeHtml(eng.blurb)}</p>
+        <div class="grid engine-grid">${list.map(card).join("")}</div>
+      </section>`;
+  }).join("");
+
+  gridEl.innerHTML = sections;
   wireCards(gridEl);
 }
 
