@@ -85,7 +85,6 @@ function render() {
   const tags = Array.isArray(landing.tags) ? landing.tags : [];
   const faqs = Array.isArray(landing.faq) ? landing.faq : [];
   const testimonials = Array.isArray(landing.testimonials) ? landing.testimonials : [];
-  const guarantee = landing.guarantee || "30-day no-questions money-back guarantee.";
   const ctaLabel = landing.cta || "Get instant access";
 
   const coverSrc = p.photo_url || p.cover_image_url;
@@ -115,7 +114,7 @@ function render() {
         ${faqs.length ? `<div class="section"><h2>FAQ</h2>${faqs.map((f) => `<div class="faq-item"><div class="faq-q">${esc(f.q)}</div><div class="faq-a">${esc(f.a)}</div></div>`).join("")}</div>` : ""}
         <div class="section center">
           <a class="btn" href="#buy">${esc(ctaLabel)} →</a>
-          <div class="guarantee" style="margin-top:14px;">✅ ${esc(guarantee)}</div>
+          <div class="guarantee" style="margin-top:14px;">⚡ Instant download · yours to keep</div>
         </div>
       </div>
 
@@ -129,10 +128,9 @@ function render() {
           <div class="trust-badges">
             <span>⚡ Instant delivery</span>
             <span>🔒 Secure checkout</span>
-            <span>✅ Guarantee</span>
+            <span>✅ Yours to keep</span>
           </div>
           <div class="guarantee">${PRODUCT.currency.toUpperCase()} · instant delivery</div>
-          <div class="guarantee" style="color:var(--mint);">✅ ${esc(guarantee)}</div>
         </div>
       </aside>
     </div>
