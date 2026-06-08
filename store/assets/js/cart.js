@@ -40,6 +40,7 @@ export function addItem(product) {
     name: product.name,
     price_cents: product.price_cents,
     cover_image_url: product.cover_image_url || null,
+    photo_url: product.photo_url || null,
   });
   write(items);
 }
@@ -156,8 +157,9 @@ function renderDrawer() {
   }
 
   itemsEl.innerHTML = items.map((it) => {
-    const cover = it.cover_image_url
-      ? `<img src="${esc(it.cover_image_url)}" alt="${esc(it.name)}" loading="lazy"/>`
+    const thumbSrc = it.photo_url || it.cover_image_url;
+    const cover = thumbSrc
+      ? `<img src="${esc(thumbSrc)}" alt="${esc(it.name)}" loading="lazy"/>`
       : `<span class="cart-ph"></span>`;
     return `
       <div class="cart-item" data-id="${esc(it.id)}">

@@ -1,5 +1,6 @@
 import { supabase, money, configured } from "./supabase-client.js";
 import { addItem, openDrawer, mountCartToggle } from "./cart.js";
+import { mountThemeToggle } from "./theme.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
 const cfg = window.STORE_CONFIG;
@@ -10,6 +11,35 @@ const BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get
 
 // Mount the cart toggle into the nav.
 mountCartToggle(document.getElementById("cart-mount"));
+
+// Nav controls: theme toggle + grid/list view toggle.
+const navLinks = document.querySelector(".nav-links");
+mountViewToggle(navLinks);
+mountThemeToggle(navLinks);
+
+// Grid / list view — persisted on <body data-view>.
+function mountViewToggle(container) {
+  if (!container) return;
+  const saved = localStorage.getItem("s0x_view") === "list" ? "list" : "grid";
+  document.body.setAttribute("data-view", saved);
+  const seg = document.createElement("div");
+  seg.className = "view-seg";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "View");
+  seg.innerHTML =
+    `<button type="button" data-view="grid" aria-label="Grid view">▦</button>` +
+    `<button type="button" data-view="list" aria-label="List view">☰</button>`;
+  container.insertBefore(seg, container.firstChild);
+  const paint = () => seg.querySelectorAll("button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.view === document.body.getAttribute("data-view")));
+  paint();
+  seg.querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => {
+      document.body.setAttribute("data-view", b.dataset.view);
+      localStorage.setItem("s0x_view", b.dataset.view);
+      paint();
+    }));
+}
 
 const stateEl = document.getElementById("state");
 const gridEl = document.getElementById("grid");
@@ -95,7 +125,7 @@ async function load() {
   try {
     let query = supabase
       .from("products")
-      .select("id,slug,name,tagline,type,engine,price_cents,compare_at_cents,cover_image_url,is_featured")
+      .select("id,slug,name,tagline,type,engine,price_cents,compare_at_cents,photo_url,cover_image_url,is_featured")
       .eq("is_active", true);
     if (BRAND_KEY) query = query.eq("brand", BRAND_KEY);
     const { data, error } = await query
@@ -180,8 +210,9 @@ function productHref(slug) {
 }
 
 function card(p) {
-  const cover = p.cover_image_url
-    ? `<img src="${escapeHtml(p.cover_image_url)}" alt="${escapeHtml(p.name)}" loading="lazy"/>`
+  const src = p.photo_url || p.cover_image_url;
+  const cover = src
+    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(p.name)}" loading="lazy"/>`
     : `<span class="ph">${escapeHtml(p.type || "")}</span>`;
   const compare = p.compare_at_cents && p.compare_at_cents > p.price_cents
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";

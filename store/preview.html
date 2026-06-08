@@ -69,8 +69,8 @@ nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-con
 .tile-img{position:relative;aspect-ratio:1/1;background:var(--raised);overflow:hidden}
 .tile-img img{width:100%;height:100%;object-fit:cover;object-position:center}
 .tile-img .ph{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.1em}
-.badge{position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;
-  padding:4px 8px;border-radius:6px;background:color-mix(in srgb,var(--accent) 90%,#000);color:#fff;font-weight:600}
+.badge{position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:.66rem;letter-spacing:0;
+  padding:4px 9px;border-radius:6px;background:color-mix(in srgb,var(--accent) 90%,#000);color:#fff;font-weight:600}
 .tile-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
 .tile-type{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .tile-name{font-family:var(--display);font-weight:800;font-size:1.02rem;letter-spacing:-.02em;line-height:1.15}
@@ -119,7 +119,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:24px 28px;text-a
 </header>
 
 <div class="note">
-  <p style="margin-top:18px;"><span class="chip">PREVIEW</span> &nbsp;<span style="color:var(--muted);font-size:.9rem;">Names shown auto-formatted to the camelCase rule (e.g. “openHouse Closer OS”). One example to gauge direction — not yet applied site-wide.</span></p>
+  <p style="margin-top:18px;"><span class="chip">PREVIEW</span> &nbsp;<span style="color:var(--muted);font-size:.9rem;">camelCase names &amp; representative photos pulled live from the catalog. One example to gauge direction — not yet applied site-wide.</span></p>
 </div>
 
 <main class="wrap">
@@ -141,15 +141,8 @@ const gridEl = document.getElementById("grid");
 const stateEl = document.getElementById("state");
 const countEl = document.getElementById("count");
 
-// ── camelCase product-name rule: word1 lowercased-first + word2 capitalized,
-//    joined with no space; remaining words kept spaced. ───────────────
-function camelify(name){
-  const parts = String(name || "").trim().split(/\s+/);
-  if (parts.length < 2) return name;
-  const w1 = parts[0].charAt(0).toLowerCase() + parts[0].slice(1);
-  const w2 = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
-  return [w1 + w2, ...parts.slice(2)].join(" ");
-}
+// Product names are stored already conforming to the camelCase brand rule
+// (e.g. "openHouse Closer OS"), so they render verbatim.
 const esc = (s) => (s||"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 // ── Theme toggle (persisted) ────────────────────────────────────────
@@ -180,8 +173,9 @@ document.querySelectorAll("#view-seg button").forEach((b) => {
 const ENGINE = { contentos: "contentOS", templatevault: "templateVault" };
 
 function tile(p){
-  const img = p.cover_image_url
-    ? `<img src="${esc(p.cover_image_url)}" alt="${esc(p.name)}" loading="lazy"/>`
+  const src = p.photo_url || p.cover_image_url;
+  const img = src
+    ? `<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy"/>`
     : `<span class="ph">${esc(p.type||"kit")}</span>`;
   const eng = ENGINE[p.engine] ? `<span class="badge">${esc(ENGINE[p.engine])}</span>` : "";
   const was = p.compare_at_cents && p.compare_at_cents > p.price_cents
@@ -192,7 +186,7 @@ function tile(p){
       <div class="tile-body">
         <div class="tile-main">
           <span class="tile-type">${esc(p.type||"kit")}</span>
-          <h3 class="tile-name">${esc(camelify(p.name))}</h3>
+          <h3 class="tile-name">${esc(p.name)}</h3>
           <p class="tile-tag">${esc(p.tagline||"")}</p>
         </div>
         <div class="tile-foot">
@@ -207,7 +201,7 @@ async function load(){
   if (!configured()){ stateEl.textContent = "Storefront not connected."; return; }
   const { data, error } = await supabase
     .from("products")
-    .select("name,tagline,type,engine,price_cents,compare_at_cents,cover_image_url,is_featured")
+    .select("name,tagline,type,engine,price_cents,compare_at_cents,photo_url,cover_image_url,is_featured")
     .eq("is_active", true)
     .order("is_featured", { ascending:false })
     .order("created_at", { ascending:false })

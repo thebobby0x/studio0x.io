@@ -1,8 +1,10 @@
 // Customer-facing account portal (ES module).
 // Separate from admin.js — any signed-in non-admin is a "customer".
 import { supabase, money, qs, configured } from "./supabase-client.js";
+import { mountThemeToggle } from "./theme.js";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
+mountThemeToggle(document.querySelector(".nav-links"));
 
 const loginView = document.getElementById("login-view");
 const dash = document.getElementById("dash");
