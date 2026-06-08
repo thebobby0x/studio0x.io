@@ -131,6 +131,7 @@ function render() {
             <span>✅ Yours to keep</span>
           </div>
           <div class="guarantee">${PRODUCT.currency.toUpperCase()} · instant delivery</div>
+          <div class="guarantee" style="margin-top:8px;">By purchasing you agree to our <a href="./terms.html" style="color:var(--muted);text-decoration:underline;">Terms &amp; refund policy</a></div>
         </div>
       </aside>
     </div>

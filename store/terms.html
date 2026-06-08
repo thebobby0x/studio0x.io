@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Terms & Refund Policy — studio0x market</title>
+<meta name="description" content="Terms of sale and the 7-day refund policy for studio0x market digital products." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./assets/css/store.css" />
+<script src="./assets/js/config.js"></script>
+<script>try{var t=localStorage.getItem('s0x_theme');if(!t)t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<style>
+  .legal { max-width: 760px; margin: 0 auto; padding: 32px 0 64px; line-height: 1.65; }
+  .legal h1.page { margin-bottom: 6px; }
+  .legal .updated { color: var(--muted); font-family: var(--font-mono); font-size: .8rem; margin-bottom: 32px; }
+  .legal h2 { margin-top: 40px; letter-spacing: -0.01em; }
+  .legal h3 { margin-top: 24px; font-size: 1.02rem; }
+  .legal p, .legal li { color: var(--text); }
+  .legal ul, .legal ol { padding-left: 22px; }
+  .legal li { margin: 7px 0; }
+  .legal .callout { border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:10px; padding:16px 18px; margin:22px 0; background:var(--surface); }
+  .legal .field { display:flex; flex-direction:column; gap:6px; margin:14px 0; }
+  .legal label { font-family: var(--font-mono); font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .legal input, .legal select, .legal textarea {
+    background:var(--surface); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:11px 13px; font:inherit; width:100%; }
+  .legal textarea { min-height:96px; resize:vertical; }
+  .legal .req { color:var(--accent); }
+  .legal .form-note { font-size:.85rem; color:var(--muted); margin-top:10px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="./index.html" class="nav-logo brand-name">studio<span>0x</span> market</a>
+  <div class="nav-links">
+    <a href="./index.html#products">Products</a>
+    <a href="./account.html">Account</a>
+    <a class="btn" href="./index.html#products">Browse →</a>
+    <span id="cart-mount" class="cart-mount"></span>
+  </div>
+</nav>
+
+<section class="wrap">
+<div class="legal">
+  <h1 class="page">Terms &amp; Refund Policy</h1>
+  <div class="updated">Last updated: 8 June 2026</div>
+
+  <p>These terms govern purchases of digital products from <span class="brand-name">studio0x market</span>
+  (operated by <span class="brand-name">studio0x LLC</span>). By completing a purchase you agree to them.
+  Our products are <strong>digital goods delivered instantly</strong> — you receive access to download
+  the moment payment is confirmed.</p>
+
+  <h2>Refund policy — 7 days</h2>
+  <p>We want you to be happy with your purchase. You may request a refund <strong>within 7 days</strong> of
+  the purchase date, subject to the conditions below. We review <strong>every</strong> request individually.</p>
+
+  <h3>Before you request a refund</h3>
+  <p>Because these are instant-access digital products, we ask that you act in good faith:
+  <strong>please genuinely open and attempt to use the product first.</strong> Many concerns
+  (formatting, how to edit a template, which app to open a file in) are quick to resolve, and we'd
+  rather help you get value from what you bought than process a refund you didn't need.</p>
+
+  <h3>How requests work</h3>
+  <ul>
+    <li>Every refund request must be submitted through the <strong>complete request form below</strong> —
+      partial or informal requests can't be processed.</li>
+    <li>Every request is <strong>reviewed by a real person</strong>, who may follow up with additional
+      questions before a decision is made.</li>
+    <li>We aim to respond within <strong>3 business days</strong> of a complete submission.</li>
+    <li>Approved refunds are returned to your original payment method; banks typically post them within
+      5–10 business days.</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Your statutory rights are unaffected.</strong> Nothing in this policy limits any
+    non-waivable consumer rights you may have under the laws of your country or state (for example,
+    rights relating to products that are faulty, not as described, or not delivered). Where the law
+    gives you stronger rights than this policy, the law applies.
+  </div>
+
+  <h2>Request a refund</h2>
+  <p>Complete all required (<span class="req">*</span>) fields. Submitting opens an email to our team with
+  your details so a human can review it.</p>
+  <form id="refund-form">
+    <div class="field">
+      <label for="rf-email">Purchase email <span class="req">*</span></label>
+      <input id="rf-email" type="email" required placeholder="the email you used at checkout" />
+    </div>
+    <div class="field">
+      <label for="rf-order">Order / receipt ID <span class="req">*</span></label>
+      <input id="rf-order" type="text" required placeholder="from your Stripe receipt or the success page" />
+    </div>
+    <div class="field">
+      <label for="rf-product">Product name(s) <span class="req">*</span></label>
+      <input id="rf-product" type="text" required placeholder="which product(s) this is about" />
+    </div>
+    <div class="field">
+      <label for="rf-date">Purchase date <span class="req">*</span></label>
+      <input id="rf-date" type="date" required />
+    </div>
+    <div class="field">
+      <label for="rf-reason">Primary reason <span class="req">*</span></label>
+      <select id="rf-reason" required>
+        <option value="">— select —</option>
+        <option>File won't download / won't open / appears corrupted</option>
+        <option>Product not as described on the page</option>
+        <option>Accidental or duplicate purchase</option>
+        <option>Unauthorized charge (I didn't make this purchase)</option>
+        <option>Needs software I don't have (compatibility)</option>
+        <option>Too advanced / too basic for my needs</option>
+        <option>Expected fully done-for-you, not a template</option>
+        <option>Quality did not meet my expectations</option>
+        <option>No longer need it / changed my mind</option>
+        <option>Other (explain below)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="rf-tried">What did you try before requesting? <span class="req">*</span></label>
+      <textarea id="rf-tried" required placeholder="Tell us how you used or attempted to use the product, and what went wrong. This helps us help you (or process the refund) faster."></textarea>
+    </div>
+    <div class="field">
+      <label for="rf-details">Anything else</label>
+      <textarea id="rf-details" placeholder="optional"></textarea>
+    </div>
+    <button class="btn" type="submit">Submit refund request →</button>
+    <div class="form-note">Prefer email? Send the same details to
+      <a href="mailto:b@studio0x.io" style="color:var(--accent);">b@studio0x.io</a>.</div>
+  </form>
+
+  <h2>License &amp; use</h2>
+  <ul>
+    <li>Your purchase grants you a non-exclusive license to use the product for your own business or personal use.</li>
+    <li>Please don't resell, redistribute, or share the source files as-is. The outputs you create with them are yours.</li>
+    <li>Downloads are tied to your purchase; access links refresh from your account / the success page.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Questions about an order or these terms? Email
+    <a href="mailto:b@studio0x.io" style="color:var(--accent);">b@studio0x.io</a>.</p>
+</div>
+</section>
+
+<footer>
+  © <span id="yr"></span> <span class="brand-name">studio0x LLC</span> ·
+  <a href="./index.html" style="color:var(--accent);text-decoration:none;">Store</a> ·
+  Secure checkout by Stripe ·
+  <a href="mailto:b@studio0x.io" style="color:var(--accent);text-decoration:none;">b@studio0x.io</a>
+</footer>
+
+<script type="module">
+  import { mountThemeToggle } from "./assets/js/theme.js";
+  mountThemeToggle(document.querySelector(".nav-links"));
+  document.getElementById("yr").textContent = new Date().getFullYear();
+  const f = document.getElementById("refund-form");
+  f.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = (id) => document.getElementById(id).value.trim();
+    const body = [
+      `Purchase email: ${v("rf-email")}`,
+      `Order / receipt ID: ${v("rf-order")}`,
+      `Product(s): ${v("rf-product")}`,
+      `Purchase date: ${v("rf-date")}`,
+      `Reason: ${v("rf-reason")}`,
+      ``,
+      `What I tried before requesting:`,
+      v("rf-tried"),
+      ``,
+      `Anything else:`,
+      v("rf-details") || "(none)",
+      ``,
+      `— Submitted from the studio0x market refund form`,
+    ].join("\n");
+    const subject = `Refund request — ${v("rf-product")} (${v("rf-order")})`;
+    window.location.href =
+      `mailto:b@studio0x.io?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  });
+</script>
+</body>
+</html>
