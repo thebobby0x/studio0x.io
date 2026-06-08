@@ -98,6 +98,9 @@ Deno.serve(async (req) => {
       cancel_url: cancelUrl || `${origin}/store/`,
       allow_promotion_codes: true,
       metadata: {
+        // Brand marker so the webhook can ignore events from other products
+        // sharing this Stripe account (see stripe-webhook fulfill guard).
+        source: "studio0x-market",
         // Comma-separated lists; the webhook fulfills each.
         product_ids: active.map((p) => p.id).join(","),
         addon_ids: addons.map((a) => a.id).join(","),

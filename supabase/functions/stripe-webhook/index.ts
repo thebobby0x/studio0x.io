@@ -53,6 +53,15 @@ Deno.serve(async (req) => {
 });
 
 async function fulfill(session: Stripe.Checkout.Session) {
+  // Shared Stripe account guard: this account also serves other brands, and
+  // Stripe delivers every checkout.session.completed to every endpoint. Only
+  // fulfill sessions our own checkout stamped — ignore everything else so we
+  // never create junk orders or email another brand's customers.
+  if (session.metadata?.source !== "studio0x-market") {
+    console.log("skipping non-studio0x session", session.id);
+    return;
+  }
+
   const email = session.customer_details?.email ?? session.customer_email ?? null;
   const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   // Supports cart (product_ids) and legacy single (product_id).
