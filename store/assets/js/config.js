@@ -18,4 +18,10 @@ window.STORE_CONFIG = {
   currency: "usd",
   // Support / from email shown on pages
   supportEmail: "b@studio0x.io",
+
+  // Launch pricing window. While now < this date, product pages reframe each
+  // product's compare-at price as where the price is HEADING, with a live day
+  // countdown ("going up to $57 in N days"). After it passes, pages fall back
+  // to the normal strikethrough. Update this date to relaunch.
+  launchPriceUntil: "2026-06-16T23:59:59",
 };
