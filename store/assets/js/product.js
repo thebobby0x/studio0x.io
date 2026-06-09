@@ -93,6 +93,14 @@ function render() {
     : `<span class="ph">${esc(p.type)}</span>`;
   const compare = p.compare_at_cents && p.compare_at_cents > p.price_cents
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";
+  // Launch pricing: while the window is open, reframe the regular (compare-at)
+  // price as where the price is HEADING, with a live day countdown.
+  const launchUntil = window.STORE_CONFIG?.launchPriceUntil ? new Date(window.STORE_CONFIG.launchPriceUntil) : null;
+  const launchActive = !!(launchUntil && launchUntil > new Date() && p.compare_at_cents && p.compare_at_cents > p.price_cents);
+  const daysLeft = launchActive ? Math.max(1, Math.ceil((launchUntil - new Date()) / 86400000)) : 0;
+  const launchBlock = launchActive
+    ? `<div class="launch-badge">🚀 Launch price</div><div class="launch-line">Going up to <strong>${money(p.compare_at_cents)}</strong> in ${daysLeft} day${daysLeft === 1 ? "" : "s"} — lock in the intro price.</div>`
+    : "";
   const tagChips = tags.length
     ? `<div class="tag-chips">${tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>` : "";
   const engineName = ENGINE_NAMES[p.engine];
@@ -120,7 +128,8 @@ function render() {
 
       <aside id="buy">
         <div class="buy-box">
-          <div class="buy-price"><span class="price">${money(p.price_cents)}</span>${compare}</div>
+          <div class="buy-price"><span class="price">${money(p.price_cents)}</span>${launchActive ? "" : compare}</div>
+          ${launchBlock}
           ${ADDONS.length ? `<div class="bump-badge">★ Add these — most buyers do</div><div class="addons" id="addons">${ADDONS.map(addonRow).join("")}</div>` : ""}
           <div class="total-row"><span class="label">Total today</span><span class="amt" id="total">${money(p.price_cents)}</span></div>
           <button class="btn btn-block" id="buy-btn">${esc(ctaLabel)} →</button>
