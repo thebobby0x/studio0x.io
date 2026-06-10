@@ -88,12 +88,14 @@ async function applyBrand() {
 }
 
 // Umbrella store only: render a "Shop by brand" directory above the grid.
+let BRANDS = [];
 async function renderBrandDirectory() {
   if (BRAND_KEY) return;
   try {
     const { data } = await supabase
       .from("brands").select("*").eq("is_active", true).order("sort", { ascending: true });
     if (!data || !data.length) return;
+    BRANDS = data;
     const wrap = document.createElement("section");
     wrap.className = "brand-dir-section";
     wrap.innerHTML =
@@ -121,11 +123,11 @@ async function load() {
     return;
   }
   await applyBrand();
-  renderBrandDirectory();
+  await renderBrandDirectory();
   try {
     let query = supabase
       .from("products")
-      .select("id,slug,name,tagline,type,engine,price_cents,compare_at_cents,photo_url,cover_image_url,is_featured")
+      .select("id,slug,name,tagline,type,engine,brand,price_cents,compare_at_cents,photo_url,cover_image_url,is_featured")
       .eq("is_active", true);
     if (BRAND_KEY) query = query.eq("brand", BRAND_KEY);
     const { data, error } = await query
@@ -144,8 +146,7 @@ async function load() {
     if (BRAND_KEY) {
       renderEngineSections();
     } else {
-      renderFilters();
-      renderGrid();
+      renderBrandSections();
     }
   } catch (e) {
     stateEl.innerHTML = `<span class="muted">Couldn't load products: ${escapeHtml(e.message)}</span>`;
@@ -205,6 +206,34 @@ function renderEngineSections() {
   }).join("");
 
   gridEl.innerHTML = sections;
+  wireCards(gridEl);
+}
+
+// Umbrella page: group all products into per-brand sections, ordered by the
+// brand directory. Same visual pattern as the brand-page engine sections.
+function renderBrandSections() {
+  filtersEl.classList.add("hidden");
+  filtersEl.innerHTML = "";
+  gridEl.classList.remove("grid");
+
+  const present = [...new Set(PRODUCTS.map((p) => p.brand).filter(Boolean))];
+  const order = BRANDS.map((b) => b.key).filter((k) => present.includes(k));
+  const keys = order.concat(present.filter((k) => !order.includes(k)));
+  const meta = (k) => BRANDS.find((b) => b.key === k) || {};
+
+  const sections = keys.map((k) => {
+    const list = PRODUCTS.filter((p) => p.brand === k);
+    if (!list.length) return "";
+    const b = meta(k);
+    return `
+      <section class="engine-section brand-section" data-brand="${escapeHtml(k)}">
+        <h2><span class="engine-name">${escapeHtml(b.name || k)}</span></h2>
+        <p class="engine-blurb">${escapeHtml(b.tagline || "")}</p>
+        <div class="grid engine-grid">${list.map(card).join("")}</div>
+      </section>`;
+  }).join("");
+
+  gridEl.innerHTML = sections || `<p class="muted" style="margin-top:40px;">No products yet.</p>`;
   wireCards(gridEl);
 }
 
