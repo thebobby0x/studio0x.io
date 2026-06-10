@@ -69,7 +69,7 @@ nav {
 .nav-links a.btn { color: var(--accent-ink); } /* keep the CTA readable on the pink fill */
 
 /* ── LAYOUT ── */
-.wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 48px 32px; }
 .wrap-narrow { max-width: 760px; margin: 0 auto; padding: 48px 32px; }
 .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
 h1.page { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; }
@@ -529,4 +529,4 @@ body[data-view="list"] .card-actions .btn { flex: 0 0 auto; }
   color: var(--muted); font-size: .95rem; margin-bottom: 22px;
   max-width: 60ch;
 }
-.engine-grid { margin-top: 0; }
+.engine-grid { margin-top: 20px; }
