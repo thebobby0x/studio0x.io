@@ -177,6 +177,7 @@ function renderFilters() {
 }
 
 function renderGrid() {
+  gridEl.classList.add("grid");
   const list = activeType === "all" ? PRODUCTS : PRODUCTS.filter((p) => p.type === activeType);
   gridEl.innerHTML = list.map(card).join("");
   wireCards(gridEl);
@@ -187,6 +188,9 @@ function renderGrid() {
 function renderEngineSections() {
   filtersEl.classList.add("hidden");
   filtersEl.innerHTML = "";
+  // The sections stack full-width; each inner .engine-grid is the card grid.
+  // (Without this, #grid's own card-grid CSS squeezes the 2 sections into 2 cramped columns.)
+  gridEl.classList.remove("grid");
   gridEl.innerHTML = "";
 
   const sections = ENGINES.map((eng) => {
@@ -216,13 +220,11 @@ function card(p) {
     : `<span class="ph">${escapeHtml(p.type || "")}</span>`;
   const compare = p.compare_at_cents && p.compare_at_cents > p.price_cents
     ? `<span class="compare">${money(p.compare_at_cents)}</span>` : "";
-  const star = p.is_featured ? `<span class="card-star" title="Featured">★</span>` : "";
   const href = productHref(p.slug);
   return `
     <div class="card" data-id="${escapeHtml(p.id)}">
       <a class="card-cover" href="${href}">
         ${cover}
-        ${star}
       </a>
       <div class="card-body">
         <span class="tag">${escapeHtml(p.type || "")}</span>
