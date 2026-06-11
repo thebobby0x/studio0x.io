@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
-import { Trophy, Wifi } from "lucide-react";
+import Link from "next/link";
+import { Trophy, Wifi, Music2 } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import SentimentTickers from "@/components/sentiment/SentimentTickers";
 import AnthemPlayer from "@/components/anthem/AnthemPlayer";
@@ -35,9 +36,18 @@ export default async function DashboardPage() {
             <span className="text-brand-border">·</span>
             <span className="text-sm text-slate-400">World Cup 2026</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Wifi size={12} className="text-brand-green" />
-            <span>Live data feed active</span>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/anthems"
+              className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors"
+            >
+              <Music2 size={13} />
+              Anthem Hub
+            </Link>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Wifi size={12} className="text-brand-green" />
+              <span>Live data feed active</span>
+            </div>
           </div>
         </div>
       </nav>
