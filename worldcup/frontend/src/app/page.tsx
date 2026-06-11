@@ -4,16 +4,15 @@ import LiveMatchCard from "@/components/match/LiveMatchCard";
 import SentimentTickers from "@/components/sentiment/SentimentTickers";
 import AnthemPlayer from "@/components/anthem/AnthemPlayer";
 import type { Match, AudioStream } from "@/lib/types";
+import { prisma } from "@/lib/prisma";
 
 async function getInitialData() {
   try {
-    const [matchesRes, audioRes] = await Promise.all([
-      fetch("http://localhost:4000/api/matches", { cache: "no-store" }),
-      fetch("http://localhost:4000/api/audio",   { cache: "no-store" }),
+    const [matches, streams] = await Promise.all([
+      prisma.match.findMany({ include: { homeTeam: true, awayTeam: true }, orderBy: { date: "asc" } }),
+      prisma.audioStream.findMany({ include: { team: true } }),
     ]);
-    const matches: Match[] = matchesRes.ok ? await matchesRes.json() : [];
-    const streams: AudioStream[] = audioRes.ok ? await audioRes.json() : [];
-    return { matches, streams };
+    return { matches: matches as unknown as Match[], streams: streams as unknown as AudioStream[] };
   } catch {
     return { matches: [], streams: [] };
   }
@@ -21,11 +20,11 @@ async function getInitialData() {
 
 export default async function DashboardPage() {
   const { matches, streams } = await getInitialData();
-  const liveMatch = matches.find((m) => m.status === "LIVE" || m.status === "NS" || m.status === "HT") ?? matches[0];
+  const liveMatch = matches.find((m) => ["LIVE", "NS", "HT"].includes(m.status)) ?? matches[0];
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      {/* Top nav */}
+      {/* Nav */}
       <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -42,7 +41,6 @@ export default async function DashboardPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* Page heading */}
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">
             FIFA World Cup 2026 <span className="text-brand-gold">Stats Engine</span>
@@ -54,49 +52,41 @@ export default async function DashboardPage() {
 
         {liveMatch ? (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Main column: match + markets */}
             <div className="xl:col-span-2 space-y-6">
-              {/* Section label */}
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
                 <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                   Opening Match · Group A
                 </span>
               </div>
-
               <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
                 <LiveMatchCard matchId={liveMatch.id} />
               </Suspense>
-
               <Suspense fallback={<div className="h-28 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
                 <SentimentTickers matchId={liveMatch.id} />
               </Suspense>
             </div>
 
-            {/* Side column: anthems */}
             <div className="space-y-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Anthem Hub</span>
               </div>
-              <Suspense fallback={<div className="h-96 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
-                <AnthemPlayer streams={streams} />
+              <AnthemPlayer streams={streams} />
+              <Suspense fallback={null}>
+                <LineupCard matchId={liveMatch.id} />
               </Suspense>
-
-              {/* Lineup shortcut */}
-              <LineupCard matchId={liveMatch.id} />
             </div>
           </div>
         ) : (
           <div className="text-center py-20 text-slate-500">
             <Trophy size={48} className="mx-auto mb-4 opacity-30" />
-            <p className="text-lg font-semibold">No matches loaded yet.</p>
-            <p className="text-sm mt-1">Run the seed script to populate match data.</p>
+            <p className="text-lg font-semibold">No matches loaded.</p>
           </div>
         )}
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup Stats Engine · V1 MVP · Data refreshes every 5 seconds
+        Studio0x.io · World Cup 2026 Stats Engine · V1 MVP · Data refreshes every 5 seconds
       </footer>
     </div>
   );
@@ -104,11 +94,20 @@ export default async function DashboardPage() {
 
 async function LineupCard({ matchId }: { matchId: string }) {
   try {
-    const res = await fetch(`http://localhost:4000/api/matches/${matchId}/lineup`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const match = await prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        homeTeam: { include: { homePlayers: true } },
+        awayTeam: { include: { homePlayers: true } },
+      },
+    });
+    if (!match) return null;
 
     const positions = ["GK", "DEF", "MID", "FWD"];
+    const sides = [
+      { team: match.homeTeam.name, players: match.homeTeam.homePlayers },
+      { team: match.awayTeam.name, players: match.awayTeam.homePlayers },
+    ];
 
     return (
       <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
@@ -116,16 +115,16 @@ async function LineupCard({ matchId }: { matchId: string }) {
           Starting Lineups
         </div>
         <div className="grid grid-cols-2 divide-x divide-brand-border">
-          {[data.home, data.away].map((side: { team: string; players: Array<{ number: number; name: string; position: string }> }) => (
+          {sides.map((side) => (
             <div key={side.team} className="p-3">
               <div className="text-xs font-bold text-white mb-2">{side.team}</div>
               {positions.map((pos) => {
-                const pp = side.players.filter((p: { position: string }) => p.position === pos);
+                const pp = (side.players as Array<{ id: string; number: number; name: string; position: string }>).filter((p) => p.position === pos);
                 if (!pp.length) return null;
                 return (
                   <div key={pos} className="mb-2">
                     <div className="text-[10px] text-slate-600 uppercase mb-1">{pos}</div>
-                    {pp.map((p: { number: number; name: string }) => (
+                    {pp.map((p: { number: number; name: string; id: string }) => (
                       <div key={p.number} className="flex items-center gap-1.5 text-xs text-slate-300 py-0.5">
                         <span className="text-[10px] text-slate-600 w-4 text-right">{p.number}</span>
                         <span>{p.name}</span>

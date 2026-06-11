@@ -1,14 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://localhost:4000/api/:path*",
-      },
-    ];
-  },
+  // All API calls are now Next.js API routes — no external proxy needed
 };
 
 export default nextConfig;
