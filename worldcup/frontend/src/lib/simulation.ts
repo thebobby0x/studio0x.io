@@ -51,14 +51,13 @@ export function elapsedFromDate(matchDate: Date): number {
   const ms = Date.now() - matchDate.getTime();
   if (ms <= 0) return 0;
   const mins = Math.floor(ms / 60000);
-  // Cycle through a 95-min window: 0-90 match, 91-94 FT display, then repeat
-  const pos = mins % 95;
-  return Math.min(90, pos);
+  // Cycle through minutes 1-89 so the match is always LIVE
+  return (mins % 89) + 1;
 }
 
 export function statusFromElapsed(elapsed: number): string {
   if (elapsed === 0)               return "NS";
   if (elapsed >= 90)               return "FT";
-  if (elapsed >= 45 && elapsed <= 46) return "HT";
+  if (elapsed === 45)              return "HT";
   return "LIVE";
 }

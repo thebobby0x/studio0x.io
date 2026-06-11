@@ -62,14 +62,14 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
       const res = await fetch(`/api/matches/${matchId}/live`);
       const data = await res.json();
       const incoming: KalshiMarket[] = data.markets ?? [];
-      setPrev((p) => {
-        const next = { ...p };
-        for (const m of markets) next[m.outcome] = m.price;
-        return next;
+      setMarkets((current) => {
+        const prevPrices: Record<string, number> = {};
+        for (const m of current) prevPrices[m.outcome] = m.price;
+        setPrev(prevPrices);
+        return incoming;
       });
-      setMarkets(incoming);
     } catch {}
-  }, [matchId, markets]);
+  }, [matchId]);
 
   useEffect(() => {
     load();
