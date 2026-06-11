@@ -1,0 +1,19 @@
+{
+  "name": "worldcup-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names API,WEB --prefix-colors green,cyan \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "seed": "cd backend && npx tsx ../scripts/seed.ts",
+    "migrate": "cd backend && npx prisma db push --schema=../prisma/schema.prisma",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prisma": "^5.22.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}
+
