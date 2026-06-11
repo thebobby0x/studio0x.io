@@ -20,9 +20,6 @@ function Track({ stream }: { stream: AudioStream }) {
   const [elapsed, setElapsed] = useState(0);
   const [playCount, setPlayCount] = useState(stream.playCount);
 
-  // Because these are mock URLs we use a silent audio data URI as stand-in
-  const SILENT_MP3 = "data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZFRlYW0gQ3JlYXRpdmUgQ29tbW9ucyBBdHRyaWJ1dGlvbgBURU5DAAAAHQAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-
   function startListenTimer() {
     if (listenTimerRef.current) return;
     listenTimerRef.current = setInterval(() => {
@@ -89,7 +86,7 @@ function Track({ stream }: { stream: AudioStream }) {
 
       {/* Player controls */}
       <div className="p-4">
-        <audio ref={audioRef} src={SILENT_MP3} loop preload="none" muted={muted} />
+        <audio ref={audioRef} src={stream.audioUrl} loop preload="none" muted={muted} />
 
         {/* Progress bar */}
         <div className="w-full h-1 bg-brand-border rounded-full mb-3 overflow-hidden">
