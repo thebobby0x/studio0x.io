@@ -44,6 +44,12 @@ export default async function DashboardPage() {
               <Music2 size={13} />
               Anthem Hub
             </Link>
+            <Link
+              href="/admin/anthems"
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Admin
+            </Link>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Wifi size={12} className="text-brand-green" />
               <span>Live data feed active</span>
