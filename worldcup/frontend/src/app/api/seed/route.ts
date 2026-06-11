@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // Protected by SEED_SECRET env var — call with ?secret=YOUR_SECRET
+export async function GET(req: Request) {
+  return seed(req);
+}
+
 export async function POST(req: Request) {
+  return seed(req);
+}
+
+async function seed(req: Request) {
   const { searchParams } = new URL(req.url);
   const secret = searchParams.get("secret");
   if (secret !== process.env.SEED_SECRET) {
