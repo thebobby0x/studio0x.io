@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import type { KalshiMarket } from "@/lib/types";
+import { TrendingUp, TrendingDown, Minus, Wifi, FlaskConical } from "lucide-react";
+import type { KalshiMarket, DataSources } from "@/lib/types";
 
 const OUTCOME_LABELS: Record<string, string> = {
   home_win: "MEX Win",
@@ -56,12 +56,14 @@ function TickerCard({ market, prev }: { market: KalshiMarket; prev?: number }) {
 export default function SentimentTickers({ matchId }: { matchId: string }) {
   const [markets, setMarkets] = useState<KalshiMarket[]>([]);
   const [prev, setPrev] = useState<Record<string, number>>({});
+  const [marketSource, setMarketSource] = useState<DataSources["markets"]>("sim");
 
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/matches/${matchId}/live`);
       const data = await res.json();
       const incoming: KalshiMarket[] = data.markets ?? [];
+      setMarketSource(data.dataSources?.markets ?? "sim");
       setMarkets((current) => {
         const prevPrices: Record<string, number> = {};
         for (const m of current) prevPrices[m.outcome] = m.price;
@@ -89,7 +91,15 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Kalshi Prediction Markets</span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-400">LIVE IMPLIED PROBABILITY</span>
+        {marketSource === "sim" ? (
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-500">
+            <FlaskConical size={9} /> Simulated
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green font-semibold">
+            <Wifi size={9} /> Kalshi Live
+          </span>
+        )}
       </div>
       <div className="flex gap-3 flex-wrap">
         {markets.map((m) => (
