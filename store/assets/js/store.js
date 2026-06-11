@@ -186,31 +186,32 @@ function renderGrid() {
 
 // Brand page: replace the single grid with two engine-labeled sections.
 // Products are fetched once (above) and partitioned by engine here.
-function renderEngineSections() {
-  filtersEl.classList.add("hidden");
-  filtersEl.innerHTML = "";
-  // The sections stack full-width; each inner .engine-grid is the card grid.
-  // (Without this, #grid's own card-grid CSS squeezes the 2 sections into 2 cramped columns.)
-  gridEl.classList.remove("grid");
-  gridEl.innerHTML = "";
-
-  const sections = ENGINES.map((eng) => {
-    const list = PRODUCTS.filter((p) => p.engine === eng.key);
-    if (!list.length) return "";
+// Build the "Made with <engine>" sections for a given product list — shared by
+// the brand pages and the umbrella's per-brand groups so they look identical.
+function engineSectionsHTML(list) {
+  return ENGINES.map((eng) => {
+    const items = list.filter((p) => p.engine === eng.key);
+    if (!items.length) return "";
     return `
       <section class="engine-section" data-engine="${escapeHtml(eng.key)}">
         <h2>Made with <span class="engine-name">${escapeHtml(eng.name)}</span></h2>
         <p class="engine-blurb">${escapeHtml(eng.blurb)}</p>
-        <div class="grid engine-grid">${list.map(card).join("")}</div>
+        <div class="grid engine-grid">${items.map(card).join("")}</div>
       </section>`;
   }).join("");
+}
 
-  gridEl.innerHTML = sections;
+// Brand page: split the brand's products into engine sections.
+function renderEngineSections() {
+  filtersEl.classList.add("hidden");
+  filtersEl.innerHTML = "";
+  gridEl.classList.remove("grid"); // sections stack full-width; .engine-grid is the card grid
+  gridEl.innerHTML = engineSectionsHTML(PRODUCTS);
   wireCards(gridEl);
 }
 
-// Umbrella page: group all products into per-brand sections, ordered by the
-// brand directory. Same visual pattern as the brand-page engine sections.
+// Umbrella page: group products by brand, then split each brand into engine
+// sections (contentOS / templateVault) — same style as the brand pages.
 function renderBrandSections() {
   filtersEl.classList.add("hidden");
   filtersEl.innerHTML = "";
@@ -226,10 +227,9 @@ function renderBrandSections() {
     if (!list.length) return "";
     const b = meta(k);
     return `
-      <section class="engine-section brand-section" data-brand="${escapeHtml(k)}">
-        <h2><span class="engine-name">${escapeHtml(b.name || k)}</span></h2>
-        <p class="engine-blurb">${escapeHtml(b.tagline || "")}</p>
-        <div class="grid engine-grid">${list.map(card).join("")}</div>
+      <section class="brand-section" data-brand="${escapeHtml(k)}">
+        <h2 class="brand-heading">${escapeHtml(b.name || k)}</h2>
+        ${engineSectionsHTML(list)}
       </section>`;
   }).join("");
 

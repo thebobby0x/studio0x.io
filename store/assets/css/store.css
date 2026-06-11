@@ -529,4 +529,17 @@ body[data-view="list"] .card-actions .btn { flex: 0 0 auto; }
   color: var(--muted); font-size: .95rem; margin-bottom: 22px;
   max-width: 60ch;
 }
-.engine-grid { margin-top: 20px; }
+.engine-grid { margin-top: 20px; grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 920px) { .engine-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .engine-grid { grid-template-columns: 1fr; } }
+
+/* ── BRAND SECTIONS (umbrella store: brand -> engine split) ── */
+.brand-section { margin-top: 64px; }
+.brand-section:first-child { margin-top: 28px; }
+.brand-heading {
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 800;
+  letter-spacing: -0.025em; color: var(--text);
+  padding-bottom: 8px; border-bottom: 1px solid var(--border-strong);
+}
+.brand-section .engine-section { margin-top: 26px; }
+.brand-section .engine-section h2 { font-size: 1.15rem; }
