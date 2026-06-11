@@ -49,12 +49,16 @@ export function simulateMarkets(elapsed: number, fixtureSeed: number) {
 
 export function elapsedFromDate(matchDate: Date): number {
   const ms = Date.now() - matchDate.getTime();
-  return Math.min(90, Math.max(0, Math.floor(ms / 1000 / 60)));
+  if (ms <= 0) return 0;
+  const mins = Math.floor(ms / 60000);
+  // Cycle through a 95-min window: 0-90 match, 91-94 FT display, then repeat
+  const pos = mins % 95;
+  return Math.min(90, pos);
 }
 
 export function statusFromElapsed(elapsed: number): string {
-  if (elapsed === 0)  return "NS";
-  if (elapsed === 45) return "HT";
-  if (elapsed >= 90)  return "FT";
+  if (elapsed === 0)               return "NS";
+  if (elapsed >= 90)               return "FT";
+  if (elapsed >= 45 && elapsed <= 46) return "HT";
   return "LIVE";
 }
