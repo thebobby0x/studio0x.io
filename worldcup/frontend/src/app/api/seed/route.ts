@@ -122,5 +122,12 @@ async function seed(req: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true, message: "Database seeded", matchId: match.id });
+  return new Response(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Seeded</title>
+    <style>body{font-family:sans-serif;background:#0a0e1a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}
+    h1{color:#00b140;font-size:2rem}a{color:#f5a623;font-size:1.1rem}</style></head>
+    <body><h1>✅ Database seeded!</h1><p>Match ID: ${match.id}</p>
+    <a href="/">← Go to dashboard</a></body></html>`,
+    { headers: { "Content-Type": "text/html" } }
+  );
 }
