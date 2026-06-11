@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { Suspense } from "react";
 import { Trophy, Wifi } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
