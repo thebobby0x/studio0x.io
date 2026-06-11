@@ -93,7 +93,7 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
               {match.homeScore}<span className="text-brand-border mx-2">–</span>{match.awayScore}
             </div>
             <div className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
-              <Clock size={12} /> Group Stage · {new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              <Clock size={12} /> Group Stage · {new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
             </div>
           </div>
 
