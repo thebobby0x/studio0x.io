@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Clock, MapPin } from "lucide-react";
-import type { LiveData } from "@/lib/types";
+import { Activity, Clock, MapPin, Wifi, FlaskConical } from "lucide-react";
+import type { LiveData, DataSources } from "@/lib/types";
 
 const METRIC_LABELS: Record<string, string> = {
   possession:   "Possession %",
@@ -55,7 +55,8 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
   if (error) return <div className="rounded-xl bg-brand-card border border-red-800/40 p-6 text-red-400">Error: {error}</div>;
   if (!data) return <div className="rounded-xl bg-brand-card border border-brand-border p-6 animate-pulse h-64" />;
 
-  const { match, metrics } = data;
+  const { match, metrics, dataSources } = data;
+  const matchIsLive = dataSources?.match === "live" || dataSources?.match === "cache";
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
   const hm = metrics[homeCode] ?? {};
@@ -74,6 +75,15 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isLive ? "bg-red-500/20 text-red-400" : "bg-slate-700 text-slate-300"}`}>
             {match.status === "LIVE" ? `${match.elapsed}'` : match.status}
           </span>
+          {matchIsLive ? (
+            <span className="flex items-center gap-1 text-[10px] text-brand-green font-semibold">
+              <Wifi size={10} /> LIVE FEED
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] text-slate-500">
+              <FlaskConical size={10} /> Simulated
+            </span>
+          )}
         </div>
       </div>
 

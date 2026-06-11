@@ -55,8 +55,15 @@ export interface AudioStream {
   tiktokDeepLink: string | null
 }
 
+export interface DataSources {
+  match:   "live" | "cache" | "sim"
+  markets: "live" | "cache" | "sim"
+  stats:   "sim"
+}
+
 export interface LiveData {
   match: Match
   metrics: LiveMetrics
   markets: KalshiMarket[]
+  dataSources?: DataSources
 }

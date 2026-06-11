@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { simulateStats, simulateMarkets, elapsedFromDate, statusFromElapsed } from "@/lib/simulation";
+import { getKalshiMarkets } from "@/lib/kalshi";
+import { getFDLiveMatch } from "@/lib/footballData";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,26 +13,56 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!match) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const elapsed  = elapsedFromDate(match.date);
-  const status   = statusFromElapsed(elapsed);
-  const fixture  = match.fixture;
+  const homeCode = match.homeTeam.code;
+  const awayCode = match.awayTeam.code;
 
-  // Compute live stats deterministically
+  // Fetch live data from both external sources in parallel
+  const [fdResult, kalshiResult] = await Promise.allSettled([
+    getFDLiveMatch(homeCode, awayCode),
+    getKalshiMarkets(homeCode, awayCode),
+  ]);
+
+  const fdMatch  = fdResult.status  === "fulfilled" ? fdResult.value  : null;
+  const kalshi   = kalshiResult.status === "fulfilled" ? kalshiResult.value : null;
+
+  // Match state: real football-data.org > simulation
+  const simElapsed = elapsedFromDate(match.date);
+  const elapsed    = (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed : simElapsed;
+  const status     = fdMatch?.status ?? statusFromElapsed(simElapsed);
+  const homeScore  = fdMatch?.homeScore ?? match.homeScore;
+  const awayScore  = fdMatch?.awayScore ?? match.awayScore;
+
+  // Detailed stats — always simulated (no free live source exists)
   const metrics: Record<string, Record<string, number>> = {
-    [match.homeTeam.code]: simulateStats(match.homeTeam.code, elapsed, fixture) as unknown as Record<string, number>,
-    [match.awayTeam.code]: simulateStats(match.awayTeam.code, elapsed, fixture) as unknown as Record<string, number>,
+    [homeCode]: simulateStats(homeCode, elapsed, match.fixture) as unknown as Record<string, number>,
+    [awayCode]: simulateStats(awayCode, elapsed, match.fixture) as unknown as Record<string, number>,
   };
 
-  // Compute market prices
-  const prices = simulateMarkets(elapsed, fixture);
-  const markets = await prisma.kalshiMarket.findMany({ where: { matchId: id } });
-  const enrichedMarkets = markets.map((m: { outcome: string; price: number; [key: string]: unknown }) => ({
+  // Market prices: real Kalshi > simulation
+  const simPrices = simulateMarkets(elapsed, match.fixture);
+  const priceMap = kalshi
+    ? { home_win: kalshi.home_win, draw: kalshi.draw, away_win: kalshi.away_win }
+    : simPrices;
+
+  const dbMarkets = await prisma.kalshiMarket.findMany({ where: { matchId: id } });
+  const enrichedMarkets = dbMarkets.map((m) => ({
     ...m,
-    price: prices[m.outcome as keyof typeof prices] ?? m.price,
+    price: priceMap[m.outcome as keyof typeof priceMap] ?? m.price,
+    contractSlug: kalshi?.tickers[m.outcome as keyof typeof kalshi.tickers] ?? m.contractSlug,
+    volume: kalshi ? kalshi.volume / dbMarkets.length : m.volume,
   }));
 
-  // Update match elapsed + status (fire-and-forget, non-blocking)
-  prisma.match.update({ where: { id }, data: { elapsed, status } }).catch(() => {});
+  // Persist updated state non-blocking
+  prisma.match.update({ where: { id }, data: { elapsed, status, homeScore, awayScore } }).catch(() => {});
 
-  return NextResponse.json({ match: { ...match, elapsed, status }, metrics, markets: enrichedMarkets });
+  return NextResponse.json({
+    match: { ...match, elapsed, status, homeScore, awayScore },
+    metrics,
+    markets: enrichedMarkets,
+    dataSources: {
+      match:   fdMatch  ? fdMatch.source  : "sim",
+      markets: kalshi   ? kalshi.source   : "sim",
+      stats:   "sim",
+    },
+  });
 }
