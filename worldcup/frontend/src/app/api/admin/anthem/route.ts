@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// PUT /api/admin/anthem?secret=wc2026studio0x
-// Body: { teamCode, audioUrl, title?, artistCredit?, durationSecs?, tiktokDeepLink?, coverArt? }
-export async function PUT(req: Request) {
+function checkAuth(req: Request) {
   const { searchParams } = new URL(req.url);
   const secret = searchParams.get("secret");
-  const ok = secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
+}
+
+// GET /api/admin/anthem?secret=... — list all teams + current anthem
+export async function GET(req: Request) {
+  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const teams = await prisma.team.findMany({
+    include: { anthem: true },
+    orderBy: { name: "asc" },
+  });
+  return NextResponse.json(teams);
+}
+
+// PUT /api/admin/anthem?secret=... — add or update anthem for a team
+export async function PUT(req: Request) {
+  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as {
     teamCode: string;
