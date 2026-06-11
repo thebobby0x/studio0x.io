@@ -10,3 +10,10 @@ supabase/.temp
 .DS_Store
 *.log
 node_modules/
+
+# World Cup app
+worldcup/prisma/dev.db
+worldcup/prisma/dev.db-journal
+worldcup/backend/dist/
+worldcup/frontend/.next/
+worldcup/**/.prisma/
