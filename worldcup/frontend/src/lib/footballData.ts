@@ -1,11 +1,10 @@
 // Real match data from football-data.org (free tier).
 // Requires FOOTBALL_DATA_API_KEY env var — falls back to null (caller uses simulation).
-// Free tier: 10 req/min. Server-side 30s cache keeps us well under that.
+// Free tier: 10 req/min. 30s server-side cache keeps us well within limits.
 
 const BASE = "https://api.football-data.org/v4";
 const CACHE_TTL_MS = 30_000;
 
-// football-data.org status → our internal status
 const STATUS_MAP: Record<string, string> = {
   SCHEDULED: "NS",
   TIMED:     "NS",
@@ -20,7 +19,6 @@ const STATUS_MAP: Record<string, string> = {
 
 interface FDScore {
   fullTime: { home: number | null; away: number | null };
-  halfTime?: { home: number | null; away: number | null };
 }
 
 interface FDMatch {
@@ -41,46 +39,65 @@ export interface FDMatchResult {
   source: "live" | "cache";
 }
 
-// Module-level cache for all today's WC matches
 let _matchCache: { ts: number; matches: FDMatch[] } | null = null;
+
+// Log remaining quota from response headers (visible in Vercel function logs)
+function logQuota(headers: Headers) {
+  const remaining = headers.get("X-Requests-Available-Minute");
+  const reset     = headers.get("X-RequestCounter-Reset");
+  if (remaining !== null) {
+    console.log(`[football-data.org] requests remaining this minute: ${remaining}${reset ? ` (resets in ${reset}s)` : ""}`);
+  }
+}
 
 async function fetchToday(apiKey: string): Promise<FDMatch[]> {
   const today = new Date().toISOString().slice(0, 10);
-  const ctrl = new AbortController();
+  const ctrl  = new AbortController();
   setTimeout(() => ctrl.abort(), 5000);
 
-  // Try WC competition (football-data.org code = "WC")
-  const res = await fetch(
-    `${BASE}/competitions/WC/matches?dateFrom=${today}&dateTo=${today}&season=2026`,
-    {
-      headers: { "X-Auth-Token": apiKey, Accept: "application/json" },
-      signal: ctrl.signal,
-      cache: "no-store",
-    }
-  );
+  const headers = { "X-Auth-Token": apiKey, Accept: "application/json" };
 
-  if (!res.ok) {
-    // 404 might mean competition code differs — try without season filter
-    if (res.status === 404) {
-      const res2 = await fetch(`${BASE}/competitions/WC/matches?dateFrom=${today}&dateTo=${today}`, {
-        headers: { "X-Auth-Token": apiKey, Accept: "application/json" },
+  // Try with explicit 2026 season first, then without if 404
+  for (const qs of [`dateFrom=${today}&dateTo=${today}&season=2026`, `dateFrom=${today}&dateTo=${today}`]) {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}/competitions/WC/matches?${qs}`, {
+        headers,
+        signal: ctrl.signal,
         cache: "no-store",
       });
-      if (!res2.ok) return [];
-      const data2 = await res2.json();
-      return data2.matches ?? [];
+    } catch (e) {
+      console.error("[football-data.org] fetch error:", e);
+      return [];
     }
-    return [];
+
+    logQuota(res.headers);
+
+    if (res.status === 429) {
+      console.warn("[football-data.org] rate limited — using simulation fallback");
+      return [];
+    }
+
+    if (res.status === 404) continue; // try next query variant
+
+    if (!res.ok) {
+      console.warn(`[football-data.org] unexpected ${res.status}: ${await res.text().catch(() => "")}`);
+      return [];
+    }
+
+    const data = await res.json();
+    const matches: FDMatch[] = data.matches ?? [];
+    console.log(`[football-data.org] fetched ${matches.length} match(es) for ${today}`);
+    return matches;
   }
 
-  const data = await res.json();
-  return data.matches ?? [];
+  return [];
 }
 
 function matchTeam(fdTeam: { tla: string; shortName: string; name: string }, code: string): boolean {
   const c = code.toUpperCase();
   return (
-    fdTeam.tla?.toUpperCase() === c ||
+    fdTeam.tla?.toUpperCase()       === c ||
     fdTeam.shortName?.toUpperCase() === c ||
     fdTeam.name?.toUpperCase().includes(c)
   );
@@ -108,17 +125,13 @@ export async function getFDLiveMatch(
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) return null;
 
-  // Serve from cache if fresh
+  // Serve from cache if still fresh (avoids burning quota on every 5s poll)
   if (_matchCache && Date.now() - _matchCache.ts < CACHE_TTL_MS) {
     const result = findInList(_matchCache.matches, homeCode, awayCode);
     return result ? { ...result, source: "cache" } : null;
   }
 
-  try {
-    const matches = await fetchToday(apiKey);
-    _matchCache = { ts: Date.now(), matches };
-    return findInList(matches, homeCode, awayCode);
-  } catch {
-    return null;
-  }
+  const matches = await fetchToday(apiKey);
+  _matchCache = { ts: Date.now(), matches };
+  return findInList(matches, homeCode, awayCode);
 }
