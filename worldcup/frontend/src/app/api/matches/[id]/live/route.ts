@@ -27,8 +27,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Match state: real football-data.org > simulation
   const simElapsed = elapsedFromDate(match.date);
-  const elapsed    = (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed : simElapsed;
   const status     = fdMatch?.status ?? statusFromElapsed(simElapsed);
+  // HT means minute is always 45; use API minute when non-zero, else simulation
+  const elapsed    = status === "HT" ? 45
+                   : (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed
+                   : simElapsed;
   const homeScore  = fdMatch?.homeScore ?? match.homeScore;
   const awayScore  = fdMatch?.awayScore ?? match.awayScore;
 
