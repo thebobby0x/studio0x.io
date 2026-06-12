@@ -39,9 +39,9 @@ export interface FDMatchResult {
   source: "live" | "cache";
 }
 
-let _matchCache: { ts: number; matches: FDMatch[] } | null = null;
+// Cache keyed by date string so finished matches on past dates are still served
+const _matchCache = new Map<string, { ts: number; matches: FDMatch[] }>();
 
-// Log remaining quota from response headers (visible in Vercel function logs)
 function logQuota(headers: Headers) {
   const remaining = headers.get("X-Requests-Available-Minute");
   const reset     = headers.get("X-RequestCounter-Reset");
@@ -50,19 +50,17 @@ function logQuota(headers: Headers) {
   }
 }
 
-async function fetchToday(apiKey: string): Promise<FDMatch[]> {
-  const today = new Date().toISOString().slice(0, 10);
-  const ctrl  = new AbortController();
+async function fetchForDate(apiKey: string, date: string): Promise<FDMatch[]> {
+  const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), 5000);
 
-  const headers = { "X-Auth-Token": apiKey, Accept: "application/json" };
+  const hdrs = { "X-Auth-Token": apiKey, Accept: "application/json" };
 
-  // Try with explicit 2026 season first, then without if 404
-  for (const qs of [`dateFrom=${today}&dateTo=${today}&season=2026`, `dateFrom=${today}&dateTo=${today}`]) {
+  for (const qs of [`dateFrom=${date}&dateTo=${date}&season=2026`, `dateFrom=${date}&dateTo=${date}`]) {
     let res: Response;
     try {
       res = await fetch(`${BASE}/competitions/WC/matches?${qs}`, {
-        headers,
+        headers: hdrs,
         signal: ctrl.signal,
         cache: "no-store",
       });
@@ -78,16 +76,16 @@ async function fetchToday(apiKey: string): Promise<FDMatch[]> {
       return [];
     }
 
-    if (res.status === 404) continue; // try next query variant
+    if (res.status === 404) continue;
 
     if (!res.ok) {
-      console.warn(`[football-data.org] unexpected ${res.status}: ${await res.text().catch(() => "")}`);
+      console.warn(`[football-data.org] unexpected ${res.status} for ${date}: ${await res.text().catch(() => "")}`);
       return [];
     }
 
     const data = await res.json();
     const matches: FDMatch[] = data.matches ?? [];
-    console.log(`[football-data.org] fetched ${matches.length} match(es) for ${today}`);
+    console.log(`[football-data.org] fetched ${matches.length} match(es) for ${date}`);
     return matches;
   }
 
@@ -120,18 +118,24 @@ function findInList(matches: FDMatch[], homeCode: string, awayCode: string): FDM
 
 export async function getFDLiveMatch(
   homeCode: string,
-  awayCode: string
+  awayCode: string,
+  matchDate: Date
 ): Promise<FDMatchResult | null> {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) return null;
 
-  // Serve from cache if still fresh (avoids burning quota on every 5s poll)
-  if (_matchCache && Date.now() - _matchCache.ts < CACHE_TTL_MS) {
-    const result = findInList(_matchCache.matches, homeCode, awayCode);
+  const dateStr = matchDate.toISOString().slice(0, 10);
+  const today   = new Date().toISOString().slice(0, 10);
+  // Finished matches on past dates don't change — cache for 1 hour
+  const ttl = dateStr < today ? 3_600_000 : CACHE_TTL_MS;
+
+  const cached = _matchCache.get(dateStr);
+  if (cached && Date.now() - cached.ts < ttl) {
+    const result = findInList(cached.matches, homeCode, awayCode);
     return result ? { ...result, source: "cache" } : null;
   }
 
-  const matches = await fetchToday(apiKey);
-  _matchCache = { ts: Date.now(), matches };
+  const matches = await fetchForDate(apiKey, dateStr);
+  _matchCache.set(dateStr, { ts: Date.now(), matches });
   return findInList(matches, homeCode, awayCode);
 }

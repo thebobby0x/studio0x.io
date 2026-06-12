@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Fetch live data from both external sources in parallel
   const [fdResult, kalshiResult] = await Promise.allSettled([
-    getFDLiveMatch(homeCode, awayCode),
+    getFDLiveMatch(homeCode, awayCode, match.date),
     getKalshiMarkets(homeCode, awayCode),
   ]);
 
