@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy, Wifi, Music2 } from "lucide-react";
+import { Trophy, Wifi, Music2, CalendarDays } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import SentimentTickers from "@/components/sentiment/SentimentTickers";
 import AnthemPlayer from "@/components/anthem/AnthemPlayer";
@@ -43,11 +43,18 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link
-              href="/anthems"
+              href="/schedule"
               className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors"
             >
+              <CalendarDays size={13} />
+              Schedule
+            </Link>
+            <Link
+              href="/anthems"
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+            >
               <Music2 size={13} />
-              Anthem Hub
+              Anthems
             </Link>
             <Link
               href="/admin/anthems"
