@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Minus, Wifi, FlaskConical } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { TrendingUp, TrendingDown, Minus, Wifi, FlaskConical, Radio } from "lucide-react";
 import type { KalshiMarket, DataSources } from "@/lib/types";
+import { KALSHI_WS_BASE } from "@/lib/kalshi";
 
 function outcomeLabels(homeCode: string, awayCode: string): Record<string, string> {
   return {
@@ -29,7 +30,17 @@ function ProbabilityBar({ price }: { price: number }) {
   );
 }
 
-function TickerCard({ market, prev, labels }: { market: KalshiMarket; prev?: number; labels: Record<string, string> }) {
+function TickerCard({
+  market,
+  prev,
+  labels,
+  wsConnected,
+}: {
+  market: KalshiMarket;
+  prev?: number;
+  labels: Record<string, string>;
+  wsConnected: boolean;
+}) {
   const pct = Math.round(market.price * 100);
   const delta = prev !== undefined ? market.price - prev : 0;
   const colorClass = OUTCOME_COLORS[market.outcome] ?? "text-slate-400 border-brand-border bg-brand-card";
@@ -43,7 +54,12 @@ function TickerCard({ market, prev, labels }: { market: KalshiMarket; prev?: num
         {labels[market.outcome] ?? market.outcome}
       </div>
       <div className="flex items-end justify-between">
-        <span className="text-3xl font-black tabular-nums">{pct}%</span>
+        <span
+          className={`text-3xl font-black tabular-nums${wsConnected ? " animate-pulse" : ""}`}
+          key={`${market.outcome}-${pct}`}
+        >
+          {pct}%
+        </span>
         <span className={`flex items-center gap-0.5 text-xs font-semibold ${deltaColor}`}>
           <Icon size={12} />
           {Math.abs(delta * 100).toFixed(1)}
@@ -60,6 +76,104 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
   const [prev, setPrev] = useState<Record<string, number>>({});
   const [marketSource, setMarketSource] = useState<DataSources["markets"]>("sim");
   const [labels, setLabels] = useState<Record<string, string>>({ home_win: "Home Win", draw: "Draw", away_win: "Away Win" });
+  const [wsConnected, setWsConnected] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const tickersRef = useRef<string[]>([]);
+  const mountedRef = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
+  const MAX_RECONNECT = 3;
+
+  const connectWs = useCallback((tickers: string[]) => {
+    // Skip if already open or connecting
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN ||
+        wsRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
+    // Skip if browser doesn't support WebSocket
+    if (typeof WebSocket === "undefined") return;
+
+    const ws = new WebSocket(KALSHI_WS_BASE);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (!mountedRef.current) { ws.close(); return; }
+      reconnectAttemptsRef.current = 0;
+      ws.send(
+        JSON.stringify({
+          id: 1,
+          cmd: "subscribe",
+          params: { channels: ["ticker"], market_tickers: tickers },
+        })
+      );
+      setWsConnected(true);
+    };
+
+    ws.onmessage = (event: MessageEvent) => {
+      if (!mountedRef.current) return;
+      try {
+        const msg = JSON.parse(event.data as string) as {
+          type?: string;
+          msg?: {
+            market_ticker?: string;
+            yes_bid?: number;
+            yes_ask?: number;
+            last_price?: number;
+          };
+        };
+
+        if (msg.type === "ticker" && msg.msg?.market_ticker) {
+          const { market_ticker, yes_bid, yes_ask, last_price } = msg.msg;
+
+          // WS prices are integers 0–99 (cents); divide by 100
+          let price: number;
+          if (yes_bid !== undefined && yes_ask !== undefined) {
+            price = (yes_bid + yes_ask) / 2 / 100;
+          } else if (last_price !== undefined) {
+            price = last_price / 100;
+          } else {
+            return;
+          }
+
+          setMarkets((current) => {
+            const updated = current.map((m) => {
+              if (m.contractSlug === market_ticker) {
+                return { ...m, price };
+              }
+              return m;
+            });
+            return updated;
+          });
+          setMarketSource("live");
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+
+    ws.onclose = () => {
+      if (!mountedRef.current) return;
+      setWsConnected(false);
+
+      // Attempt reconnect up to MAX_RECONNECT times
+      if (reconnectAttemptsRef.current < MAX_RECONNECT && tickersRef.current.length > 0) {
+        reconnectAttemptsRef.current += 1;
+        setTimeout(() => {
+          if (mountedRef.current) {
+            connectWs(tickersRef.current);
+          }
+        }, 3000);
+      }
+    };
+  }, []); // no deps — uses refs only
 
   const load = useCallback(async () => {
     try {
@@ -76,19 +190,73 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
         setPrev(prevPrices);
         return incoming;
       });
-    } catch {}
-  }, [matchId]);
+
+      // Extract real Kalshi tickers from the response
+      if (data.kalshiTickers) {
+        const kt = data.kalshiTickers as { home_win: string; draw: string; away_win: string };
+        const realTickers = [kt.home_win, kt.draw, kt.away_win].filter(
+          (t) => typeof t === "string" && t.startsWith("KX")
+        );
+        if (realTickers.length > 0) {
+          tickersRef.current = realTickers;
+          // Only attempt WS connection if not already connected
+          if (
+            !wsRef.current ||
+            (wsRef.current.readyState !== WebSocket.OPEN &&
+              wsRef.current.readyState !== WebSocket.CONNECTING)
+          ) {
+            connectWs(realTickers);
+          }
+        }
+      }
+    } catch {
+      // Ignore fetch errors
+    }
+  }, [matchId, connectWs]);
 
   useEffect(() => {
+    mountedRef.current = true;
     load();
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
-  }, [matchId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Poll more slowly when WS is connected; faster when not
+    const getInterval = () => (wsConnected ? 60_000 : 5_000);
+
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const scheduleNext = () => {
+      intervalId = setInterval(() => {
+        load();
+      }, getInterval());
+    };
+
+    scheduleNext();
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [matchId, wsConnected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup WebSocket on unmount or matchId change
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent reconnect on intentional close
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      tickersRef.current = [];
+      reconnectAttemptsRef.current = 0;
+    };
+  }, [matchId]);
 
   if (markets.length === 0) {
     return (
       <div className="flex gap-3">
-        {[1, 2, 3].map((i) => <div key={i} className="flex-1 h-28 rounded-xl bg-brand-card border border-brand-border animate-pulse" />)}
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex-1 h-28 rounded-xl bg-brand-card border border-brand-border animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -97,19 +265,23 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Kalshi Prediction Markets</span>
-        {marketSource === "sim" ? (
-          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-500">
-            <FlaskConical size={9} /> Simulated
+        {wsConnected ? (
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-semibold">
+            <Radio size={9} className="animate-pulse" /> Kalshi Live
+          </span>
+        ) : marketSource === "live" || marketSource === "cache" ? (
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-semibold">
+            <Wifi size={9} /> Kalshi
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green font-semibold">
-            <Wifi size={9} /> Kalshi Live
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-500">
+            <FlaskConical size={9} /> Simulated
           </span>
         )}
       </div>
       <div className="flex gap-3 flex-wrap">
         {markets.map((m) => (
-          <TickerCard key={m.outcome} market={m} prev={prev[m.outcome]} labels={labels} />
+          <TickerCard key={m.outcome} market={m} prev={prev[m.outcome]} labels={labels} wsConnected={wsConnected} />
         ))}
       </div>
     </div>
