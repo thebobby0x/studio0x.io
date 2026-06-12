@@ -47,17 +47,20 @@ export function simulateMarkets(elapsed: number, fixtureSeed: number) {
   return { home_win: Math.round(homeWin * 100) / 100, draw: Math.round(draw * 100) / 100, away_win: awayWin };
 }
 
+// Returns the approximate match minute, accounting for halftime.
+// Assumes kickoff + ~45 min first half + ~17 min halftime break + second half.
 export function elapsedFromDate(matchDate: Date): number {
   const ms = Date.now() - matchDate.getTime();
   if (ms <= 0) return 0;
-  const mins = Math.floor(ms / 60000);
-  // Cycle through minutes 1-89 so the match is always LIVE
-  return (mins % 89) + 1;
+  const wall = Math.floor(ms / 60000);
+  if (wall <= 45) return wall;               // first half
+  if (wall <= 62) return 45;                 // halftime break (~17 min)
+  return Math.min(wall - 17, 90);            // second half
 }
 
 export function statusFromElapsed(elapsed: number): string {
-  if (elapsed === 0)               return "NS";
-  if (elapsed >= 90)               return "FT";
-  if (elapsed === 45)              return "HT";
+  if (elapsed === 0)  return "NS";
+  if (elapsed >= 90)  return "FT";
+  if (elapsed === 45) return "HT";
   return "LIVE";
 }
