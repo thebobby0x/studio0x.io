@@ -66,4 +66,5 @@ export interface LiveData {
   metrics: LiveMetrics
   markets: KalshiMarket[]
   dataSources?: DataSources
+  kalshiTickers?: { home_win: string; draw: string; away_win: string } | null
 }

@@ -1,18 +1,21 @@
-// Real Kalshi prediction market data.
-// Requires KALSHI_API_KEY env var — falls back to null (caller uses simulation).
+// Real Kalshi prediction market data — fully public, no API key required.
 
-const BASE = "https://api.elections.kalshi.com/trade-api/v2";
-const CACHE_TTL_MS = 30_000;
+export const KALSHI_REST_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+export const KALSHI_WS_BASE = "wss://api.elections.kalshi.com/trade-api/ws/v2";
+
+const CACHE_TTL_MS = 10_000; // 10 seconds — markets update frequently
+
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"] as const;
 
 interface KalshiRawMarket {
   ticker: string;
   event_ticker?: string;
   series_ticker?: string;
-  title: string;
-  yes_bid?: number;
-  yes_ask?: number;
-  last_price?: number;
-  volume?: number;
+  title?: string;
+  yes_bid_dollars?: string;
+  yes_ask_dollars?: string;
+  last_price_dollars?: string;
+  volume_fp?: string;
 }
 
 export interface KalshiLivePrices {
@@ -27,46 +30,124 @@ export interface KalshiLivePrices {
 // Module-level cache — persists across requests in the same serverless instance
 const _cache = new Map<string, { ts: number; data: KalshiLivePrices }>();
 
-async function fetchKalshi(path: string, apiKey: string): Promise<Response> {
+async function fetchKalshi(path: string): Promise<Response> {
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), 4000);
-  return fetch(`${BASE}${path}`, {
-    headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+  return fetch(`${KALSHI_REST_BASE}${path}`, {
+    headers: { Accept: "application/json" },
     signal: ctrl.signal,
     cache: "no-store",
   });
 }
 
-// Kalshi prices can be 0–99 (cents) or 0.00–0.99; normalize to decimal
-function norm(p: number | undefined): number {
-  if (p === undefined || p === null) return 0;
-  return p > 1 ? p / 100 : p;
+// Parse a Kalshi decimal string price to a number (e.g. "0.4500" -> 0.45)
+function parseDollars(s: string | undefined): number | undefined {
+  if (s === undefined || s === null) return undefined;
+  const n = parseFloat(s);
+  return isNaN(n) ? undefined : n;
 }
 
-function midpoint(bid?: number, ask?: number, last?: number): number {
-  if (bid !== undefined && ask !== undefined) return (norm(bid) + norm(ask)) / 2;
-  return norm(last);
+function midpoint(bid?: string, ask?: string, last?: string): number {
+  const b = parseDollars(bid);
+  const a = parseDollars(ask);
+  const l = parseDollars(last);
+  if (b !== undefined && a !== undefined) return (b + a) / 2;
+  return l ?? 0;
 }
 
-// Try to classify a market as home_win / draw / away_win by its title
-function classify(
-  title: string,
+function parseVolume(fp?: string): number {
+  if (!fp) return 0;
+  const n = parseFloat(fp);
+  return isNaN(n) ? 0 : n;
+}
+
+// Build candidate event tickers for a match: try UTC date ±1 day and both team orderings
+function buildCandidateEventTickers(homeCode: string, awayCode: string, matchDate: Date): string[] {
+  const tickers: string[] = [];
+
+  for (const deltaDays of [-1, 0, 1]) {
+    const d = new Date(matchDate);
+    d.setUTCDate(d.getUTCDate() + deltaDays);
+
+    const yy = String(d.getUTCFullYear()).slice(2); // "26"
+    const mon = MONTHS[d.getUTCMonth()];            // "JUN"
+    const dd = String(d.getUTCDate()).padStart(2, "0"); // "12"
+
+    const dateStr = `${yy}${mon}${dd}`; // "26JUN12"
+
+    // Both orderings of team codes
+    tickers.push(`KXFIFAGAME-${dateStr}${homeCode}${awayCode}`);
+    tickers.push(`KXFIFAGAME-${dateStr}${awayCode}${homeCode}`);
+  }
+
+  return tickers;
+}
+
+// Try to fetch a single market by ticker, returns null if 404 or error
+async function fetchMarket(ticker: string): Promise<KalshiRawMarket | null> {
+  try {
+    const res = await fetchKalshi(`/markets/${encodeURIComponent(ticker)}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return (json.market as KalshiRawMarket) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Fetch markets for one event ticker (home, away, TIE) in parallel
+async function fetchEventMarkets(
+  eventTicker: string,
   homeCode: string,
   awayCode: string
-): "home_win" | "draw" | "away_win" | null {
-  const t = title.toLowerCase();
-  const homeNames = [homeCode.toLowerCase(), "mexico"];
-  const awayNames = [awayCode.toLowerCase(), "south africa", "southafrica"];
+): Promise<{ home: KalshiRawMarket | null; draw: KalshiRawMarket | null; away: KalshiRawMarket | null } | null> {
+  const [home, draw, away] = await Promise.all([
+    fetchMarket(`${eventTicker}-${homeCode}`),
+    fetchMarket(`${eventTicker}-TIE`),
+    fetchMarket(`${eventTicker}-${awayCode}`),
+  ]);
 
-  if (t.includes("draw") || t.includes("tie")) return "draw";
-  if (awayNames.some((n) => t.includes(n)) && (t.includes("win") || t.includes("beat"))) return "away_win";
-  if (homeNames.some((n) => t.includes(n)) && (t.includes("win") || t.includes("beat"))) return "home_win";
-  return null;
+  // Only return if at least one market was found
+  if (!home && !draw && !away) return null;
+  return { home, draw, away };
+}
+
+// Fallback: search open events for the series and find by team codes
+async function searchEventsFallback(
+  homeCode: string,
+  awayCode: string
+): Promise<{ home: KalshiRawMarket | null; draw: KalshiRawMarket | null; away: KalshiRawMarket | null; eventTicker: string } | null> {
+  try {
+    const res = await fetchKalshi(`/events?series_ticker=KXFIFAGAME&status=open&limit=100`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const events: Array<{ event_ticker: string; title?: string }> = json.events ?? [];
+
+    // Find an event whose ticker contains both team codes
+    const upper = (s: string) => s.toUpperCase();
+    const h = upper(homeCode);
+    const a = upper(awayCode);
+
+    const match = events.find((e) => {
+      const t = upper(e.event_ticker);
+      return (t.includes(h) && t.includes(a));
+    });
+
+    if (!match) return null;
+
+    const eventTicker = match.event_ticker;
+    const result = await fetchEventMarkets(eventTicker, homeCode, awayCode);
+    if (!result) return null;
+    return { ...result, eventTicker };
+  } catch {
+    return null;
+  }
 }
 
 export async function getKalshiMarkets(
   homeCode: string,
-  awayCode: string
+  awayCode: string,
+  matchDate: Date
 ): Promise<KalshiLivePrices | null> {
   const cacheKey = `${homeCode}:${awayCode}`;
   const cached = _cache.get(cacheKey);
@@ -74,70 +155,95 @@ export async function getKalshiMarkets(
     return { ...cached.data, source: "cache" };
   }
 
-  const apiKey = process.env.KALSHI_API_KEY;
-  if (!apiKey) return null;
-
   try {
-    // Try several series tickers Kalshi might use for WC 2026
-    const seriesTickers = ["FIFA-WC26", "FIFAWC26", "FIFA-WC-2026", "WORLDCUP26"];
-    let markets: KalshiRawMarket[] = [];
+    // Build candidate event tickers (UTC ±1 day, both team orderings)
+    const candidates = buildCandidateEventTickers(homeCode, awayCode, matchDate);
 
-    for (const st of seriesTickers) {
-      const res = await fetchKalshi(
-        `/markets?limit=200&series_ticker=${st}&status=active`,
-        apiKey
-      );
-      if (res.ok) {
-        const json = await res.json();
-        const found: KalshiRawMarket[] = json.markets ?? [];
-        if (found.length > 0) { markets = found; break; }
+    let foundEventTicker: string | null = null;
+    let homeMarket: KalshiRawMarket | null = null;
+    let drawMarket: KalshiRawMarket | null = null;
+    let awayMarket: KalshiRawMarket | null = null;
+
+    // Try each candidate event ticker in sequence (stop on first hit)
+    for (const eventTicker of candidates) {
+      // Determine which ordering of teams this ticker uses
+      // The last part after the date is the two team codes concatenated
+      // We need to figure out which is home and which is away
+      const upperTicker = eventTicker.toUpperCase();
+      const upperHome = homeCode.toUpperCase();
+      const upperAway = awayCode.toUpperCase();
+
+      // Determine actual home/away in this ticker ordering
+      const afterPrefix = upperTicker.replace(/^KXFIFAGAME-\d{2}[A-Z]{3}\d{2}/, "");
+      let effectiveHome: string;
+      let effectiveAway: string;
+
+      if (afterPrefix.startsWith(upperHome)) {
+        effectiveHome = homeCode;
+        effectiveAway = awayCode;
+      } else {
+        effectiveHome = awayCode;
+        effectiveAway = homeCode;
+      }
+
+      const result = await fetchEventMarkets(eventTicker, effectiveHome, effectiveAway);
+      if (result) {
+        foundEventTicker = eventTicker;
+        // Map back to true home/away
+        if (effectiveHome === homeCode) {
+          homeMarket = result.home;
+          drawMarket = result.draw;
+          awayMarket = result.away;
+        } else {
+          homeMarket = result.away;
+          drawMarket = result.draw;
+          awayMarket = result.home;
+        }
+        break;
       }
     }
 
-    // If series ticker search empty, try keyword search
-    if (!markets.length) {
-      const res = await fetchKalshi(
-        `/markets?limit=200&status=active&keyword=world+cup+${homeCode.toLowerCase()}`,
-        apiKey
-      );
-      if (res.ok) {
-        const json = await res.json();
-        markets = json.markets ?? [];
+    // Fallback: search open events by series ticker
+    if (!foundEventTicker) {
+      const fallback = await searchEventsFallback(homeCode, awayCode);
+      if (fallback) {
+        foundEventTicker = fallback.eventTicker;
+        homeMarket = fallback.home;
+        drawMarket = fallback.draw;
+        awayMarket = fallback.away;
       }
     }
 
-    if (!markets.length) return null;
-
-    // Bucket into home_win / draw / away_win by title
-    const buckets: Record<string, KalshiRawMarket[]> = { home_win: [], draw: [], away_win: [] };
-    for (const m of markets) {
-      const cat = classify(m.title, homeCode, awayCode);
-      if (cat) buckets[cat].push(m);
+    if (!foundEventTicker) {
+      console.log(`[kalshi] no markets found for ${homeCode} vs ${awayCode}`);
+      return null;
     }
 
-    const pick = (arr: KalshiRawMarket[]) => arr[0]; // highest-volume would be better if sorted
-    const hw = pick(buckets.home_win);
-    const dr = pick(buckets.draw);
-    const aw = pick(buckets.away_win);
+    console.log(`[kalshi] found ${homeCode} vs ${awayCode} at ${foundEventTicker}`);
 
-    if (!hw && !dr && !aw) return null;
+    const homeWinPrice = midpoint(homeMarket?.yes_bid_dollars, homeMarket?.yes_ask_dollars, homeMarket?.last_price_dollars);
+    const drawPrice    = midpoint(drawMarket?.yes_bid_dollars, drawMarket?.yes_ask_dollars, drawMarket?.last_price_dollars);
+    const awayWinPrice = midpoint(awayMarket?.yes_bid_dollars, awayMarket?.yes_ask_dollars, awayMarket?.last_price_dollars);
 
-    const homeWinPrice = hw ? midpoint(hw.yes_bid, hw.yes_ask, hw.last_price) : 0.51;
-    const drawPrice    = dr ? midpoint(dr.yes_bid, dr.yes_ask, dr.last_price) : 0.24;
-    const awayRaw      = 1 - homeWinPrice - drawPrice;
+    const totalVol = parseVolume(homeMarket?.volume_fp) + parseVolume(drawMarket?.volume_fp) + parseVolume(awayMarket?.volume_fp);
 
     const result: KalshiLivePrices = {
       home_win:  Math.round(homeWinPrice * 100) / 100,
       draw:      Math.round(drawPrice * 100) / 100,
-      away_win:  Math.max(0.01, Math.round(awayRaw * 100) / 100),
-      volume:    (hw?.volume ?? 0) + (dr?.volume ?? 0) + (aw?.volume ?? 0),
-      tickers:   { home_win: hw?.ticker ?? "", draw: dr?.ticker ?? "", away_win: aw?.ticker ?? "" },
-      source:    "live",
+      away_win:  Math.round(awayWinPrice * 100) / 100,
+      volume:    totalVol,
+      tickers: {
+        home_win: homeMarket?.ticker ?? "",
+        draw:     drawMarket?.ticker ?? "",
+        away_win: awayMarket?.ticker ?? "",
+      },
+      source: "live",
     };
 
     _cache.set(cacheKey, { ts: Date.now(), data: result });
     return result;
   } catch {
+    console.log(`[kalshi] no markets found for ${homeCode} vs ${awayCode}`);
     return null;
   }
 }

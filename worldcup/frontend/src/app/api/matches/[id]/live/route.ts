@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Fetch live data from both external sources in parallel
   const [fdResult, kalshiResult] = await Promise.allSettled([
     getFDLiveMatch(homeCode, awayCode, match.date),
-    getKalshiMarkets(homeCode, awayCode),
+    getKalshiMarkets(homeCode, awayCode, new Date(match.date)),
   ]);
 
   const fdMatch  = fdResult.status  === "fulfilled" ? fdResult.value  : null;
@@ -62,6 +62,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     match: { ...match, elapsed, status, homeScore, awayScore },
     metrics,
     markets: enrichedMarkets,
+    kalshiTickers: kalshi ? kalshi.tickers : null,
     dataSources: {
       match:   fdMatch  ? fdMatch.source  : "sim",
       markets: kalshi   ? kalshi.source   : "sim",
