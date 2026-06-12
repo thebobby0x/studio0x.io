@@ -23,7 +23,12 @@ async function getInitialData() {
 
 export default async function DashboardPage() {
   const { matches, streams } = await getInitialData();
-  const liveMatch = matches.find((m) => ["LIVE", "NS", "HT"].includes(m.status)) ?? matches[0];
+  // Prefer the most recently kicked-off live/in-progress match
+  const liveMatches = matches.filter((m) => ["LIVE", "HT"].includes(m.status));
+  const liveMatch =
+    liveMatches.length > 0
+      ? liveMatches.reduce((a, b) => (new Date(a.date) > new Date(b.date) ? a : b))
+      : (matches.find((m) => m.status === "NS") ?? matches[matches.length - 1]);
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
@@ -74,7 +79,7 @@ export default async function DashboardPage() {
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
                 <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Opening Match · Group A
+                  Group {liveMatch.homeTeam.groupStage} · {liveMatch.venue}, {liveMatch.city}
                 </span>
               </div>
               <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
