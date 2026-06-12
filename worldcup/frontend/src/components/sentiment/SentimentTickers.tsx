@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus, Wifi, FlaskConical } from "lucide-react";
 import type { KalshiMarket, DataSources } from "@/lib/types";
 
-const OUTCOME_LABELS: Record<string, string> = {
-  home_win: "MEX Win",
-  draw:     "Draw",
-  away_win: "RSA Win",
-};
+function outcomeLabels(homeCode: string, awayCode: string): Record<string, string> {
+  return {
+    home_win: `${homeCode} Win`,
+    draw:     "Draw",
+    away_win: `${awayCode} Win`,
+  };
+}
 
 const OUTCOME_COLORS: Record<string, string> = {
   home_win: "text-brand-green border-brand-green/30 bg-brand-green/5",
@@ -27,7 +29,7 @@ function ProbabilityBar({ price }: { price: number }) {
   );
 }
 
-function TickerCard({ market, prev }: { market: KalshiMarket; prev?: number }) {
+function TickerCard({ market, prev, labels }: { market: KalshiMarket; prev?: number; labels: Record<string, string> }) {
   const pct = Math.round(market.price * 100);
   const delta = prev !== undefined ? market.price - prev : 0;
   const colorClass = OUTCOME_COLORS[market.outcome] ?? "text-slate-400 border-brand-border bg-brand-card";
@@ -38,7 +40,7 @@ function TickerCard({ market, prev }: { market: KalshiMarket; prev?: number }) {
   return (
     <div className={`rounded-xl border p-4 flex-1 min-w-[140px] ${colorClass}`}>
       <div className="text-xs font-medium uppercase tracking-widest opacity-70 mb-1">
-        {OUTCOME_LABELS[market.outcome] ?? market.outcome}
+        {labels[market.outcome] ?? market.outcome}
       </div>
       <div className="flex items-end justify-between">
         <span className="text-3xl font-black tabular-nums">{pct}%</span>
@@ -57,6 +59,7 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
   const [markets, setMarkets] = useState<KalshiMarket[]>([]);
   const [prev, setPrev] = useState<Record<string, number>>({});
   const [marketSource, setMarketSource] = useState<DataSources["markets"]>("sim");
+  const [labels, setLabels] = useState<Record<string, string>>({ home_win: "Home Win", draw: "Draw", away_win: "Away Win" });
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +67,9 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
       const data = await res.json();
       const incoming: KalshiMarket[] = data.markets ?? [];
       setMarketSource(data.dataSources?.markets ?? "sim");
+      if (data.match?.homeTeam?.code && data.match?.awayTeam?.code) {
+        setLabels(outcomeLabels(data.match.homeTeam.code, data.match.awayTeam.code));
+      }
       setMarkets((current) => {
         const prevPrices: Record<string, number> = {};
         for (const m of current) prevPrices[m.outcome] = m.price;
@@ -103,7 +109,7 @@ export default function SentimentTickers({ matchId }: { matchId: string }) {
       </div>
       <div className="flex gap-3 flex-wrap">
         {markets.map((m) => (
-          <TickerCard key={m.outcome} market={m} prev={prev[m.outcome]} />
+          <TickerCard key={m.outcome} market={m} prev={prev[m.outcome]} labels={labels} />
         ))}
       </div>
     </div>
