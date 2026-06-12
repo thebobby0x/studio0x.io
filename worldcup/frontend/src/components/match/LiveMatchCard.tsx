@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Activity, Clock, MapPin, Wifi, FlaskConical } from "lucide-react";
 import type { LiveData, DataSources } from "@/lib/types";
 
@@ -91,28 +92,28 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
       <div className="px-6 py-8">
         <div className="grid grid-cols-3 items-center gap-4">
           {/* Home team */}
-          <div className="text-center">
+          <Link href={`/team/${homeCode}`} className="text-center group block">
             <div className="text-5xl mb-2">{match.homeTeam.flagEmoji}</div>
-            <div className="font-bold text-lg text-white">{match.homeTeam.name}</div>
+            <div className="font-bold text-lg text-white group-hover:text-brand-gold transition-colors">{match.homeTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{homeCode} · Home</div>
-          </div>
+          </Link>
 
           {/* Score */}
           <div className="text-center">
             <div className="text-6xl font-black text-white tabular-nums tracking-tighter">
               {match.homeScore}<span className="text-brand-border mx-2">–</span>{match.awayScore}
             </div>
-            <div className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
-              <Clock size={12} /> Group Stage · {new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+            <div suppressHydrationWarning className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
+              <Clock size={12} /> Group Stage · {new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </div>
           </div>
 
           {/* Away team */}
-          <div className="text-center">
+          <Link href={`/team/${awayCode}`} className="text-center group block">
             <div className="text-5xl mb-2">{match.awayTeam.flagEmoji}</div>
-            <div className="font-bold text-lg text-white">{match.awayTeam.name}</div>
+            <div className="font-bold text-lg text-white group-hover:text-brand-gold transition-colors">{match.awayTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{awayCode} · Away</div>
-          </div>
+          </Link>
         </div>
       </div>
 

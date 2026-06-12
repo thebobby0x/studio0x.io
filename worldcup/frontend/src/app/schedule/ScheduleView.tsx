@@ -5,6 +5,16 @@ import Link from "next/link";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
+// ─── Local-date helpers ──────────────────────────────────────────────────────
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function utcToLocalDateStr(utcDate: string): string {
+  return localDateStr(new Date(utcDate));
+}
+
 // ─── Countdown helpers ───────────────────────────────────────────────────────
 
 function fmt2(n: number) { return String(n).padStart(2, "0"); }
@@ -44,7 +54,7 @@ function MatchCard({ m, now }: { m: ScheduleMatch; now: number }) {
   const borderClass = isLive
     ? "border-brand-green/40 shadow-lg shadow-brand-green/5"
     : isDone
-    ? "border-brand-border/50 opacity-70"
+    ? "border-brand-border/50 opacity-60"
     : urgent
     ? "border-amber-500/40 shadow-amber-500/5 shadow-md"
     : "border-brand-border";
@@ -52,77 +62,93 @@ function MatchCard({ m, now }: { m: ScheduleMatch; now: number }) {
   const groupLabel = m.group ? `Group ${m.group}` : m.stageLabel;
 
   return (
-    <Link href="/" className={`block rounded-2xl bg-brand-card border overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:shadow-xl ${borderClass}`}>
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border/50">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          {groupLabel}
-        </span>
-        <StatusBadge m={m} urgent={urgent} />
+    <div className={`relative rounded-2xl bg-brand-card border overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:shadow-xl ${borderClass}`}>
+      {/* Card-level link to match detail (below interactive team links) */}
+      <Link
+        href={`/schedule/${m.id}`}
+        className="absolute inset-0 z-0"
+        aria-label={`${m.homeTeam.name} vs ${m.awayTeam.name} match details`}
+      />
+
+      {/* Content layer — pointer-events-none so clicks fall through to card link */}
+      <div className="relative z-10 pointer-events-none">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border/50">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            {groupLabel}
+          </span>
+          <StatusBadge m={m} urgent={urgent} />
+        </div>
+
+        {/* Main content */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-5">
+          {/* Home team — team page link re-enables pointer events */}
+          <Link
+            href={`/team/${m.homeTeam.tla}`}
+            className="pointer-events-auto text-center block group/team transition-opacity hover:opacity-80"
+          >
+            <div className="text-4xl select-none">{getFlag(m.homeTeam.tla)}</div>
+            <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1 group-hover/team:text-brand-gold transition-colors">
+              {m.homeTeam.name}
+            </div>
+            <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
+              {m.homeTeam.tla}
+            </div>
+          </Link>
+
+          {/* Center — score or countdown (passes clicks through to card link) */}
+          <div className="text-center min-w-[90px]">
+            {isLive && (
+              <>
+                <div className="text-4xl font-black tabular-nums text-white tracking-tighter">
+                  {m.homeScore ?? 0}<span className="text-brand-border mx-1">—</span>{m.awayScore ?? 0}
+                </div>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-[11px] text-slate-400">
+                    {m.status === "HT" ? "HT" : `${m.minute}'`}
+                  </span>
+                </div>
+              </>
+            )}
+            {isDone && (
+              <>
+                <div className="text-4xl font-black tabular-nums text-slate-400 tracking-tighter">
+                  {m.homeScore ?? 0}<span className="text-brand-border/60 mx-1">—</span>{m.awayScore ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Full Time</div>
+              </>
+            )}
+            {isNS && (
+              <>
+                <div suppressHydrationWarning className={`font-black tabular-nums tracking-tight leading-none ${
+                  urgent ? "text-3xl font-mono text-amber-400" : "text-2xl text-white"
+                }`}>
+                  {top}
+                </div>
+                {sub && (
+                  <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">{sub}</div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Away team */}
+          <Link
+            href={`/team/${m.awayTeam.tla}`}
+            className="pointer-events-auto text-center block group/team transition-opacity hover:opacity-80"
+          >
+            <div className="text-4xl select-none">{getFlag(m.awayTeam.tla)}</div>
+            <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1 group-hover/team:text-brand-gold transition-colors">
+              {m.awayTeam.name}
+            </div>
+            <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
+              {m.awayTeam.tla}
+            </div>
+          </Link>
+        </div>
       </div>
-
-      {/* Main content */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-5">
-        {/* Home team */}
-        <div className="text-center">
-          <div className="text-4xl select-none">{getFlag(m.homeTeam.tla)}</div>
-          <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1">
-            {m.homeTeam.name}
-          </div>
-          <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
-            {m.homeTeam.tla}
-          </div>
-        </div>
-
-        {/* Center — score or countdown */}
-        <div className="text-center min-w-[90px]">
-          {isLive && (
-            <>
-              <div className="text-4xl font-black tabular-nums text-white tracking-tighter">
-                {m.homeScore ?? 0}<span className="text-brand-border mx-1">—</span>{m.awayScore ?? 0}
-              </div>
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[11px] text-slate-400">
-                  {m.status === "HT" ? "HT" : `${m.minute}'`}
-                </span>
-              </div>
-            </>
-          )}
-          {isDone && (
-            <>
-              <div className="text-4xl font-black tabular-nums text-slate-400 tracking-tighter">
-                {m.homeScore ?? 0}<span className="text-brand-border/60 mx-1">—</span>{m.awayScore ?? 0}
-              </div>
-              <div className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Full Time</div>
-            </>
-          )}
-          {isNS && (
-            <>
-              <div className={`font-black tabular-nums tracking-tight leading-none ${
-                urgent ? "text-3xl font-mono text-amber-400" : "text-2xl text-white"
-              }`}>
-                {top}
-              </div>
-              {sub && (
-                <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">{sub}</div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Away team */}
-        <div className="text-center">
-          <div className="text-4xl select-none">{getFlag(m.awayTeam.tla)}</div>
-          <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1">
-            {m.awayTeam.name}
-          </div>
-          <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
-            {m.awayTeam.tla}
-          </div>
-        </div>
-      </div>
-    </Link>
+    </div>
   );
 }
 
@@ -145,7 +171,7 @@ function StatusBadge({ m, urgent }: { m: ScheduleMatch; urgent: boolean }) {
   }
   const dt = new Date(m.utcDate);
   return (
-    <span className="text-[10px] text-slate-500">
+    <span suppressHydrationWarning className="text-[10px] text-slate-500">
       {dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
     </span>
   );
@@ -187,39 +213,40 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
     return () => clearInterval(id);
   }, []);
 
-  const todayStr = new Date(now).toISOString().slice(0, 10);
+  const todayStr = localDateStr(new Date(now));
 
   const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
 
   const filtered = useMemo(() => {
     switch (filter) {
       case "live":     return matches.filter(m => m.status === "LIVE" || m.status === "HT");
-      case "today":    return matches.filter(m => m.utcDate.startsWith(todayStr));
-      case "upcoming": return matches.filter(m => m.status === "NS" && !m.utcDate.startsWith(todayStr));
+      case "today":    return matches.filter(m => utcToLocalDateStr(m.utcDate) === todayStr);
+      case "upcoming": return matches.filter(m => m.status === "NS" && utcToLocalDateStr(m.utcDate) !== todayStr);
       case "results":  return matches.filter(m => m.status === "FT");
       default:         return matches;
     }
   }, [matches, filter, todayStr]);
 
-  // Group by date (YYYY-MM-DD)
+  // Group by local calendar date
   const groups = useMemo(() => {
     const map = new Map<string, ScheduleMatch[]>();
     for (const m of filtered) {
-      const day = m.utcDate.slice(0, 10);
+      const day = utcToLocalDateStr(m.utcDate);
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(m);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [filtered]);
 
-  function formatDayHeader(dateStr: string) {
-    const dt = new Date(dateStr + "T12:00:00Z");
-    const today = new Date(now);
+  function formatDayHeader(localDate: string) {
+    const [y, mo, d] = localDate.split("-").map(Number);
+    const dt = new Date(y, mo - 1, d, 12, 0, 0);
+    const todayLocal = new Date(now);
     const isToday =
-      dt.getUTCFullYear() === today.getUTCFullYear() &&
-      dt.getUTCMonth()    === today.getUTCMonth() &&
-      dt.getUTCDate()     === today.getUTCDate();
-    const label = dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+      dt.getFullYear() === todayLocal.getFullYear() &&
+      dt.getMonth()    === todayLocal.getMonth() &&
+      dt.getDate()     === todayLocal.getDate();
+    const label = dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
     return { label, isToday };
   }
 
@@ -279,7 +306,7 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
             <section key={dateStr}>
               {/* Date header */}
               <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">{label}</h2>
+                <h2 suppressHydrationWarning className="text-sm font-bold text-slate-400 uppercase tracking-widest">{label}</h2>
                 {isToday && (
                   <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full uppercase tracking-widest">
                     Today
