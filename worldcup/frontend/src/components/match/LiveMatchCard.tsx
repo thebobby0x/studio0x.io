@@ -116,8 +116,8 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
         </div>
       </div>
 
-      {/* Stats bars */}
-      {Object.keys(hm).length > 0 && (
+      {/* Stats bars — only shown when real data is available */}
+      {dataSources?.stats !== "sim" && Object.keys(hm).length > 0 && (
         <div className="px-6 pb-6 space-y-3">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
             <Activity size={12} />
