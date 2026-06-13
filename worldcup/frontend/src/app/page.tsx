@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Trophy, Wifi, Music2, CalendarDays, ChevronRight } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import SentimentTickers from "@/components/sentiment/SentimentTickers";
+import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import AnthemPlayer from "@/components/anthem/AnthemPlayer";
 import type { Match, AudioStream } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
@@ -174,6 +175,13 @@ export default async function DashboardPage() {
               <Suspense fallback={<div className="h-28 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
                 <SentimentTickers matchId={liveMatch.id} />
               </Suspense>
+
+              {liveMatch.homeTeam.groupStage && (
+                <GroupWinnerTickers
+                  group={liveMatch.homeTeam.groupStage}
+                  highlightTeams={[liveMatch.homeTeam.name, liveMatch.awayTeam.name]}
+                />
+              )}
 
               {/* Other DB matches */}
               {matches.length > 1 && (
