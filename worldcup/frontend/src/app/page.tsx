@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Trophy, Wifi, Music2, CalendarDays, ChevronRight } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
-import SentimentTickers from "@/components/sentiment/SentimentTickers";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import AnthemPlayer from "@/components/anthem/AnthemPlayer";
 import type { Match, AudioStream } from "@/lib/types";
@@ -42,12 +41,19 @@ export default async function DashboardPage() {
     getTodaySchedule(),
   ]);
 
-  // Prefer the most recently kicked-off live/in-progress match
   const liveMatches = matches.filter((m) => ["LIVE", "HT"].includes(m.status));
-  const liveMatch =
+  const ftMatches   = matches.filter((m) => m.status === "FT");
+  const nsMatches   = matches.filter((m) => m.status === "NS");
+
+  // Prefer: live → most recently completed → next upcoming
+  const featuredMatch =
     liveMatches.length > 0
       ? liveMatches.reduce((a, b) => (new Date(a.date) > new Date(b.date) ? a : b))
-      : (matches.find((m) => m.status === "NS") ?? matches[matches.length - 1]);
+      : ftMatches.length > 0
+        ? ftMatches[ftMatches.length - 1]
+        : (nsMatches[0] ?? matches[matches.length - 1]);
+
+  const liveMatch = featuredMatch;
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
@@ -163,6 +169,10 @@ export default async function DashboardPage() {
                       Live · Group {liveMatch.homeTeam.groupStage} · {liveMatch.venue}, {liveMatch.city}
                     </span>
                   </>
+                ) : liveMatch.status === "FT" ? (
+                  <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Last Result · Group {liveMatch.homeTeam.groupStage} · {liveMatch.venue}, {liveMatch.city}
+                  </span>
                 ) : (
                   <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Next Match · Group {liveMatch.homeTeam.groupStage} · {liveMatch.venue}, {liveMatch.city}
@@ -172,10 +182,6 @@ export default async function DashboardPage() {
               <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
                 <LiveMatchCard matchId={liveMatch.id} />
               </Suspense>
-              <Suspense fallback={<div className="h-28 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
-                <SentimentTickers matchId={liveMatch.id} />
-              </Suspense>
-
               {liveMatch.homeTeam.groupStage && (
                 <GroupWinnerTickers
                   group={liveMatch.homeTeam.groupStage}
