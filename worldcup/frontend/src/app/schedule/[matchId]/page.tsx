@@ -6,6 +6,7 @@ import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
+import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -220,6 +221,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             )}
           </div>
         </div>
+
+        {/* Stadium info + live weather */}
+        {venueInfo && venueFromDB?.venue && (
+          <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Group standings */}

@@ -7,10 +7,11 @@ import LiveMatchCard from "@/components/match/LiveMatchCard";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
+import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import type { Match } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
-import { venueCity } from "@/lib/venues";
+import { venueCity, getVenueInfo } from "@/lib/venues";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
 async function getInitialData() {
@@ -174,6 +175,12 @@ export default async function DashboardPage() {
             <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
               <LiveMatchCard matchId={featuredMatch.id} />
             </Suspense>
+
+            {(() => {
+              const realVenue = featuredMatch.venue && featuredMatch.venue !== "World Cup Stadium" ? featuredMatch.venue : null;
+              const vi = realVenue ? getVenueInfo(realVenue) : null;
+              return vi && realVenue ? <StadiumInfoCard venueName={realVenue} venueInfo={vi} /> : null;
+            })()}
 
             <LiveWinMeter matchId={featuredMatch.id} />
 
