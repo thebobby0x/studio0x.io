@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
-import { Music2, ChevronLeft, Check, Plus, Save, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Music2, ChevronLeft, Check, Plus, Save, Eye, EyeOff, Loader2, AlertCircle, Upload, Link2 } from "lucide-react";
 
 interface TeamWithAnthem {
   id: string;
@@ -42,6 +42,10 @@ export default function AnthemAdmin() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+  const [driveUrl, setDriveUrl] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const isAuthed = !!secret;
 
@@ -83,6 +87,44 @@ export default function AnthemAdmin() {
     setSelected(null);
     setSaveResult(null);
     setForm(EMPTY_FORM);
+  }
+
+  async function uploadFile(file: File) {
+    setUploading(true);
+    setUploadErr("");
+    try {
+      const fd = new FormData();
+      fd.append("audio", file);
+      const res = await fetch(`/api/admin/upload?secret=${encodeURIComponent(secret)}`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { setUploadErr(data.error ?? "Upload failed."); return; }
+      setForm(f => ({ ...f, audioUrl: data.url }));
+    } catch {
+      setUploadErr("Upload failed — check your network.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function importFromDrive() {
+    if (!driveUrl.trim()) return;
+    setUploading(true);
+    setUploadErr("");
+    try {
+      const res = await fetch(`/api/admin/upload?secret=${encodeURIComponent(secret)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driveUrl: driveUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setUploadErr(data.error ?? "Drive import failed."); return; }
+      setForm(f => ({ ...f, audioUrl: data.url }));
+      setDriveUrl("");
+    } catch {
+      setUploadErr("Drive import failed — check your network.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function saveAnthem() {
@@ -273,21 +315,60 @@ export default function AnthemAdmin() {
                   </div>
                 </div>
 
-                {/* Audio URL */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                    Audio URL <span className="text-red-400">*</span>
+                {/* Upload section */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-400">
+                    Audio File <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="url"
-                    value={form.audioUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, audioUrl: e.target.value }))}
-                    placeholder="https://cdn1.suno.ai/your-track.mp3"
-                    className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-green text-sm"
-                  />
-                  <p className="text-[10px] text-slate-600 mt-1">
-                    From Suno: right-click track → Copy audio address, or paste the CDN URL
-                  </p>
+
+                  {/* File upload drop zone */}
+                  <div
+                    className="border-2 border-dashed border-brand-border rounded-xl px-4 py-5 text-center cursor-pointer hover:border-brand-green/50 transition-colors"
+                    onClick={() => fileRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) uploadFile(f); }}
+                  >
+                    <input ref={fileRef} type="file" accept="audio/*,.mp3" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f); }} />
+                    {uploading
+                      ? <div className="flex items-center justify-center gap-2 text-slate-400 text-sm"><Loader2 size={16} className="animate-spin" /> Uploading…</div>
+                      : <div className="flex items-center justify-center gap-2 text-slate-500 text-sm"><Upload size={15} /> Drop MP3 here or <span className="text-brand-gold underline">browse</span></div>
+                    }
+                  </div>
+
+                  {/* Google Drive import */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="url"
+                        value={driveUrl}
+                        onChange={e => setDriveUrl(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && importFromDrive()}
+                        placeholder="Paste Google Drive share link…"
+                        className="w-full bg-brand-dark border border-brand-border rounded-xl pl-8 pr-3 py-2.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-green text-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={importFromDrive}
+                      disabled={!driveUrl.trim() || uploading}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold disabled:opacity-40 transition-colors shrink-0"
+                    >
+                      {uploading ? <Loader2 size={14} className="animate-spin" /> : "Import"}
+                    </button>
+                  </div>
+                  {uploadErr && <p className="flex items-center gap-1.5 text-xs text-red-400"><AlertCircle size={12} />{uploadErr}</p>}
+
+                  {/* Resulting / manual URL */}
+                  <div>
+                    <label className="block text-[10px] text-slate-600 mb-1">Audio URL (auto-filled after upload, or paste directly)</label>
+                    <input
+                      type="url"
+                      value={form.audioUrl}
+                      onChange={(e) => setForm((f) => ({ ...f, audioUrl: e.target.value }))}
+                      placeholder="https://… auto-filled after upload"
+                      className={`w-full bg-brand-dark border rounded-xl px-4 py-2.5 text-white placeholder:text-slate-700 focus:outline-none text-xs font-mono ${form.audioUrl ? "border-brand-green/50 focus:border-brand-green" : "border-brand-border focus:border-brand-border"}`}
+                    />
+                  </div>
                 </div>
 
                 {/* Title */}
