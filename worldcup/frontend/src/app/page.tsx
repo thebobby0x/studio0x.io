@@ -145,22 +145,30 @@ export default async function DashboardPage() {
           <div className="space-y-6">
             {/* Featured match label */}
             <div className="flex items-center gap-3">
-              {["LIVE", "HT"].includes(featuredMatch.status) ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
+              {(() => {
+                const realVenue = featuredMatch.venue && featuredMatch.venue !== "World Cup Stadium" ? featuredMatch.venue : null;
+                const city = realVenue ? venueCity(realVenue, featuredMatch.city) : null;
+                const venuePart = realVenue ? ` · ${realVenue}${city ? `, ${city}` : ""}` : "";
+                const groupPart = `Group ${featuredMatch.homeTeam.groupStage}`;
+                if (["LIVE", "HT"].includes(featuredMatch.status)) return (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Live · {groupPart}{venuePart}
+                    </span>
+                  </>
+                );
+                if (featuredMatch.status === "FT") return (
                   <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Live · Group {featuredMatch.homeTeam.groupStage} · {featuredMatch.venue}{venueCity(featuredMatch.venue, featuredMatch.city) ? `, ${venueCity(featuredMatch.venue, featuredMatch.city)}` : ""}
+                    Most Recent · {groupPart}{venuePart}
                   </span>
-                </>
-              ) : featuredMatch.status === "FT" ? (
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Last Result · Group {featuredMatch.homeTeam.groupStage} · {featuredMatch.venue}{venueCity(featuredMatch.venue, featuredMatch.city) ? `, ${venueCity(featuredMatch.venue, featuredMatch.city)}` : ""}
-                </span>
-              ) : (
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Next Match · Group {featuredMatch.homeTeam.groupStage} · {featuredMatch.venue}{venueCity(featuredMatch.venue, featuredMatch.city) ? `, ${venueCity(featuredMatch.venue, featuredMatch.city)}` : ""}
-                </span>
-              )}
+                );
+                return (
+                  <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Next Match · {groupPart}{venuePart}
+                  </span>
+                );
+              })()}
             </div>
 
             <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
