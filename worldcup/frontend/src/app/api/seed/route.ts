@@ -245,8 +245,23 @@ const ANTHEMS: Record<string, { id: string; title: string; url: string; duration
   URU: { id: "audio-uru", title: "Celeste y Blanca (Uruguay World Cup Anthem 2026)",   url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",  durationSecs: 190 },
 };
 
+export const maxDuration = 300;
+
 export async function GET(req: Request) { return seed(req); }
 export async function POST(req: Request) { return seed(req); }
+
+type FDMatch = {
+  id: number;
+  utcDate: string;
+  status: string;
+  minute?: number;
+  stage: string;
+  group?: string | null;
+  homeTeam: { name: string; shortName?: string; tla: string };
+  awayTeam: { name: string; shortName?: string; tla: string };
+  score: { fullTime: { home: number | null; away: number | null } };
+  venue?: string;
+};
 
 async function seed(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -269,155 +284,154 @@ async function seed(req: Request) {
   const log: string[] = [];
   const t0 = Date.now();
 
-  // ── 1. Fetch all WC 2026 matches from football-data.org ────────────────────
-  const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 10000);
-  const fdRes = await fetch(`${FD_BASE}/competitions/WC/matches?season=2026`, {
-    headers: { "X-Auth-Token": apiKey, Accept: "application/json" },
-    signal: ctrl.signal,
-    cache: "no-store",
-  });
-
-  if (!fdRes.ok) {
-    log.push(`FD API error: ${fdRes.status}`);
-    return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
-  }
-
-  const fdJson = await fdRes.json();
-  const fdMatches: Array<{
-    id: number;
-    utcDate: string;
-    status: string;
-    minute?: number;
-    stage: string;
-    group?: string | null;
-    matchday?: number;
-    homeTeam: { name: string; shortName?: string; tla: string };
-    awayTeam: { name: string; shortName?: string; tla: string };
-    score: { fullTime: { home: number | null; away: number | null } };
-    venue?: string;
-  }> = fdJson.matches ?? [];
-
-  log.push(`Fetched ${fdMatches.length} matches from football-data.org`);
-
-  // ── 2. Remove old fake-fixture records (1001, 1002) so real FD IDs take over
-  const deleted = await prisma.match.deleteMany({ where: { fixture: { in: [1001, 1002] } } });
-  if (deleted.count > 0) log.push(`Removed ${deleted.count} legacy fake-fixture records`);
-
-  // ── 3. Collect all unique teams; determine group from first match seen ─────
-  const teamMeta = new Map<string, { name: string; group: string }>();
-  for (const m of fdMatches) {
-    const group = m.group ? m.group.replace("GROUP_", "") : (m.stage ?? "KO");
-    const norm = (t: { name: string; shortName?: string; tla: string }) => ({
-      name: t.shortName || t.name,
-      group,
+  try {
+    // ── 1. Fetch all WC 2026 matches from football-data.org ──────────────────
+    const ctrl = new AbortController();
+    const fetchTimeout = setTimeout(() => ctrl.abort(), 20000);
+    const fdRes = await fetch(`${FD_BASE}/competitions/WC/matches?season=2026`, {
+      headers: { "X-Auth-Token": apiKey, Accept: "application/json" },
+      signal: ctrl.signal,
+      cache: "no-store",
     });
-    if (m.homeTeam?.tla && !teamMeta.has(m.homeTeam.tla)) teamMeta.set(m.homeTeam.tla, norm(m.homeTeam));
-    if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, norm(m.awayTeam));
-  }
+    clearTimeout(fetchTimeout);
 
-  // ── 4. Upsert teams ────────────────────────────────────────────────────────
-  const teamIdByTla = new Map<string, string>();
-  let teamCount = 0;
-  for (const [tla, meta] of teamMeta) {
-    const team = await prisma.team.upsert({
-      where: { code: tla },
-      update: { name: meta.name, flagEmoji: getFlag(tla), groupStage: meta.group },
-      create: { name: meta.name, code: tla, flagEmoji: getFlag(tla), groupStage: meta.group },
-    });
-    teamIdByTla.set(tla, team.id);
-    teamCount++;
-  }
-  log.push(`Upserted ${teamCount} teams`);
-
-  // ── 5. Upsert players for squads we have ──────────────────────────────────
-  let playerCount = 0;
-  for (const [tla, players] of Object.entries(SQUADS)) {
-    const teamId = teamIdByTla.get(tla);
-    if (!teamId) continue;
-    for (const p of players) {
-      await prisma.player.upsert({
-        where: { id: p.id },
-        update: {},
-        create: { ...p, teamId },
-      });
-      playerCount++;
+    if (!fdRes.ok) {
+      log.push(`FD API error: ${fdRes.status} ${fdRes.statusText}`);
+      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
     }
-  }
-  log.push(`Upserted ${playerCount} players across ${Object.keys(SQUADS).length} squads`);
 
-  // ── 6. Upsert anthems ─────────────────────────────────────────────────────
-  let anthemCount = 0;
-  for (const [tla, a] of Object.entries(ANTHEMS)) {
-    const teamId = teamIdByTla.get(tla);
-    if (!teamId) continue;
-    await prisma.audioStream.upsert({
-      where: { teamId },
-      update: {},
-      create: {
+    const fdJson = await fdRes.json();
+    const fdMatches: FDMatch[] = fdJson.matches ?? [];
+    log.push(`Fetched ${fdMatches.length} matches from football-data.org`);
+
+    // ── 2. Remove old fake-fixture records — delete children first to avoid FK violations ──
+    await prisma.kalshiMarket.deleteMany({ where: { match: { fixture: { in: [1001, 1002] } } } });
+    await prisma.liveMetric.deleteMany({ where: { match: { fixture: { in: [1001, 1002] } } } });
+    const deleted = await prisma.match.deleteMany({ where: { fixture: { in: [1001, 1002] } } });
+    if (deleted.count > 0) log.push(`Removed ${deleted.count} legacy fake-fixture records`);
+
+    // ── 3. Collect all unique teams ──────────────────────────────────────────
+    const teamMeta = new Map<string, { name: string; group: string }>();
+    for (const m of fdMatches) {
+      const group = m.group ? m.group.replace("GROUP_", "") : (m.stage ?? "KO");
+      const norm = (t: { name: string; shortName?: string; tla: string }) => ({
+        name: t.shortName || t.name,
+        group,
+      });
+      if (m.homeTeam?.tla && !teamMeta.has(m.homeTeam.tla)) teamMeta.set(m.homeTeam.tla, norm(m.homeTeam));
+      if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, norm(m.awayTeam));
+    }
+
+    // ── 4. Batch upsert teams: createMany for new rows, parallel update for existing ──
+    const teamsData = [...teamMeta.entries()].map(([tla, meta]) => ({
+      code: tla,
+      name: meta.name,
+      flagEmoji: getFlag(tla),
+      groupStage: meta.group,
+    }));
+    await prisma.team.createMany({ data: teamsData, skipDuplicates: true });
+    await Promise.all(
+      teamsData.map(t =>
+        prisma.team.update({
+          where: { code: t.code },
+          data: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
+        })
+      )
+    );
+    const allTeams = await prisma.team.findMany({ select: { id: true, code: true } });
+    const teamIdByTla = new Map(allTeams.map(t => [t.code, t.id]));
+    log.push(`Upserted ${teamsData.length} teams`);
+
+    // ── 5. Batch create players (skipDuplicates = idempotent) ────────────────
+    const playersData = Object.entries(SQUADS).flatMap(([tla, players]) => {
+      const teamId = teamIdByTla.get(tla);
+      if (!teamId) return [];
+      return players.map(p => ({ ...p, teamId }));
+    });
+    const { count: playerCount } = await prisma.player.createMany({ data: playersData, skipDuplicates: true });
+    log.push(`Upserted ${playersData.length} players (${playerCount} new) across ${Object.keys(SQUADS).length} squads`);
+
+    // ── 6. Batch create anthems (skipDuplicates = idempotent) ────────────────
+    const anthemsData = Object.entries(ANTHEMS).flatMap(([tla, a]) => {
+      const teamId = teamIdByTla.get(tla);
+      if (!teamId) return [];
+      return [{
         id: a.id,
         teamId,
         title: a.title,
         artistCredit: "Suno AI × Studio0x",
         audioUrl: a.url,
         durationSecs: a.durationSecs,
-        tiktokDeepLink: null,
-      },
+        tiktokDeepLink: null as string | null,
+      }];
     });
-    anthemCount++;
-  }
-  log.push(`Upserted ${anthemCount} anthems`);
+    await prisma.audioStream.createMany({ data: anthemsData, skipDuplicates: true });
+    log.push(`Upserted ${anthemsData.length} anthems`);
 
-  // ── 7. Upsert matches + Kalshi markets ────────────────────────────────────
-  let matchCount = 0;
-  let marketCount = 0;
-  for (const m of fdMatches) {
-    if (!m.homeTeam?.tla || !m.awayTeam?.tla) continue;
-    const homeId = teamIdByTla.get(m.homeTeam.tla);
-    const awayId = teamIdByTla.get(m.awayTeam.tla);
-    if (!homeId || !awayId) continue;
+    // ── 7. Batch create matches, then parallel update live/finished scores ───
+    const validMatches = fdMatches.filter(
+      m => m.homeTeam?.tla && m.awayTeam?.tla &&
+           teamIdByTla.has(m.homeTeam.tla) && teamIdByTla.has(m.awayTeam.tla)
+    );
+    const matchesCreateData = validMatches.map(m => ({
+      fixture: m.id,
+      homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
+      awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
+      venue: (m.venue as string | undefined) ?? "World Cup Stadium",
+      city: "Host City",
+      date: new Date(m.utcDate),
+      status: STATUS_MAP[m.status] ?? "NS",
+      homeScore: m.score?.fullTime?.home ?? 0,
+      awayScore: m.score?.fullTime?.away ?? 0,
+      elapsed: m.minute ?? 0,
+    }));
+    await prisma.match.createMany({ data: matchesCreateData, skipDuplicates: true });
 
-    const status = STATUS_MAP[m.status] ?? "NS";
-    const homeScore = m.score?.fullTime?.home ?? 0;
-    const awayScore = m.score?.fullTime?.away ?? 0;
-    const elapsed = m.minute ?? 0;
-
-    const match = await prisma.match.upsert({
-      where: { fixture: m.id },
-      update: { status, homeScore, awayScore, elapsed },
-      create: {
-        fixture: m.id,
-        homeTeamId: homeId,
-        awayTeamId: awayId,
-        venue: (m.venue as string | undefined) ?? "World Cup Stadium",
-        city: "Host City",
-        date: new Date(m.utcDate),
-        status,
-        homeScore,
-        awayScore,
-        elapsed,
-      },
-    });
-
-    // Kalshi markets (one per outcome, idempotent)
-    const homeTla = m.homeTeam.tla;
-    const awayTla = m.awayTeam.tla;
-    const mkSeeds = [
-      { outcome: "home_win", contractSlug: `KXFIFAGAME-${homeTla}-${awayTla}-HW`, price: 0.40 },
-      { outcome: "draw",     contractSlug: `KXFIFAGAME-${homeTla}-${awayTla}-TIE`, price: 0.25 },
-      { outcome: "away_win", contractSlug: `KXFIFAGAME-${homeTla}-${awayTla}-AW`, price: 0.35 },
-    ];
-    for (const mk of mkSeeds) {
-      await prisma.kalshiMarket.upsert({
-        where: { matchId_outcome: { matchId: match.id, outcome: mk.outcome } },
-        update: {},
-        create: { ...mk, matchId: match.id },
-      });
-      marketCount++;
+    // Update status/scores for non-scheduled matches in parallel
+    const activeMatches = validMatches.filter(
+      m => m.status !== "SCHEDULED" && m.status !== "TIMED" && m.status !== "POSTPONED" && m.status !== "CANCELLED"
+    );
+    if (activeMatches.length > 0) {
+      await Promise.all(
+        activeMatches.map(m =>
+          prisma.match.updateMany({
+            where: { fixture: m.id },
+            data: {
+              status: STATUS_MAP[m.status] ?? "NS",
+              homeScore: m.score?.fullTime?.home ?? 0,
+              awayScore: m.score?.fullTime?.away ?? 0,
+              elapsed: m.minute ?? 0,
+            },
+          })
+        )
+      );
     }
-    matchCount++;
+    log.push(`Upserted ${validMatches.length} matches (${activeMatches.length} score/status updates)`);
+
+    // ── 8. Batch create Kalshi markets (skipDuplicates = idempotent) ─────────
+    const matchDbRows = await prisma.match.findMany({
+      where: { fixture: { in: validMatches.map(m => m.id) } },
+      select: { id: true, fixture: true },
+    });
+    const matchDbIdByFixture = new Map(matchDbRows.map(r => [r.fixture, r.id]));
+
+    const marketsData = validMatches.flatMap(m => {
+      const matchId = matchDbIdByFixture.get(m.id);
+      if (!matchId) return [];
+      return [
+        { matchId, outcome: "home_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-HW`, price: 0.40 },
+        { matchId, outcome: "draw",     contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-TIE`, price: 0.25 },
+        { matchId, outcome: "away_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-AW`, price: 0.35 },
+      ];
+    });
+    await prisma.kalshiMarket.createMany({ data: marketsData, skipDuplicates: true });
+    log.push(`Upserted ${marketsData.length} Kalshi market records`);
+
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name}: ${err.message}\n\n${err.stack ?? ""}` : String(err);
+    log.push(`ERROR: ${msg}`);
+    return new Response(errorPage(log.join("\n") + "\n\n" + msg), { headers: { "Content-Type": "text/html" } });
   }
-  log.push(`Upserted ${matchCount} matches · ${marketCount} Kalshi market records`);
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   log.push(`Done in ${elapsed}s`);
@@ -450,7 +464,7 @@ async function seed(req: Request) {
 
 function errorPage(msg: string) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Seed Error</title>
-  <style>body{font-family:sans-serif;background:#0a0e1a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}
-  h1{color:#f56565}pre{color:#f5a623;font-size:.85rem}</style></head>
-  <body><h1>⚠️ Seed failed</h1><pre>${msg}</pre></body></html>`;
+  <style>body{font-family:sans-serif;background:#0a0e1a;color:#e2e8f0;max-width:780px;margin:60px auto;padding:0 20px}
+  h1{color:#f56565}pre{color:#f5a623;font-size:.8rem;white-space:pre-wrap;word-break:break-all;background:#0f172a;padding:16px;border-radius:8px;line-height:1.6}</style></head>
+  <body><h1>⚠️ Seed failed</h1><pre>${msg}</pre><p style="color:#64748b;font-size:.85rem">Check Vercel logs for full stack trace.</p></body></html>`;
 }
