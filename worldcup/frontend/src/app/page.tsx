@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Trophy, Wifi, CalendarDays, ChevronRight } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
+import LiveWinMeter from "@/components/stats/LiveWinMeter";
+import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
 import type { Match } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
@@ -165,12 +167,19 @@ export default async function DashboardPage() {
               <LiveMatchCard matchId={featuredMatch.id} />
             </Suspense>
 
+            <LiveWinMeter matchId={featuredMatch.id} />
+
             {featuredMatch.homeTeam.groupStage && (
               <GroupWinnerTickers
                 group={featuredMatch.homeTeam.groupStage}
                 highlightTeams={[featuredMatch.homeTeam.name, featuredMatch.awayTeam.name]}
               />
             )}
+
+            <TournamentOddsPanel
+              highlightTlas={[featuredMatch.homeTeam.code, featuredMatch.awayTeam.code]}
+              limit={12}
+            />
 
             {/* All Matches table */}
             {matches.length > 1 && (

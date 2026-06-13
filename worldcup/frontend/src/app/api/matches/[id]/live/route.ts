@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { simulateStats, simulateMarkets, elapsedFromDate, statusFromElapsed } from "@/lib/simulation";
 import { getKalshiMarkets } from "@/lib/kalshi";
 import { getFDLiveMatch } from "@/lib/footballData";
+import { getTeamTournamentProb } from "@/lib/polymarket";
+import { liveWinProbability, preMatchWinProbFromTournamentOdds } from "@/lib/probabilities";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,26 +18,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
 
-  // Fetch live data from both external sources in parallel
-  const [fdResult, kalshiResult] = await Promise.allSettled([
+  // Fetch live data in parallel — tournament odds alongside match/market data
+  const [fdResult, kalshiResult, homeTournamentProb, awayTournamentProb] = await Promise.allSettled([
     getFDLiveMatch(homeCode, awayCode, match.date),
     getKalshiMarkets(homeCode, awayCode, new Date(match.date)),
+    getTeamTournamentProb(homeCode),
+    getTeamTournamentProb(awayCode),
   ]);
 
   const fdMatch  = fdResult.status  === "fulfilled" ? fdResult.value  : null;
   const kalshi   = kalshiResult.status === "fulfilled" ? kalshiResult.value : null;
+  const homeW    = homeTournamentProb.status === "fulfilled" ? homeTournamentProb.value : null;
+  const awayW    = awayTournamentProb.status === "fulfilled" ? awayTournamentProb.value : null;
 
-  // Match state: real football-data.org > simulation
+  // Match state
   const simElapsed = elapsedFromDate(match.date);
   const status     = fdMatch?.status ?? statusFromElapsed(simElapsed);
-  // HT means minute is always 45; use API minute when non-zero, else simulation
   const elapsed    = status === "HT" ? 45
                    : (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed
                    : simElapsed;
   const homeScore  = fdMatch?.homeScore ?? match.homeScore;
   const awayScore  = fdMatch?.awayScore ?? match.awayScore;
 
-  // Detailed stats — always simulated (no free live source exists)
+  // Detailed stats — always simulated
   const metrics: Record<string, Record<string, number>> = {
     [homeCode]: simulateStats(homeCode, elapsed, match.fixture) as unknown as Record<string, number>,
     [awayCode]: simulateStats(awayCode, elapsed, match.fixture) as unknown as Record<string, number>,
@@ -55,6 +60,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     volume: kalshi ? kalshi.volume / dbMarkets.length : m.volume,
   }));
 
+  // Derived live win probabilities from Polymarket tournament odds + current score
+  let liveProbs: { home: number; draw: number; away: number } | null = null;
+  if (homeW !== null && awayW !== null) {
+    const preMatchHomeWinProb = preMatchWinProbFromTournamentOdds(homeW ?? 0.02, awayW ?? 0.02);
+    liveProbs = liveWinProbability(preMatchHomeWinProb, homeScore, awayScore, elapsed, status);
+  }
+
   // Persist updated state non-blocking
   prisma.match.update({ where: { id }, data: { elapsed, status, homeScore, awayScore } }).catch(() => {});
 
@@ -63,10 +75,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     metrics,
     markets: enrichedMarkets,
     kalshiTickers: kalshi ? kalshi.tickers : null,
+    liveProbs,
+    tournamentOdds: {
+      home: homeW,
+      away: awayW,
+    },
     dataSources: {
       match:   fdMatch  ? fdMatch.source  : "sim",
       markets: kalshi   ? kalshi.source   : "sim",
       stats:   "sim",
+      probs:   (homeW !== null && awayW !== null) ? "polymarket" : "unavailable",
     },
   });
 }

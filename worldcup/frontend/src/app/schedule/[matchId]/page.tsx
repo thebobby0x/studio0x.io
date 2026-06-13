@@ -5,6 +5,7 @@ import { Trophy, Music2, Wifi, CalendarDays, ArrowLeft, MapPin, Clock, Users } f
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
+import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -295,6 +296,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           )}
         </div>
 
+        {/* Live win probability meter — DB match needed for matchId */}
+        <MatchWinMeter fixtureId={m.id} />
+
         {/* Group winner prediction markets */}
         {m.group && (
           <GroupWinnerTickers
@@ -363,6 +367,16 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       </footer>
     </div>
   );
+}
+
+async function MatchWinMeter({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <LiveWinMeter matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
 }
 
 const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"];
