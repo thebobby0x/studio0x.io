@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
+import { getVenueInfo } from "@/lib/venues";
 
 const FD_BASE = "https://api.football-data.org/v4";
 
@@ -378,7 +379,7 @@ async function seed(req: Request) {
       homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
       awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
       venue: (m.venue as string | undefined) ?? "World Cup Stadium",
-      city: "Host City",
+      city: (() => { const v = m.venue; const info = v ? getVenueInfo(v as string) : null; return info?.city ?? ""; })(),
       date: new Date(m.utcDate),
       status: STATUS_MAP[m.status] ?? "NS",
       homeScore: m.score?.fullTime?.home ?? 0,

@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Trophy, Music2, Wifi, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
+import { Trophy, Music2, Wifi, CalendarDays, ArrowLeft, MapPin, Clock, Users } from "lucide-react";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
+import { prisma } from "@/lib/prisma";
+import { getVenueInfo } from "@/lib/venues";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -94,6 +96,10 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
     ? allMatches.filter(x => x.group === m.group && x.id !== m.id)
     : [];
   const table = m.group ? buildGroupTable(allMatches, m.group) : [];
+
+  // Venue info from static lookup (football-data free tier has no venue data)
+  const venueFromDB = await prisma.match.findFirst({ where: { fixture: m.id }, select: { venue: true } }).catch(() => null);
+  const venueInfo = venueFromDB?.venue ? getVenueInfo(venueFromDB.venue) : null;
 
   // Other fixtures involving either team
   const homeOtherMatches = allMatches
@@ -199,6 +205,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             <span className="flex items-center gap-1.5">
               <MapPin size={12} />
               {m.stageLabel} · Matchday {m.matchday}
+              {venueInfo && <span className="text-slate-600">· {venueInfo.city} · Cap. {venueInfo.capacity.toLocaleString()}</span>}
             </span>
             <span suppressHydrationWarning className="flex items-center gap-1.5">
               <Clock size={12} />
@@ -296,6 +303,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           />
         )}
 
+        {/* Starting lineups from DB */}
+        <MatchLineupCard fixtureId={m.id} homeName={m.homeTeam.name} awayName={m.awayTeam.name} />
+
         {/* Team fixtures */}
         {(homeOtherMatches.length > 0 || awayOtherMatches.length > 0) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -338,19 +348,86 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           </div>
         )}
 
-        {/* CTA to full dashboard */}
+        {/* CTA to dashboard */}
         <div className="rounded-2xl bg-gradient-to-r from-brand-green/10 to-amber-500/10 border border-brand-green/20 p-6 text-center">
-          <p className="text-slate-400 text-sm mb-3">Want live telemetry, prediction markets, and real-time stats?</p>
+          <p className="text-slate-400 text-sm mb-3">Live scores, group winner odds & prediction markets</p>
           <Link href="/" className="inline-flex items-center gap-2 bg-brand-gold text-brand-dark font-bold text-sm px-5 py-2.5 rounded-full hover:bg-amber-300 transition-colors">
             <Trophy size={14} />
-            Open Stats Dashboard
+            Open Dashboard
           </Link>
         </div>
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 Stats Engine · Data via football-data.org
+        studio0x.io · FIFA World Cup 2026 · Data via football-data.org
       </footer>
     </div>
   );
+}
+
+const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"];
+const POSITION_LABELS: Record<string, string> = { GK: "Goalkeeper", DEF: "Defenders", MID: "Midfielders", FWD: "Forwards" };
+
+async function MatchLineupCard({ fixtureId, homeName, awayName }: { fixtureId: number; homeName: string; awayName: string }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({
+      where: { fixture: fixtureId },
+      include: {
+        homeTeam: { include: { homePlayers: true } },
+        awayTeam: { include: { homePlayers: true } },
+      },
+    });
+    if (!dbMatch) return null;
+
+    const sides = [
+      { team: dbMatch.homeTeam, name: homeName },
+      { team: dbMatch.awayTeam, name: awayName },
+    ] as const;
+
+    const hasPlayers = sides.some(s => (s.team as { homePlayers?: unknown[] }).homePlayers && (s.team as { homePlayers: unknown[] }).homePlayers.length > 0);
+    if (!hasPlayers) return null;
+
+    return (
+      <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border">
+          <Users size={13} className="text-slate-500" />
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Starting Lineups</span>
+          <span className="ml-auto text-[10px] text-slate-600">Subs coming with paid API</span>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-brand-border">
+          {sides.map(({ team, name }) => {
+            const players = ((team as { homePlayers: Array<{ id: string; number: number; name: string; position: string }> }).homePlayers ?? [])
+              .sort((a, b) => {
+                const pi = POSITION_ORDER.indexOf(a.position) - POSITION_ORDER.indexOf(b.position);
+                return pi !== 0 ? pi : a.number - b.number;
+              });
+            return (
+              <div key={team.id} className="p-3">
+                <Link href={`/team/${team.code}`} className="text-xs font-bold text-white mb-3 block hover:text-brand-gold transition-colors">
+                  {name}
+                </Link>
+                {POSITION_ORDER.map(pos => {
+                  const pp = players.filter(p => p.position === pos);
+                  if (!pp.length) return null;
+                  return (
+                    <div key={pos} className="mb-3">
+                      <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">{POSITION_LABELS[pos]}</div>
+                      {pp.map(p => (
+                        <div key={p.id} className="flex items-center gap-2 py-1">
+                          <span className="text-[10px] text-slate-600 w-4 text-right font-mono tabular-nums">{p.number}</span>
+                          <span className="text-xs text-slate-300">{p.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  } catch {
+    return null;
+  }
 }
