@@ -52,7 +52,7 @@ export default function LiveWinMeter({ matchId }: { matchId: string }) {
     return () => clearInterval(id);
   }, [load]);
 
-  if (source === "unavailable" || !probs) return null;
+  if (source === "unavailable" || !probs || status === "FT") return null;
 
   const isLive = status === "LIVE" || status === "HT";
 
