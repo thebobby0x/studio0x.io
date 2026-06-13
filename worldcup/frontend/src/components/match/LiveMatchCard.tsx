@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Activity, Clock, MapPin, Wifi, FlaskConical, Users } from "lucide-react";
-import type { LiveData, DataSources } from "@/lib/types";
+import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
+import type { LiveData } from "@/lib/types";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 
 const METRIC_LABELS: Record<string, string> = {
@@ -58,7 +58,6 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
   if (!data) return <div className="rounded-xl bg-brand-card border border-brand-border p-6 animate-pulse h-64" />;
 
   const { match, metrics, dataSources } = data;
-  const matchIsLive = (dataSources as DataSources | undefined)?.match === "live" || (dataSources as DataSources | undefined)?.match === "cache";
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
   const hm = metrics[homeCode] ?? {};
@@ -77,9 +76,13 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <MapPin size={14} />
-            <span>{match.venue}{city ? `, ${city}` : ""}</span>
+            {match.venue && match.venue !== "World Cup Stadium" ? (
+              <span>{match.venue}{city ? `, ${city}` : ""}</span>
+            ) : (
+              <span className="text-slate-600">Venue TBD</span>
+            )}
           </div>
-          {capacityStr && (
+          {capacityStr && match.venue !== "World Cup Stadium" && (
             <div className="flex items-center gap-1.5 text-[10px] text-slate-600 ml-5">
               <Users size={10} />
               <span>Capacity {capacityStr} · Est. sold out</span>
@@ -91,14 +94,14 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isLive ? "bg-red-500/20 text-red-400" : isDone ? "bg-slate-700 text-slate-400" : "bg-slate-700 text-slate-300"}`}>
             {match.status === "LIVE" ? `${match.elapsed}'` : match.status}
           </span>
-          {matchIsLive ? (
+          {isLive ? (
             <span className="flex items-center gap-1 text-[10px] text-brand-green font-semibold">
               <Wifi size={10} /> LIVE
             </span>
+          ) : isDone ? (
+            <span className="text-[10px] text-slate-500 font-semibold">Latest</span>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] text-slate-500">
-              <FlaskConical size={10} /> Sim
-            </span>
+            <span className="text-[10px] text-amber-500 font-semibold">Upcoming</span>
           )}
         </div>
       </div>
