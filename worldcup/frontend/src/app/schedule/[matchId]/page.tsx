@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Trophy, Music2, Wifi, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -286,6 +287,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             </div>
           )}
         </div>
+
+        {/* Group winner prediction markets */}
+        {m.group && (
+          <GroupWinnerTickers
+            group={m.group}
+            highlightTeams={[m.homeTeam.name, m.awayTeam.name]}
+          />
+        )}
 
         {/* Team fixtures */}
         {(homeOtherMatches.length > 0 || awayOtherMatches.length > 0) && (
