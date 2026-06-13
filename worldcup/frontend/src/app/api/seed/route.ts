@@ -246,6 +246,62 @@ const ANTHEMS: Record<string, { id: string; title: string; url: string; duration
   URU: { id: "audio-uru", title: "Celeste y Blanca (Uruguay World Cup Anthem 2026)",   url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",  durationSecs: 190 },
 };
 
+// WC 2026 official group stage venue assignments — hardcoded, never changes
+const MATCHUP_VENUES: Record<string, string> = {
+  // Group A
+  "MEX-RSA": "Estadio Azteca",        "KOR-CZE": "Estadio Akron",
+  "CZE-RSA": "Mercedes-Benz Stadium", "MEX-KOR": "Estadio Akron",
+  "CZE-MEX": "Estadio Azteca",        "RSA-KOR": "Estadio BBVA",
+  // Group B
+  "CAN-BIH": "BMO Field",             "QAT-SUI": "Levi's Stadium",
+  "SUI-BIH": "SoFi Stadium",          "CAN-QAT": "BC Place",
+  "SUI-CAN": "BC Place",              "BIH-QAT": "Lumen Field",
+  // Group C
+  "BRA-MAR": "MetLife Stadium",        "HAI-SCO": "Gillette Stadium",
+  "SCO-MAR": "Gillette Stadium",       "BRA-HAI": "Lincoln Financial Field",
+  "SCO-BRA": "Hard Rock Stadium",      "MAR-HAI": "Mercedes-Benz Stadium",
+  // Group D
+  "USA-PAR": "SoFi Stadium",           "AUS-TUR": "BC Place",
+  "USA-AUS": "Lumen Field",            "TUR-PAR": "Levi's Stadium",
+  "TUR-USA": "SoFi Stadium",           "PAR-AUS": "Levi's Stadium",
+  // Group E
+  "GER-CUW": "NRG Stadium",            "CIV-ECU": "Lincoln Financial Field",
+  "GER-CIV": "BMO Field",              "ECU-CUW": "Arrowhead Stadium",
+  "CUW-CIV": "Lincoln Financial Field","ECU-GER": "MetLife Stadium",
+  // Group F
+  "NED-JPN": "AT&T Stadium",           "SWE-TUN": "Estadio BBVA",
+  "NED-SWE": "NRG Stadium",            "TUN-JPN": "Estadio BBVA",
+  "JPN-SWE": "AT&T Stadium",           "TUN-NED": "Arrowhead Stadium",
+  // Group G
+  "BEL-EGY": "Lumen Field",            "IRN-NZL": "SoFi Stadium",
+  "BEL-IRN": "SoFi Stadium",           "NZL-EGY": "BC Place",
+  "EGY-IRN": "Lumen Field",            "NZL-BEL": "BC Place",
+  // Group H
+  "ESP-CPV": "Mercedes-Benz Stadium",  "KSA-URU": "Hard Rock Stadium",
+  "ESP-KSA": "Mercedes-Benz Stadium",  "URU-CPV": "Hard Rock Stadium",
+  "CPV-KSA": "NRG Stadium",            "URU-ESP": "Estadio Akron",
+  // Group I
+  "FRA-SEN": "MetLife Stadium",         "IRQ-NOR": "Gillette Stadium",
+  "FRA-IRQ": "Lincoln Financial Field", "NOR-SEN": "MetLife Stadium",
+  "NOR-FRA": "Gillette Stadium",        "SEN-IRQ": "BMO Field",
+  // Group J
+  "ARG-ALG": "Arrowhead Stadium",       "AUT-JOR": "Levi's Stadium",
+  "ARG-AUT": "AT&T Stadium",            "JOR-ALG": "Levi's Stadium",
+  "ALG-AUT": "Arrowhead Stadium",       "JOR-ARG": "AT&T Stadium",
+  // Group K
+  "POR-COD": "NRG Stadium",             "UZB-COL": "Estadio Azteca",
+  "POR-UZB": "NRG Stadium",             "COL-COD": "Estadio Akron",
+  "COL-POR": "Hard Rock Stadium",       "COD-UZB": "Mercedes-Benz Stadium",
+  // Group L
+  "ENG-CRO": "AT&T Stadium",            "GHA-PAN": "BMO Field",
+  "ENG-GHA": "Gillette Stadium",         "PAN-CRO": "BMO Field",
+  "PAN-ENG": "MetLife Stadium",          "CRO-GHA": "Lincoln Financial Field",
+};
+
+function matchupVenue(h: string, a: string): string | null {
+  return MATCHUP_VENUES[`${h}-${a}`] ?? null;
+}
+
 export const maxDuration = 300;
 
 export async function GET(req: Request) { return seed(req); }
@@ -378,8 +434,8 @@ async function seed(req: Request) {
       fixture: m.id,
       homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
       awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
-      venue: (m.venue as string | undefined) ?? "World Cup Stadium",
-      city: (() => { const v = m.venue; const info = v ? getVenueInfo(v as string) : null; return info?.city ?? ""; })(),
+      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined) ?? "World Cup Stadium",
+      city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined); return v ? (getVenueInfo(v)?.city ?? "") : ""; })(),
       date: new Date(m.utcDate),
       status: STATUS_MAP[m.status] ?? "NS",
       homeScore: m.score?.fullTime?.home ?? 0,
@@ -387,6 +443,13 @@ async function seed(req: Request) {
       elapsed: m.minute ?? 0,
     }));
     await prisma.match.createMany({ data: matchesCreateData, skipDuplicates: true });
+
+    // Venue update pass — overwrites any previously stored placeholder with hardcoded values
+    await Promise.all(validMatches.map(m => {
+      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined) ?? "World Cup Stadium";
+      const city = venue !== "World Cup Stadium" ? (getVenueInfo(venue)?.city ?? "") : "";
+      return prisma.match.updateMany({ where: { fixture: m.id }, data: { venue, city } });
+    }));
 
     // Update status/scores for non-scheduled matches in parallel
     const activeMatches = validMatches.filter(
