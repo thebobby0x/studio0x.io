@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
+const GAMMA = "https://gamma-api.polymarket.com";
+
 async function get(url: string) {
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
+    const res = await fetch(url, { headers: { Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" });
     const text = await res.text();
     let json: unknown = null;
     try { json = JSON.parse(text); } catch { json = text.slice(0, 500); }
@@ -18,73 +16,46 @@ async function get(url: string) {
   }
 }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const home = (searchParams.get("home") ?? "USA").toUpperCase();
-  const away = (searchParams.get("away") ?? "PAR").toUpperCase();
-
+export async function GET() {
   const results: Record<string, unknown> = {};
 
-  // ── 1. Polymarket gamma API — browse markets ──────────────────────────────
-  const pmBase = "https://gamma-api.polymarket.com";
+  // 1. Fetch ALL soccer events (more pages)
+  const evR = await get(`${GAMMA}/events?active=true&closed=false&limit=50&tag_slug=soccer`);
+  const events = evR.ok
+    ? ((evR.body as {events?: Array<{slug: string; title: string; markets?: unknown[]}>})?.events
+       ?? (Array.isArray(evR.body) ? evR.body as Array<{slug: string; title: string}> : []))
+    : [];
+  results.allSoccerEvents = events.map((e: {slug: string; title: string; markets?: unknown[]}) => ({
+    slug: e.slug,
+    title: e.title,
+    marketCount: e.markets?.length ?? "?",
+  }));
 
-  // Try sports/soccer/world-cup tag searches
-  const pmSearches = [
-    `${pmBase}/markets?active=true&closed=false&limit=20&tag_slug=soccer`,
-    `${pmBase}/markets?active=true&closed=false&limit=20&tag_slug=sports`,
-    `${pmBase}/markets?active=true&closed=false&limit=20&tag_slug=world-cup`,
-    `${pmBase}/markets?active=true&closed=false&limit=20&q=FIFA`,
-    `${pmBase}/markets?active=true&closed=false&limit=20&q=World+Cup`,
-    `${pmBase}/markets?active=true&closed=false&limit=20&q=${home}`,
-    `${pmBase}/events?active=true&closed=false&limit=20&tag_slug=soccer`,
-    `${pmBase}/events?active=true&closed=false&limit=20&q=World+Cup`,
-  ];
+  await new Promise(r => setTimeout(r, 400));
 
-  const pmResults: Record<string, unknown> = {};
-  for (const url of pmSearches) {
-    const key = url.replace(pmBase, "");
-    const r = await get(url);
-    const items = r.ok
-      ? ((r.body as {markets?: unknown[]; events?: unknown[]; results?: unknown[]})?.markets
-        ?? (r.body as {events?: unknown[]})?.events
-        ?? (Array.isArray(r.body) ? r.body as unknown[] : []))
+  // 2. Drill into a specific group winner event
+  const groupSlugs = ["world-cup-group-a-winner", "world-cup-group-b-winner"];
+  for (const slug of groupSlugs) {
+    const r = await get(`${GAMMA}/events?slug=${slug}`);
+    const evts = r.ok
+      ? ((r.body as {events?: unknown[]})?.events ?? (Array.isArray(r.body) ? r.body : []))
       : [];
-    pmResults[key] = {
-      status: r.status,
-      count: (items as unknown[]).length,
-      sample: (items as Array<{slug?: string; question?: string; title?: string}>).slice(0, 5).map(m => ({
-        slug: m.slug,
-        question: m.question ?? m.title,
-      })),
-    };
-    await new Promise(r => setTimeout(r, 300));
-  }
-  results.polymarket = pmResults;
-
-  // ── 2. Polymarket CLOB API — check if soccer markets exist ───────────────
-  const clobBase = "https://clob.polymarket.com";
-  const clobChecks = [
-    `${clobBase}/markets?next_cursor=`,
-    `${clobBase}/sampling-markets`,
-  ];
-  const clobResults: Record<string, unknown> = {};
-  for (const url of clobChecks) {
-    const r = await get(url);
-    const items = r.ok
-      ? ((r.body as {data?: unknown[]})?.data ?? (Array.isArray(r.body) ? r.body as unknown[] : []))
-      : [];
-    clobResults[url.replace(clobBase, "")] = {
-      status: r.status,
-      count: (items as unknown[]).length,
-      sample: (items as Array<{condition_id?: string; question?: string; market_slug?: string}>).slice(0, 3).map(m => ({
-        condition_id: m.condition_id,
-        question: m.question,
-        slug: m.market_slug,
-      })),
-    };
+    results[slug] = { status: r.status, count: (evts as unknown[]).length, full: (evts as unknown[])[0] };
     await new Promise(r => setTimeout(r, 400));
   }
-  results.clobApi = clobResults;
 
-  return NextResponse.json({ params: { home, away }, results });
+  // 3. Fetch the tournament winner event for structure reference
+  const twR = await get(`${GAMMA}/events?slug=world-cup-winner`);
+  const twEvts = twR.ok
+    ? ((twR.body as {events?: unknown[]})?.events ?? (Array.isArray(twR.body) ? twR.body : []))
+    : [];
+  results["world-cup-winner"] = { status: twR.status, full: (twEvts as unknown[])[0] };
+
+  await new Promise(r => setTimeout(r, 400));
+
+  // 4. Try fetching a known market by slug from CLOB
+  const clobR = await get(`https://clob.polymarket.com/markets/will-uruguay-win-group-h-in-the-2026-fifa-world-cup`);
+  results.clobUruguayMarket = { status: clobR.status, body: clobR.body };
+
+  return NextResponse.json(results);
 }
