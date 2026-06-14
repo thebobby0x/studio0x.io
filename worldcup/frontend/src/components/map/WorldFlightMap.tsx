@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { LineString } from "geojson";
 import {
   ComposableMap,
   Geographies,
@@ -41,7 +42,7 @@ function ArcPath({ arc, animOffset }: ArcPathProps) {
     60
   );
 
-  const lineData: GeoJSON.LineString = {
+  const lineData: LineString = {
     type: "LineString",
     coordinates: coords,
   };
@@ -165,7 +166,7 @@ export default function WorldFlightMap() {
       >
         <Geographies geography={GEO_URL}>
           {({ geographies }) =>
-            geographies.map((geo) => (
+            (geographies as Array<{ rsmKey: string } & Record<string, unknown>>).map((geo) => (
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
