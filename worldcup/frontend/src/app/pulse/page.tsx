@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Trophy, CalendarDays, Wifi, Radio } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { FlightArc } from "@/app/api/flight-paths/route";
+import LiveClock from "@/components/ui/LiveClock";
 
 const WorldFlightMap = dynamic(
   () => import("@/components/map/WorldFlightMap"),
@@ -51,6 +52,7 @@ export default function PulsePage() {
               <Wifi size={11} className="text-brand-green" />
               <span className="hidden sm:inline">Live</span>
             </div>
+            <LiveClock />
           </div>
         </div>
       </nav>

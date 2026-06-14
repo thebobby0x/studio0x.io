@@ -6,6 +6,7 @@ import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
 import { getAllVenues } from "@/lib/venues";
 import type { FlightArc } from "@/app/api/flight-paths/route";
+import type { VenueDensity } from "@/app/api/flight-density/route";
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 const GOLD = "#f5a623";
@@ -33,6 +34,7 @@ const ALL_VENUES = getAllVenues();
 export default function WorldFlightMap() {
   const [countries, setCountries] = useState<string[]>([]);
   const [arcs, setArcs] = useState<FlightArc[]>([]);
+  const [density, setDensity] = useState<VenueDensity[]>([]);
   const [loading, setLoading] = useState(true);
   const [dashOffset, setDashOffset] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -60,11 +62,21 @@ export default function WorldFlightMap() {
     }
   }, []);
 
+  // Fetch flight density
+  const fetchDensity = useCallback(async () => {
+    try {
+      const res = await fetch("/api/flight-density");
+      if (res.ok) setDensity(await res.json());
+    } catch { /* non-fatal */ }
+  }, []);
+
   useEffect(() => {
     fetchArcs();
-    const t = setInterval(fetchArcs, 60_000);
-    return () => clearInterval(t);
-  }, [fetchArcs]);
+    fetchDensity();
+    const t1 = setInterval(fetchArcs, 60_000);
+    const t2 = setInterval(fetchDensity, 90_000);
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, [fetchArcs, fetchDensity]);
 
   // Animate dash offset
   useEffect(() => {
@@ -80,6 +92,9 @@ export default function WorldFlightMap() {
     });
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, []);
+
+  const densityByName = Object.fromEntries(density.map(d => [d.name, d.count]));
+  const maxDensity = Math.max(1, ...density.map(d => d.count));
 
   if (loading && countries.length === 0) {
     return (
@@ -102,6 +117,27 @@ export default function WorldFlightMap() {
         {countries.map((d, i) => (
           <path key={i} d={d} fill="#1e293b" stroke="#334155" strokeWidth={0.4} />
         ))}
+
+        {/* Flight density heatmap rings at each venue */}
+        {ALL_VENUES.map(venue => {
+          const pt = dot(venue.lng, venue.lat);
+          if (!pt) return null;
+          const count = densityByName[venue.name] ?? 0;
+          if (count === 0) return null;
+          const intensity = count / maxDensity;
+          const r = 8 + intensity * 28;
+          return (
+            <circle
+              key={`heat-${venue.name}`}
+              cx={pt[0]} cy={pt[1]}
+              r={r}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={1.5}
+              strokeOpacity={0.15 + intensity * 0.35}
+            />
+          );
+        })}
 
         {/* Flight arcs */}
         {arcs.map(arc => {
@@ -150,7 +186,7 @@ export default function WorldFlightMap() {
       </svg>
 
       {/* Legend */}
-      <div className="flex items-center gap-6 px-4 py-3 border-t border-slate-800">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 border-t border-slate-800">
         <div className="flex items-center gap-2">
           <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke={GOLD} strokeWidth="2" strokeDasharray="6 4" /></svg>
           <span className="text-xs text-slate-500">Home → first venue</span>
@@ -158,6 +194,13 @@ export default function WorldFlightMap() {
         <div className="flex items-center gap-2">
           <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke={GREEN} strokeWidth="2" strokeDasharray="6 4" /></svg>
           <span className="text-xs text-slate-500">Venue → venue</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeOpacity="0.5" />
+            <circle cx="8" cy="8" r="3" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeOpacity="0.3" />
+          </svg>
+          <span className="text-xs text-slate-500">Flight density</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3 items-center justify-center">

@@ -8,6 +8,7 @@ import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
+import LiveClock from "@/components/ui/LiveClock";
 import type { Match } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
@@ -82,6 +83,7 @@ export default async function DashboardPage() {
               <Wifi size={11} className="text-brand-green" />
               <span className="hidden sm:inline">Live</span>
             </div>
+            <LiveClock />
           </div>
         </div>
       </nav>
