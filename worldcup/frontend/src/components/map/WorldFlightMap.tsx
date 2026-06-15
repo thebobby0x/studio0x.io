@@ -498,7 +498,7 @@ export default function WorldFlightMap() {
         <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
           <svg width="10" height="10" viewBox="0 0 10 10">
             <circle cx="5" cy="5" r="4" fill="none" stroke={BLUE} strokeWidth="1.5" strokeOpacity="0.6" />
-          </svg>Air traffic
+          </svg>Fan flights
         </div>
       </div>
     </div>

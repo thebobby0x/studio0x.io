@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trophy, CalendarDays, Radio, Check, Lock, Wifi, Star } from "lucide-react";
-import type { ScheduleMatch } from "@/app/api/schedule/route";
+import type { PredictMatch } from "@/app/api/matches/route";
 import { getFlag } from "@/lib/flags";
 import LiveClock from "@/components/ui/LiveClock";
 
 interface Prediction { home: number; away: number }
-type Preds = Record<number, Prediction>;
+type Preds = Record<number, Prediction>; // keyed by fixture id
 
 interface ScoreResult {
   total: number;
@@ -20,10 +20,12 @@ function calcPoints(pred: Prediction, homeScore: number, awayScore: number): Sco
   const po = pred.home > pred.away ? "H" : pred.home < pred.away ? "A" : "D";
   const ao = homeScore > awayScore ? "H" : homeScore < awayScore ? "A" : "D";
   if (po === ao) rows.push({ label: "Correct outcome", pts: 10 });
-  if (pred.home === homeScore) rows.push({ label: `${pred.home > pred.away ? "Home" : "Away"} goals (home)`, pts: 5 });
-  if (pred.away === awayScore) rows.push({ label: `${pred.away > pred.home ? "Home" : "Away"} goals (away)`, pts: 5 });
-  if (pred.home - pred.away === homeScore - awayScore && !(pred.home === homeScore && pred.away === awayScore))
-    rows.push({ label: "Correct goal diff", pts: 5 });
+  if (pred.home === homeScore) rows.push({ label: "Home goals correct", pts: 5 });
+  if (pred.away === awayScore) rows.push({ label: "Away goals correct", pts: 5 });
+  const predDiff   = pred.home - pred.away;
+  const actualDiff = homeScore - awayScore;
+  if (predDiff === actualDiff && !(pred.home === homeScore && pred.away === awayScore))
+    rows.push({ label: "Correct goal difference", pts: 5 });
   if (pred.home === homeScore && pred.away === awayScore)
     rows.push({ label: "Exact score bonus", pts: 5 });
   return { total: rows.reduce((s, r) => s + r.pts, 0), breakdown: rows };
@@ -45,25 +47,25 @@ function ScorePicker({ value, onChange }: { value: number; onChange: (v: number)
   );
 }
 
-function formatMatchTime(utcDate: string) {
-  const d = new Date(utcDate);
-  return d.toLocaleString(undefined, {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
+function formatDay(isoDate: string) {
+  return new Date(isoDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatTime(isoDate: string) {
+  return new Date(isoDate).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function PredictPage() {
-  const [matches,  setMatches]  = useState<ScheduleMatch[]>([]);
+  const [matches,  setMatches]  = useState<PredictMatch[]>([]);
   const [preds,    setPreds]    = useState<Preds>({});
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    fetch("/api/schedule")
+    fetch("/api/matches")
       .then(r => r.json())
-      .then((all: ScheduleMatch[]) =>
-        setMatches(all.sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()))
+      .then((all: PredictMatch[]) =>
+        setMatches(all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()))
       )
       .finally(() => setLoading(false));
   }, []);
@@ -75,22 +77,24 @@ export default function PredictPage() {
     } catch { /* ignore */ }
   }, []);
 
-  function save(id: number, pred: Prediction) {
-    const next = { ...preds, [id]: pred };
+  function save(fixture: number, pred: Prediction) {
+    const next = { ...preds, [fixture]: pred };
     setPreds(next);
     try { localStorage.setItem("wc26_preds", JSON.stringify(next)); } catch { /* ignore */ }
   }
 
-  const byDay = matches.reduce<Record<number, ScheduleMatch[]>>((acc, m) => {
-    const d = m.matchday ?? 1;
-    (acc[d] ??= []).push(m);
+  // Group by calendar day
+  const byDay = matches.reduce<Record<string, PredictMatch[]>>((acc, m) => {
+    const day = new Date(m.date).toISOString().slice(0, 10);
+    (acc[day] ??= []).push(m);
     return acc;
   }, {});
 
-  const ftWithPred = matches.filter(m => m.status === "FT" && preds[m.id] && m.homeScore != null);
-  const totalPts   = ftWithPred.reduce((s, m) => s + calcPoints(preds[m.id], m.homeScore!, m.awayScore!).total, 0);
-  const locked     = Object.keys(preds).length;
-  const maxPossible = matches.filter(m => m.status === "NS").length * 30;
+  const ftWithPred    = matches.filter(m => m.status === "FT" && preds[m.fixture]);
+  const totalPts      = ftWithPred.reduce((s, m) => s + calcPoints(preds[m.fixture], m.homeScore, m.awayScore).total, 0);
+  const locked        = Object.keys(preds).length;
+  const nsCount       = matches.filter(m => m.status === "NS").length;
+  const maxPossible   = nsCount * 30;
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
@@ -144,14 +148,8 @@ export default function PredictPage() {
               </div>
             </div>
           </div>
-          {/* Scoring rules strip */}
           <div className="flex divide-x divide-amber-900/30 border-t border-amber-900/30 text-center text-[10px]">
-            {[
-              ["10", "Outcome"],
-              ["5",  "Each score"],
-              ["5",  "Goal diff"],
-              ["5",  "Exact score"],
-            ].map(([p, l]) => (
+            {[["10","Outcome"],["5","Each score"],["5","Goal diff"],["5","Exact"]].map(([p, l]) => (
               <div key={l} className="flex-1 py-2 text-amber-700/70">
                 <div className="font-black text-amber-500">{p}</div>
                 <div>{l}</div>
@@ -163,71 +161,74 @@ export default function PredictPage() {
         {/* Match groups */}
         {loading ? (
           <div className="text-center text-slate-500 text-sm py-12 animate-pulse">Loading matches…</div>
+        ) : matches.length === 0 ? (
+          <div className="text-center text-slate-500 text-sm py-12">
+            No matches found — run the seed first at <code className="text-brand-gold">/api/seed?secret=wc2026studio0x</code>
+          </div>
         ) : (
           Object.entries(byDay).map(([day, dayMatches]) => (
             <div key={day} className="space-y-3">
               <div className="flex items-center gap-3 pt-1">
-                <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-600">Matchday {day}</span>
+                <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 shrink-0">
+                  {formatDay(day + "T12:00:00")}
+                </span>
                 <div className="flex-1 h-px bg-slate-800" />
               </div>
 
               {dayMatches.map(m => {
-                const pred     = preds[m.id];
-                const isFT     = m.status === "FT";
-                const isLive   = m.status === "LIVE" || m.status === "HT";
-                const isExp    = expanded === m.id;
+                const pred   = preds[m.fixture];
+                const isFT   = m.status === "FT";
+                const isLive = m.status === "LIVE" || m.status === "HT";
+                const isExp  = expanded === m.fixture;
+                const groupLabel = `Group ${m.group}`;
 
                 /* ── Completed + predicted ── */
-                if (isFT && pred && m.homeScore != null) {
-                  const { total: pts, breakdown } = calcPoints(pred, m.homeScore, m.awayScore!);
+                if (isFT && pred) {
+                  const { total: pts, breakdown } = calcPoints(pred, m.homeScore, m.awayScore);
                   const exact = pred.home === m.homeScore && pred.away === m.awayScore;
                   return (
                     <div
-                      key={m.id}
-                      onClick={() => setExpanded(isExp ? null : m.id)}
-                      className={`rounded-2xl overflow-hidden cursor-pointer transition-all ${
-                        pts > 0 ? "border border-brand-gold/25 bg-[#0f1208]" : "border border-slate-800 bg-brand-card"
+                      key={m.fixture}
+                      onClick={() => setExpanded(isExp ? null : m.fixture)}
+                      className={`rounded-2xl overflow-hidden cursor-pointer transition-colors ${
+                        pts > 0
+                          ? "border border-brand-gold/25 bg-[#0f1208]"
+                          : "border border-slate-800 bg-brand-card"
                       }`}
                     >
-                      {/* Result header */}
                       <div className={`flex items-center justify-between px-4 py-2 border-b text-[10px] ${
                         pts > 0 ? "border-brand-gold/20 bg-brand-gold/8" : "border-slate-800 bg-slate-900/40"
                       }`}>
-                        <span className="uppercase tracking-widest text-slate-500">{m.stageLabel} · MD{m.matchday}</span>
-                        <span className="text-slate-600">{formatMatchTime(m.utcDate)}</span>
+                        <span className="uppercase tracking-widest text-slate-500">{groupLabel}</span>
+                        <span className="text-slate-600">{formatTime(m.date)}</span>
                       </div>
 
                       <div className="px-4 py-4">
-                        {/* Score row */}
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2">
                             <span className="text-2xl">{getFlag(m.homeTeam.tla)}</span>
                             <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
                           </div>
-
                           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900">
                             <span className={`text-xl font-black tabular-nums ${m.homeScore === pred.home ? "text-brand-green" : "text-white"}`}>
                               {m.homeScore}
                             </span>
-                            <span className="text-slate-700 text-sm">–</span>
+                            <span className="text-slate-700 text-sm mx-0.5">–</span>
                             <span className={`text-xl font-black tabular-nums ${m.awayScore === pred.away ? "text-brand-green" : "text-white"}`}>
                               {m.awayScore}
                             </span>
                           </div>
-
-                          <div className="flex items-center gap-2 min-w-0 flex-row-reverse">
+                          <div className="flex items-center gap-2 flex-row-reverse">
                             <span className="text-2xl">{getFlag(m.awayTeam.tla)}</span>
                             <span className="text-xs font-bold text-slate-400">{m.awayTeam.tla}</span>
                           </div>
                         </div>
 
-                        {/* Your pick + points */}
                         <div className="flex items-center justify-between">
                           <div className="text-[11px] text-slate-500">
                             Your pick: <span className={`font-semibold ${exact ? "text-brand-green" : "text-slate-300"}`}>
                               {pred.home}–{pred.away}
-                            </span>
-                            {exact && " ✓"}
+                            </span>{exact && " ✓"}
                           </div>
                           <div className={`flex items-center gap-1.5 font-black text-sm ${pts > 0 ? "text-brand-gold" : "text-slate-600"}`}>
                             {pts > 0 && <Check size={13} />}
@@ -235,7 +236,6 @@ export default function PredictPage() {
                           </div>
                         </div>
 
-                        {/* Breakdown (expanded) */}
                         {isExp && (
                           <div className="mt-3 pt-3 border-t border-slate-800">
                             {breakdown.length === 0 ? (
@@ -256,9 +256,30 @@ export default function PredictPage() {
                             )}
                           </div>
                         )}
-                        {!isExp && (
-                          <p className="text-[9px] text-slate-700 mt-1.5 text-right">tap to {isExp ? "collapse" : "expand"}</p>
-                        )}
+                        {!isExp && <p className="text-[9px] text-slate-700 mt-1.5 text-right">tap for breakdown</p>}
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* ── Completed without prediction ── */
+                if (isFT) {
+                  return (
+                    <div key={m.fixture} className="rounded-2xl overflow-hidden border border-slate-800/60 bg-brand-card opacity-60">
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 text-[10px]">
+                        <span className="uppercase tracking-widest text-slate-600">{groupLabel}</span>
+                        <span className="text-slate-700 italic">no prediction</span>
+                      </div>
+                      <div className="px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{getFlag(m.homeTeam.tla)}</span>
+                          <span className="text-xs font-bold text-slate-500">{m.homeTeam.tla}</span>
+                        </div>
+                        <span className="text-lg font-black text-slate-500">{m.homeScore}–{m.awayScore}</span>
+                        <div className="flex items-center gap-2 flex-row-reverse">
+                          <span className="text-xl">{getFlag(m.awayTeam.tla)}</span>
+                          <span className="text-xs font-bold text-slate-500">{m.awayTeam.tla}</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -267,11 +288,11 @@ export default function PredictPage() {
                 /* ── Live match ── */
                 if (isLive) {
                   return (
-                    <div key={m.id} className="rounded-2xl overflow-hidden border border-red-900/40 bg-brand-card">
+                    <div key={m.fixture} className="rounded-2xl overflow-hidden border border-red-900/40 bg-brand-card">
                       <div className="flex items-center gap-2 px-4 py-2 bg-red-950/30 border-b border-red-900/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                         <span className="text-[10px] text-red-400 font-semibold uppercase tracking-widest">
-                          Live · {m.status === "HT" ? "Half Time" : `${m.minute}'`}
+                          Live · {m.status === "HT" ? "HT" : "In play"}
                         </span>
                       </div>
                       <div className="px-4 py-4 flex items-center justify-between">
@@ -280,7 +301,7 @@ export default function PredictPage() {
                           <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
                         </div>
                         <span className="text-xl font-black text-white px-3 py-1.5 rounded-xl bg-slate-900">
-                          {m.homeScore ?? 0}–{m.awayScore ?? 0}
+                          {m.homeScore}–{m.awayScore}
                         </span>
                         <div className="flex items-center gap-2 flex-row-reverse">
                           <span className="text-2xl">{getFlag(m.awayTeam.tla)}</span>
@@ -299,37 +320,34 @@ export default function PredictPage() {
                 /* ── Upcoming (NS) — score picker ── */
                 const cur = pred ?? { home: 0, away: 0 };
                 return (
-                  <div key={m.id} className="rounded-2xl overflow-hidden bg-brand-card border border-brand-border">
+                  <div key={m.fixture} className="rounded-2xl overflow-hidden bg-brand-card border border-brand-border">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border">
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">{m.stageLabel} · MD{m.matchday}</span>
-                      <span className="text-[10px] text-slate-600">{formatMatchTime(m.utcDate)} local</span>
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">{groupLabel}</span>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-600">{formatTime(m.date)}</span>
+                        {m.venue && <span className="text-[9px] text-slate-700 ml-2">{m.city || m.venue}</span>}
+                      </div>
                     </div>
                     <div className="px-4 py-5">
                       <div className="flex items-center justify-between gap-2">
-                        {/* Home */}
-                        <div className="flex flex-col items-center gap-1.5 min-w-0">
+                        <div className="flex flex-col items-center gap-1.5 min-w-0 w-16">
                           <span className="text-3xl leading-none">{getFlag(m.homeTeam.tla)}</span>
-                          <span className="text-[11px] font-bold text-slate-400">{m.homeTeam.tla}</span>
+                          <span className="text-[11px] font-bold text-slate-300">{m.homeTeam.tla}</span>
                         </div>
-
-                        {/* Pickers */}
-                        <div className="flex items-center gap-1.5">
-                          <ScorePicker value={cur.home} onChange={v => save(m.id, { ...cur, home: v })} />
-                          <span className="text-slate-700 font-bold text-lg mx-1">–</span>
-                          <ScorePicker value={cur.away} onChange={v => save(m.id, { ...cur, away: v })} />
+                        <div className="flex items-center gap-1.5 flex-1 justify-center">
+                          <ScorePicker value={cur.home} onChange={v => save(m.fixture, { ...cur, home: v })} />
+                          <span className="text-slate-700 font-bold text-lg mx-0.5">–</span>
+                          <ScorePicker value={cur.away} onChange={v => save(m.fixture, { ...cur, away: v })} />
                         </div>
-
-                        {/* Away */}
-                        <div className="flex flex-col items-center gap-1.5 min-w-0">
+                        <div className="flex flex-col items-center gap-1.5 min-w-0 w-16">
                           <span className="text-3xl leading-none">{getFlag(m.awayTeam.tla)}</span>
-                          <span className="text-[11px] font-bold text-slate-400">{m.awayTeam.tla}</span>
+                          <span className="text-[11px] font-bold text-slate-300">{m.awayTeam.tla}</span>
                         </div>
                       </div>
-
                       {pred ? (
                         <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-brand-green">
                           <Lock size={10} />
-                          <span>Prediction saved · tap +/− to edit</span>
+                          <span>Saved · tap +/− to edit</span>
                         </div>
                       ) : (
                         <p className="mt-3 text-center text-[10px] text-slate-600">tap +/− to lock in your pick</p>
