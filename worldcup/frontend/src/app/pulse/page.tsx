@@ -109,9 +109,15 @@ export default function PulsePage() {
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                     arc.status === "in-transit"
                       ? "bg-brand-green/20 text-brand-green"
-                      : "bg-slate-800 text-slate-500"
+                      : arc.status === "in-city"
+                        ? "bg-amber-500/15 text-amber-500"
+                        : "bg-slate-800 text-slate-500"
                   }`}>
-                    {arc.status === "in-transit" ? "In transit" : arc.phase === "venue-to-venue" ? "At venue" : "Arriving"}
+                    {arc.status === "in-transit"
+                      ? "In transit"
+                      : arc.status === "in-city"
+                        ? "In host city"
+                        : "At venue"}
                   </span>
                 </div>
               ))}

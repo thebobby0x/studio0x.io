@@ -14,7 +14,7 @@ export interface FlightArc {
   phase: "home-to-venue" | "venue-to-venue";
   fromLabel: string;
   toLabel: string;
-  status: "in-transit" | "arrived";
+  status: "in-transit" | "arrived" | "in-city";
 }
 
 export async function GET() {
@@ -70,7 +70,7 @@ export async function GET() {
         phase: "home-to-venue",
         fromLabel: homeCoords.country,
         toLabel: nextVenueInfo.city,
-        status: "arrived",
+        status: "in-city",
       });
     } else {
       const lastFt = ftMatches[ftMatches.length - 1];

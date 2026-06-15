@@ -32,7 +32,7 @@ const POSITION_LABELS: Record<string, string> = {
 };
 
 function MatchRow({ m, teamTla }: { m: ScheduleMatch; teamTla: string }) {
-  const isHome = m.homeTeam.tla.toUpperCase() === teamTla.toUpperCase();
+  const isHome = (m.homeTeam.tla ?? "").toUpperCase() === teamTla.toUpperCase();
   const opp = isHome ? m.awayTeam : m.homeTeam;
   const teamScore = isHome ? m.homeScore : m.awayScore;
   const oppScore  = isHome ? m.awayScore : m.homeScore;
@@ -84,7 +84,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
 
   const allMatches = await fetchSchedule();
   const teamMatches = allMatches.filter(m =>
-    m.homeTeam.tla.toUpperCase() === TLA || m.awayTeam.tla.toUpperCase() === TLA
+    (m.homeTeam.tla ?? "").toUpperCase() === TLA || (m.awayTeam.tla ?? "").toUpperCase() === TLA
   );
 
   if (teamMatches.length === 0) {
@@ -99,7 +99,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
     );
   }
 
-  const teamInfo = teamMatches[0].homeTeam.tla.toUpperCase() === TLA
+  const teamInfo = (teamMatches[0].homeTeam.tla ?? "").toUpperCase() === TLA
     ? teamMatches[0].homeTeam
     : teamMatches[0].awayTeam;
   const group = teamMatches.find(m => m.group)?.group ?? null;
@@ -108,7 +108,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
   const ftMatches = teamMatches.filter(m => m.status === "FT");
   let w = 0, d = 0, l = 0, gf = 0, ga = 0;
   for (const m of ftMatches) {
-    const isHome = m.homeTeam.tla.toUpperCase() === TLA;
+    const isHome = (m.homeTeam.tla ?? "").toUpperCase() === TLA;
     const scored   = isHome ? (m.homeScore ?? 0) : (m.awayScore ?? 0);
     const conceded = isHome ? (m.awayScore ?? 0) : (m.homeScore ?? 0);
     gf += scored; ga += conceded;

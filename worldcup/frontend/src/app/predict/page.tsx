@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Trophy, CalendarDays, Radio, Check, Lock, Wifi, Star } from "lucide-react";
 import type { PredictMatch } from "@/app/api/matches/route";
+import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { getFlag } from "@/lib/flags";
 import LiveClock from "@/components/ui/LiveClock";
 
 interface Prediction { home: number; away: number }
-type Preds = Record<number, Prediction>; // keyed by fixture id
+type Preds = Record<number, Prediction>;
 
 interface ScoreResult {
   total: number;
@@ -47,6 +48,25 @@ function ScorePicker({ value, onChange }: { value: number; onChange: (v: number)
   );
 }
 
+type FormResult = "W" | "D" | "L";
+
+const FORM_COLORS: Record<FormResult, string> = {
+  W: "bg-brand-green/20 text-brand-green",
+  D: "bg-amber-500/20 text-amber-400",
+  L: "bg-red-500/20 text-red-400",
+};
+
+function FormDots({ results }: { results: FormResult[] }) {
+  if (results.length === 0) return null;
+  return (
+    <div className="flex gap-0.5">
+      {results.map((r, i) => (
+        <span key={i} className={`text-[8px] font-black w-3.5 h-3.5 flex items-center justify-center rounded-sm ${FORM_COLORS[r]}`}>{r}</span>
+      ))}
+    </div>
+  );
+}
+
 function formatDay(isoDate: string) {
   return new Date(isoDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
@@ -57,17 +77,27 @@ function formatTime(isoDate: string) {
 
 export default function PredictPage() {
   const [matches,  setMatches]  = useState<PredictMatch[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleMatch[]>([]);
   const [preds,    setPreds]    = useState<Preds>({});
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    fetch("/api/matches")
-      .then(r => r.json())
-      .then((all: PredictMatch[]) =>
-        setMatches(all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()))
-      )
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/matches").then(r => r.json()),
+      fetch("/api/schedule").then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([dbMatches, scheduleData]) => {
+      setMatches((dbMatches as PredictMatch[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      setSchedule(scheduleData as ScheduleMatch[]);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  // Refresh live schedule every 60s
+  useEffect(() => {
+    const t = setInterval(() => {
+      fetch("/api/schedule").then(r => r.ok ? r.json() : []).then(setSchedule).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -83,17 +113,106 @@ export default function PredictPage() {
     try { localStorage.setItem("wc26_preds", JSON.stringify(next)); } catch { /* ignore */ }
   }
 
+  // Map schedule by match ID (= fixture number in DB)
+  const scheduleMap = useMemo(() => {
+    const m = new Map<number, ScheduleMatch>();
+    schedule.forEach(s => m.set(s.id, s));
+    return m;
+  }, [schedule]);
+
+  // Merge DB team data with live statuses/scores
+  const liveMatches = useMemo(() =>
+    matches.map(m => {
+      const live = scheduleMap.get(m.fixture);
+      if (!live) return m;
+      return {
+        ...m,
+        status: live.status as string,
+        homeScore: live.homeScore ?? m.homeScore,
+        awayScore: live.awayScore ?? m.awayScore,
+      };
+    }),
+    [matches, scheduleMap]
+  );
+
+  // Compute form (last N results per team TLA) from live schedule
+  const teamForm = useMemo(() => {
+    const form: Record<string, FormResult[]> = {};
+    const ftMatches = [...schedule]
+      .filter(s => s.status === "FT" && s.homeScore !== null && s.awayScore !== null
+        && s.homeTeam.tla && s.awayTeam.tla)
+      .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
+
+    for (const s of ftMatches) {
+      const h = s.homeTeam.tla.toUpperCase();
+      const a = s.awayTeam.tla.toUpperCase();
+      if (!form[h]) form[h] = [];
+      if (!form[a]) form[a] = [];
+      const hs = s.homeScore!;
+      const as_ = s.awayScore!;
+      if (hs > as_) { form[h].push("W"); form[a].push("L"); }
+      else if (hs < as_) { form[h].push("L"); form[a].push("W"); }
+      else { form[h].push("D"); form[a].push("D"); }
+    }
+    return form;
+  }, [schedule]);
+
+  // Compute group standings positions
+  const { groupPositions, groupPts, groupGD } = useMemo(() => {
+    const pts: Record<string, number>  = {};
+    const gd:  Record<string, number>  = {};
+    const gf:  Record<string, number>  = {};
+    const grp: Record<string, string>  = {};
+
+    for (const s of schedule) {
+      if (s.status !== "FT" || s.homeScore === null || s.awayScore === null || !s.group) continue;
+      const h = s.homeTeam.tla?.toUpperCase();
+      const a = s.awayTeam.tla?.toUpperCase();
+      if (!h || !a || h === "TBD" || a === "TBD") continue;
+
+      if (pts[h] === undefined) { pts[h] = 0; gd[h] = 0; gf[h] = 0; }
+      if (pts[a] === undefined) { pts[a] = 0; gd[a] = 0; gf[a] = 0; }
+      grp[h] = s.group; grp[a] = s.group;
+
+      const hs = s.homeScore, as_ = s.awayScore;
+      gf[h] += hs; gd[h] += (hs - as_);
+      gf[a] += as_; gd[a] += (as_ - hs);
+
+      if (hs > as_) { pts[h] += 3; }
+      else if (hs < as_) { pts[a] += 3; }
+      else { pts[h]++; pts[a]++; }
+    }
+
+    const byGroup: Record<string, string[]> = {};
+    for (const [tla, g] of Object.entries(grp)) {
+      if (!byGroup[g]) byGroup[g] = [];
+      byGroup[g].push(tla);
+    }
+
+    const positions: Record<string, number> = {};
+    for (const teams of Object.values(byGroup)) {
+      teams.sort((x, y) => {
+        if ((pts[y] ?? 0) !== (pts[x] ?? 0)) return (pts[y] ?? 0) - (pts[x] ?? 0);
+        if ((gd[y] ?? 0) !== (gd[x] ?? 0)) return (gd[y] ?? 0) - (gd[x] ?? 0);
+        return (gf[y] ?? 0) - (gf[x] ?? 0);
+      });
+      teams.forEach((t, i) => { positions[t] = i + 1; });
+    }
+
+    return { groupPositions: positions, groupPts: pts, groupGD: gd };
+  }, [schedule]);
+
   // Group by calendar day
-  const byDay = matches.reduce<Record<string, PredictMatch[]>>((acc, m) => {
+  const byDay = liveMatches.reduce<Record<string, typeof liveMatches>>((acc, m) => {
     const day = new Date(m.date).toISOString().slice(0, 10);
     (acc[day] ??= []).push(m);
     return acc;
   }, {});
 
-  const ftWithPred    = matches.filter(m => m.status === "FT" && preds[m.fixture]);
+  const ftWithPred    = liveMatches.filter(m => m.status === "FT" && preds[m.fixture]);
   const totalPts      = ftWithPred.reduce((s, m) => s + calcPoints(preds[m.fixture], m.homeScore, m.awayScore).total, 0);
   const locked        = Object.keys(preds).length;
-  const nsCount       = matches.filter(m => m.status === "NS").length;
+  const nsCount       = liveMatches.filter(m => m.status === "NS").length;
   const maxPossible   = nsCount * 30;
 
   return (
@@ -181,6 +300,14 @@ export default function PredictPage() {
                 const isLive = m.status === "LIVE" || m.status === "HT";
                 const isExp  = expanded === m.fixture;
                 const groupLabel = `Group ${m.group}`;
+                const homeForm = (teamForm[m.homeTeam.tla.toUpperCase()] ?? []).slice(-3);
+                const awayForm = (teamForm[m.awayTeam.tla.toUpperCase()] ?? []).slice(-3);
+                const homePos  = groupPositions[m.homeTeam.tla.toUpperCase()];
+                const awayPos  = groupPositions[m.awayTeam.tla.toUpperCase()];
+                const homePts  = groupPts[m.homeTeam.tla.toUpperCase()];
+                const awayPts  = groupPts[m.awayTeam.tla.toUpperCase()];
+                const homeGD   = groupGD[m.homeTeam.tla.toUpperCase()];
+                const awayGD   = groupGD[m.awayTeam.tla.toUpperCase()];
 
                 /* ── Completed + predicted ── */
                 if (isFT && pred) {
@@ -207,7 +334,10 @@ export default function PredictPage() {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">{getFlag(m.homeTeam.tla)}</span>
-                            <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
+                              {homePos && <span className="text-[9px] text-slate-600">P{homePos} · {homePts ?? 0}pts</span>}
+                            </div>
                           </div>
                           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900">
                             <span className={`text-xl font-black tabular-nums ${m.homeScore === pred.home ? "text-brand-green" : "text-white"}`}>
@@ -220,7 +350,10 @@ export default function PredictPage() {
                           </div>
                           <div className="flex items-center gap-2 flex-row-reverse">
                             <span className="text-2xl">{getFlag(m.awayTeam.tla)}</span>
-                            <span className="text-xs font-bold text-slate-400">{m.awayTeam.tla}</span>
+                            <div className="flex flex-col gap-0.5 items-end">
+                              <span className="text-xs font-bold text-slate-400">{m.awayTeam.tla}</span>
+                              {awayPos && <span className="text-[9px] text-slate-600">P{awayPos} · {awayPts ?? 0}pts</span>}
+                            </div>
                           </div>
                         </div>
 
@@ -328,7 +461,29 @@ export default function PredictPage() {
                         {m.venue && <span className="text-[9px] text-slate-700 ml-2">{m.city || m.venue}</span>}
                       </div>
                     </div>
-                    <div className="px-4 py-5">
+
+                    {/* Team context strip */}
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1 text-[10px] text-slate-600">
+                      <div className="flex flex-col gap-1 items-start">
+                        {homePos != null && (
+                          <span className={`font-semibold ${homePos <= 2 ? "text-brand-green" : "text-slate-600"}`}>
+                            P{homePos} · {homePts ?? 0}pts {homeGD != null && homeGD !== 0 ? (homeGD > 0 ? `+${homeGD}` : homeGD) + " GD" : ""}
+                          </span>
+                        )}
+                        <FormDots results={homeForm} />
+                      </div>
+                      <span className="text-slate-700 text-[9px]">vs</span>
+                      <div className="flex flex-col gap-1 items-end">
+                        {awayPos != null && (
+                          <span className={`font-semibold ${awayPos <= 2 ? "text-brand-green" : "text-slate-600"}`}>
+                            P{awayPos} · {awayPts ?? 0}pts {awayGD != null && awayGD !== 0 ? (awayGD > 0 ? `+${awayGD}` : awayGD) + " GD" : ""}
+                          </span>
+                        )}
+                        <FormDots results={awayForm} />
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-4">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex flex-col items-center gap-1.5 min-w-0 w-16">
                           <span className="text-3xl leading-none">{getFlag(m.homeTeam.tla)}</span>
