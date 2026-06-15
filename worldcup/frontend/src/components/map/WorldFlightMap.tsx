@@ -32,12 +32,23 @@ function dot(lng: number, lat: number): [number, number] | null {
 
 const ALL_VENUES = getAllVenues();
 
+function travelStats(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  const R = 6371;
+  const dLat = (toLat - fromLat) * Math.PI / 180;
+  const dLng = (toLng - fromLng) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(fromLat * Math.PI / 180) * Math.cos(toLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  const km = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  const miles = Math.round(km * 0.621371);
+  const hours = Math.round((km / 900 + 0.75) * 10) / 10;
+  return { km, miles, hours };
+}
+
 type Layer = "home-arcs" | "venue-hops" | "density";
 
 const LAYER_CONFIG: { id: Layer; label: string; color: string }[] = [
   { id: "home-arcs",  label: "Home arcs",   color: GOLD  },
   { id: "venue-hops", label: "Venue hops",  color: GREEN },
-  { id: "density",    label: "Air traffic", color: BLUE  },
+  { id: "density",    label: "Fan flights",  color: BLUE  },
 ];
 
 interface VB { x: number; y: number; w: number; h: number }
@@ -460,6 +471,15 @@ export default function WorldFlightMap() {
               <div className="text-[11px] text-slate-500 mt-1">
                 {selectedArc.phase === "home-to-venue" ? "Home country → first match venue" : "Venue → next match venue"}
               </div>
+              {(() => {
+                const s = travelStats(selectedArc.fromLat, selectedArc.fromLng, selectedArc.toLat, selectedArc.toLng);
+                return (
+                  <div className="flex gap-4 mt-2.5 text-[11px] text-slate-500">
+                    <span>✈ {s.miles.toLocaleString()} mi · {s.km.toLocaleString()} km</span>
+                    <span>⏱ ~{s.hours}h flight</span>
+                  </div>
+                );
+              })()}
             </div>
             <button onClick={clearSelection} className="text-slate-600 hover:text-slate-400 text-lg leading-none shrink-0 transition-colors">×</button>
           </div>

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy, Wifi, CalendarDays, ChevronRight, Radio } from "lucide-react";
+import { Trophy, Wifi, CalendarDays, ChevronRight, Radio, Star } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
@@ -77,6 +77,7 @@ export default async function DashboardPage() {
               <CalendarDays size={13} />Schedule
             </Link>
             <Link href="/pulse" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"><Radio size={11} />Pulse</Link>
+            <Link href="/predict" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"><Star size={11} />Predict</Link>
             <Link href="/anthems" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Anthems</Link>
             <Link href="/admin/anthems" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">Admin</Link>
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500">

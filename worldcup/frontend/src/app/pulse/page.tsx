@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Trophy, CalendarDays, Wifi, Radio } from "lucide-react";
+import { Trophy, CalendarDays, Wifi, Radio, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { FlightArc } from "@/app/api/flight-paths/route";
 import LiveClock from "@/components/ui/LiveClock";
@@ -47,6 +47,9 @@ export default function PulsePage() {
             </Link>
             <Link href="/pulse" className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors">
               <Radio size={13} />Pulse
+            </Link>
+            <Link href="/predict" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+              <Star size={12} />Predict
             </Link>
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
               <Wifi size={11} className="text-brand-green" />
