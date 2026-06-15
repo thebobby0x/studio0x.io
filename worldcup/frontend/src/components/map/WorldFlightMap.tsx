@@ -15,6 +15,9 @@ const BLUE  = "#3b82f6";
 const W = 960;
 const H = 500;
 
+// FIFA WC 2026: 26 players + ~36 support staff (coaches, medics, analysts, kit, federation officials)
+const TEAM_PARTY_SIZE = 62;
+
 const projection = geoNaturalEarth1().scale(155).translate([W / 2, H / 2]);
 const pathGen    = geoPath(projection);
 
@@ -227,6 +230,8 @@ export default function WorldFlightMap() {
   const offset         = -((dashOffset % 10));
   const followedArc    = followTla ? arcs.find(a => a.tla === followTla) ?? null : null;
   const venueInfo      = selectedVenue ? getVenueInfo(selectedVenue) : null;
+  const homeArcCount   = arcs.filter(a => a.phase === "home-to-venue").length;
+  const venueHopCount  = arcs.filter(a => a.phase === "venue-to-venue").length;
 
   const toggleLayer = (l: Layer) =>
     setActiveLayers(prev => { const n = new Set(prev); n.has(l) ? n.delete(l) : n.add(l); return n; });
@@ -282,9 +287,9 @@ export default function WorldFlightMap() {
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? color : "#334155" }} />
                 {label}
-                {id === "density" && on && totalAircraft > 0 && (
-                  <span className="ml-0.5 opacity-60">{totalAircraft}</span>
-                )}
+                {id === "density"    && on && totalAircraft > 0  && <span className="ml-0.5 opacity-60">{totalAircraft}</span>}
+                {id === "home-arcs" && on && homeArcCount > 0   && <span className="ml-0.5 opacity-60">{homeArcCount} teams</span>}
+                {id === "venue-hops"&& on && venueHopCount > 0  && <span className="ml-0.5 opacity-60">{venueHopCount} teams</span>}
               </button>
             );
           })}
@@ -473,10 +478,17 @@ export default function WorldFlightMap() {
               </div>
               {(() => {
                 const s = travelStats(selectedArc.fromLat, selectedArc.fromLng, selectedArc.toLat, selectedArc.toLng);
+                const personMiles = (s.miles * TEAM_PARTY_SIZE).toLocaleString();
                 return (
-                  <div className="flex gap-4 mt-2.5 text-[11px] text-slate-500">
-                    <span>✈ {s.miles.toLocaleString()} mi · {s.km.toLocaleString()} km</span>
-                    <span>⏱ ~{s.hours}h flight</span>
+                  <div className="flex flex-col gap-1 mt-2.5 text-[11px] text-slate-500">
+                    <div className="flex gap-4">
+                      <span>✈ {s.miles.toLocaleString()} mi · {s.km.toLocaleString()} km</span>
+                      <span>⏱ ~{s.hours}h flight</span>
+                    </div>
+                    <div className="flex gap-4 text-slate-600">
+                      <span>👥 ~{TEAM_PARTY_SIZE} traveling</span>
+                      <span>🗺 {personMiles} person-miles</span>
+                    </div>
                   </div>
                 );
               })()}
