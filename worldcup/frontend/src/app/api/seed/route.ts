@@ -404,11 +404,14 @@ async function seed(req: Request) {
     );
     log.push(`Fetched ${afTeams.length} team records (${teamCodeById.size} with codes)`);
 
-    // ── 2. Clear all existing match data to avoid orphaned football-data.org fixture IDs ──
+    // ── 2. Full wipe in FK order so re-seed starts from a clean slate ──────────
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
-    const deleted = await prisma.match.deleteMany({});
-    if (deleted.count > 0) log.push(`Cleared ${deleted.count} existing match records (fresh seed)`);
+    await prisma.match.deleteMany({});
+    await prisma.audioStream.deleteMany({});
+    await prisma.player.deleteMany({});
+    const deletedTeams = await prisma.team.deleteMany({});
+    if (deletedTeams.count > 0) log.push(`Cleared ${deletedTeams.count} stale team records`);
 
     // Normalize fixtures to internal shape
     const fdMatches = afFixtures.map(f => {
