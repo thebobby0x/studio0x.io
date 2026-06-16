@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Clock, MapPin, Wifi, FlaskConical } from "lucide-react";
-import type { LiveData, DataSources } from "@/lib/types";
+import Link from "next/link";
+import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
+import type { LiveData } from "@/lib/types";
+import { getVenueInfo, venueCity } from "@/lib/venues";
 
 const METRIC_LABELS: Record<string, string> = {
   possession:   "Possession %",
@@ -56,67 +58,85 @@ export default function LiveMatchCard({ matchId }: { matchId: string }) {
   if (!data) return <div className="rounded-xl bg-brand-card border border-brand-border p-6 animate-pulse h-64" />;
 
   const { match, metrics, dataSources } = data;
-  const matchIsLive = dataSources?.match === "live" || dataSources?.match === "cache";
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
   const hm = metrics[homeCode] ?? {};
   const am = metrics[awayCode] ?? {};
   const isLive = match.status === "LIVE" || match.status === "HT";
+  const isDone = match.status === "FT";
+
+  const city = venueCity(match.venue, match.city);
+  const venueInfo = getVenueInfo(match.venue);
+  const capacityStr = venueInfo ? venueInfo.capacity.toLocaleString() : null;
 
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-brand-green/20 via-transparent to-amber-500/20 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-slate-400">
-          <MapPin size={14} /> {match.venue}, {match.city}
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <MapPin size={14} />
+            {match.venue && match.venue !== "World Cup Stadium" ? (
+              <span>{match.venue}{city ? `, ${city}` : ""}</span>
+            ) : (
+              <span className="text-slate-600">Venue TBD</span>
+            )}
+          </div>
+          {capacityStr && match.venue !== "World Cup Stadium" && (
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-600 ml-5">
+              <Users size={10} />
+              <span>Capacity {capacityStr} · Est. sold out</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isLive && <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />}
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isLive ? "bg-red-500/20 text-red-400" : "bg-slate-700 text-slate-300"}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isLive ? "bg-red-500/20 text-red-400" : isDone ? "bg-slate-700 text-slate-400" : "bg-slate-700 text-slate-300"}`}>
             {match.status === "LIVE" ? `${match.elapsed}'` : match.status}
           </span>
-          {matchIsLive ? (
+          {isLive ? (
             <span className="flex items-center gap-1 text-[10px] text-brand-green font-semibold">
-              <Wifi size={10} /> LIVE FEED
+              <Wifi size={10} /> LIVE
             </span>
+          ) : isDone ? (
+            <span className="text-[10px] text-slate-500 font-semibold">Latest</span>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] text-slate-500">
-              <FlaskConical size={10} /> Simulated
-            </span>
+            <span className="text-[10px] text-amber-500 font-semibold">Upcoming</span>
           )}
         </div>
       </div>
 
       {/* Scoreboard */}
-      <div className="px-6 py-8">
-        <div className="grid grid-cols-3 items-center gap-4">
+      <div className="px-4 py-8">
+        <div className="grid grid-cols-3 items-center gap-2">
           {/* Home team */}
-          <div className="text-center">
-            <div className="text-5xl mb-2">{match.homeTeam.flagEmoji}</div>
-            <div className="font-bold text-lg text-white">{match.homeTeam.name}</div>
-            <div className="text-xs text-slate-500 uppercase tracking-wider">{homeCode} · Home</div>
-          </div>
+          <Link href={`/team/${homeCode}`} className="text-center group block">
+            <div className="text-4xl sm:text-5xl mb-2">{match.homeTeam.flagEmoji}</div>
+            <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.homeTeam.name}</div>
+            <div className="text-xs text-slate-500 uppercase tracking-wider">{homeCode}</div>
+          </Link>
 
           {/* Score */}
           <div className="text-center">
-            <div className="text-6xl font-black text-white tabular-nums tracking-tighter">
-              {match.homeScore}<span className="text-brand-border mx-2">–</span>{match.awayScore}
+            <div className="text-5xl sm:text-6xl font-black text-white tabular-nums tracking-tighter leading-none">
+              {match.homeScore}<span className="text-brand-border mx-1 sm:mx-2">–</span>{match.awayScore}
             </div>
-            <div className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
-              <Clock size={12} /> Group Stage · {new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+            <div suppressHydrationWarning className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
+              <Clock size={12} />
+              <span>{new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
             </div>
           </div>
 
           {/* Away team */}
-          <div className="text-center">
-            <div className="text-5xl mb-2">{match.awayTeam.flagEmoji}</div>
-            <div className="font-bold text-lg text-white">{match.awayTeam.name}</div>
-            <div className="text-xs text-slate-500 uppercase tracking-wider">{awayCode} · Away</div>
-          </div>
+          <Link href={`/team/${awayCode}`} className="text-center group block">
+            <div className="text-4xl sm:text-5xl mb-2">{match.awayTeam.flagEmoji}</div>
+            <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.awayTeam.name}</div>
+            <div className="text-xs text-slate-500 uppercase tracking-wider">{awayCode}</div>
+          </Link>
         </div>
       </div>
 
-      {/* Stats bars — only shown when real data is available */}
+      {/* Stats bars */}
       {dataSources?.stats !== "sim" && Object.keys(hm).length > 0 && (
         <div className="px-6 pb-6 space-y-3">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
