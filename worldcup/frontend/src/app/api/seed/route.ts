@@ -437,19 +437,19 @@ async function seed(req: Request) {
       if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, { name: m.awayTeam.name, group });
     }
 
-    // ── 4. Batch upsert teams: createMany for new rows, parallel update for existing ──
+    // ── 4. Upsert teams ──────────────────────────────────────────────────────
     const teamsData = [...teamMeta.entries()].map(([tla, meta]) => ({
       code: tla,
       name: meta.name,
       flagEmoji: getFlag(tla),
       groupStage: meta.group,
     }));
-    await prisma.team.createMany({ data: teamsData, skipDuplicates: true });
     await Promise.all(
       teamsData.map(t =>
-        prisma.team.update({
+        prisma.team.upsert({
           where: { code: t.code },
-          data: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
+          create: t,
+          update: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
         })
       )
     );
