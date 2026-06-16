@@ -1,34 +1,30 @@
-// Real match data from football-data.org (free tier).
-// Requires FOOTBALL_DATA_API_KEY env var — falls back to null (caller uses simulation).
-// Free tier: 10 req/min. 30s server-side cache keeps us well within limits.
+// Live match data from api-football.com.
+// Requires API_FOOTBALL_KEY env var — falls back to null (caller uses simulation).
+// Free tier: 100 req/day. Per-date in-memory cache keeps us well within limits.
 
-const BASE = "https://api.football-data.org/v4";
-const CACHE_TTL_MS = 30_000;
+const BASE    = "https://v3.football.api-sports.io";
+const LEAGUE  = 1;    // FIFA World Cup
+const SEASON  = 2026;
+const LIVE_TTL_MS   = 120_000;  // 2 min for today's matches
+const PAST_TTL_MS   = 3_600_000; // 1 hr for finished dates
 
 const STATUS_MAP: Record<string, string> = {
-  SCHEDULED: "NS",
-  TIMED:     "NS",
-  IN_PLAY:   "LIVE",
-  PAUSED:    "HT",
-  FINISHED:  "FT",
-  SUSPENDED: "FT",
-  POSTPONED: "NS",
-  CANCELLED: "NS",
-  AWARDED:   "FT",
+  NS:   "NS",
+  "1H": "LIVE", HT: "HT", "2H": "LIVE",
+  ET:   "LIVE", BT: "HT", P:   "LIVE",
+  FT:   "FT",  AET: "FT", PEN: "FT",
+  PST:  "NS",  CANC: "NS", ABD: "NS",
+  AWD:  "FT",  WO: "FT",
+  SUSP: "LIVE", INT: "LIVE", LIVE: "LIVE",
 };
 
-interface FDScore {
-  fullTime: { home: number | null; away: number | null };
-}
-
-interface FDMatch {
-  id: number;
-  utcDate: string;
-  status: string;
-  minute?: number;
-  score: FDScore;
-  homeTeam: { tla: string; shortName: string; name: string };
-  awayTeam: { tla: string; shortName: string; name: string };
+interface AFFixture {
+  fixture: { id: number; date: string; status: { short: string; elapsed: number | null } };
+  teams: {
+    home: { id: number; name: string; code: string | null };
+    away: { id: number; name: string; code: string | null };
+  };
+  goals: { home: number | null; away: number | null };
 }
 
 export interface FDMatchResult {
@@ -39,80 +35,41 @@ export interface FDMatchResult {
   source: "live" | "cache";
 }
 
-// Cache keyed by date string so finished matches on past dates are still served
-const _matchCache = new Map<string, { ts: number; matches: FDMatch[] }>();
+const _cache = new Map<string, { ts: number; fixtures: AFFixture[] }>();
 
-function logQuota(headers: Headers) {
-  const remaining = headers.get("X-Requests-Available-Minute");
-  const reset     = headers.get("X-RequestCounter-Reset");
-  if (remaining !== null) {
-    console.log(`[football-data.org] requests remaining this minute: ${remaining}${reset ? ` (resets in ${reset}s)` : ""}`);
-  }
-}
-
-async function fetchForDate(apiKey: string, date: string): Promise<FDMatch[]> {
+async function fetchForDate(apiKey: string, date: string): Promise<AFFixture[]> {
   const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 5000);
-
-  const hdrs = { "X-Auth-Token": apiKey, Accept: "application/json" };
-
-  for (const qs of [`dateFrom=${date}&dateTo=${date}&season=2026`, `dateFrom=${date}&dateTo=${date}`]) {
-    let res: Response;
-    try {
-      res = await fetch(`${BASE}/competitions/WC/matches?${qs}`, {
-        headers: hdrs,
-        signal: ctrl.signal,
-        cache: "no-store",
-      });
-    } catch (e) {
-      console.error("[football-data.org] fetch error:", e);
-      return [];
-    }
-
-    logQuota(res.headers);
-
-    if (res.status === 429) {
-      console.warn("[football-data.org] rate limited — using simulation fallback");
-      return [];
-    }
-
-    if (res.status === 404) continue;
-
-    if (!res.ok) {
-      console.warn(`[football-data.org] unexpected ${res.status} for ${date}: ${await res.text().catch(() => "")}`);
-      return [];
-    }
-
-    const data = await res.json();
-    const matches: FDMatch[] = data.matches ?? [];
-    console.log(`[football-data.org] fetched ${matches.length} match(es) for ${date}`);
-    return matches;
+  setTimeout(() => ctrl.abort(), 8_000);
+  try {
+    const res = await fetch(
+      `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}&date=${date}`,
+      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
+    );
+    if (res.status === 429) { console.warn("[api-football] rate limited"); return []; }
+    if (!res.ok) { console.warn(`[api-football] ${res.status} for ${date}`); return []; }
+    const json = await res.json();
+    const fixtures: AFFixture[] = json.response ?? [];
+    console.log(`[api-football] ${fixtures.length} fixture(s) for ${date}`);
+    return fixtures;
+  } catch (e) {
+    console.error("[api-football] fetch error:", e);
+    return [];
   }
-
-  return [];
 }
 
-function matchTeam(fdTeam: { tla: string; shortName: string; name: string }, code: string): boolean {
-  const c = code.toUpperCase();
-  return (
-    fdTeam.tla?.toUpperCase()       === c ||
-    fdTeam.shortName?.toUpperCase() === c ||
-    fdTeam.name?.toUpperCase().includes(c)
+function findInList(fixtures: AFFixture[], homeCode: string, awayCode: string, src: "live" | "cache"): FDMatchResult | null {
+  const h = homeCode.toUpperCase();
+  const a = awayCode.toUpperCase();
+  const f = fixtures.find(
+    x => (x.teams.home.code ?? "").toUpperCase() === h && (x.teams.away.code ?? "").toUpperCase() === a
   );
-}
-
-function findInList(matches: FDMatch[], homeCode: string, awayCode: string): FDMatchResult | null {
-  const match = matches.find(
-    (m) => matchTeam(m.homeTeam, homeCode) && matchTeam(m.awayTeam, awayCode)
-  );
-  if (!match) return null;
-
+  if (!f) return null;
   return {
-    status:    STATUS_MAP[match.status] ?? "NS",
-    elapsed:   match.minute ?? 0,
-    homeScore: match.score.fullTime.home ?? 0,
-    awayScore: match.score.fullTime.away ?? 0,
-    source:    "live",
+    status:    STATUS_MAP[f.fixture.status.short] ?? "NS",
+    elapsed:   f.fixture.status.elapsed ?? 0,
+    homeScore: f.goals.home ?? 0,
+    awayScore: f.goals.away ?? 0,
+    source:    src,
   };
 }
 
@@ -121,21 +78,19 @@ export async function getFDLiveMatch(
   awayCode: string,
   matchDate: Date
 ): Promise<FDMatchResult | null> {
-  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return null;
 
   const dateStr = matchDate.toISOString().slice(0, 10);
   const today   = new Date().toISOString().slice(0, 10);
-  // Finished matches on past dates don't change — cache for 1 hour
-  const ttl = dateStr < today ? 3_600_000 : CACHE_TTL_MS;
+  const ttl     = dateStr < today ? PAST_TTL_MS : LIVE_TTL_MS;
 
-  const cached = _matchCache.get(dateStr);
+  const cached = _cache.get(dateStr);
   if (cached && Date.now() - cached.ts < ttl) {
-    const result = findInList(cached.matches, homeCode, awayCode);
-    return result ? { ...result, source: "cache" } : null;
+    return findInList(cached.fixtures, homeCode, awayCode, "cache");
   }
 
-  const matches = await fetchForDate(apiKey, dateStr);
-  _matchCache.set(dateStr, { ts: Date.now(), matches });
-  return findInList(matches, homeCode, awayCode);
+  const fixtures = await fetchForDate(apiKey, dateStr);
+  _cache.set(dateStr, { ts: Date.now(), fixtures });
+  return findInList(fixtures, homeCode, awayCode, "live");
 }

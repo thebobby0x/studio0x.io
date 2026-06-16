@@ -3,13 +3,32 @@ import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
 
-const FD_BASE = "https://api.football-data.org/v4";
+const AF_BASE  = "https://v3.football.api-sports.io";
+const AF_LEAGUE = 1;    // FIFA World Cup
+const AF_SEASON = 2026;
 
 const STATUS_MAP: Record<string, string> = {
-  SCHEDULED: "NS", TIMED: "NS",
-  IN_PLAY: "LIVE", PAUSED: "HT",
-  FINISHED: "FT", SUSPENDED: "FT",
-  POSTPONED: "NS", CANCELLED: "NS", AWARDED: "FT",
+  NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
+  ET: "LIVE", BT: "HT", P: "LIVE",
+  FT: "FT", AET: "FT", PEN: "FT",
+  PST: "NS", CANC: "NS", ABD: "NS",
+  AWD: "FT", WO: "FT", SUSP: "LIVE", INT: "LIVE", LIVE: "LIVE",
+};
+
+// Static group assignments (api-football.com doesn't include group in fixture response)
+const TEAM_GROUPS: Record<string, string> = {
+  MEX: "A", RSA: "A", KOR: "A", CZE: "A",
+  CAN: "B", BIH: "B", QAT: "B", SUI: "B",
+  BRA: "C", MAR: "C", HAI: "C", SCO: "C",
+  USA: "D", PAR: "D", AUS: "D", TUR: "D",
+  GER: "E", CUW: "E", CIV: "E", ECU: "E",
+  NED: "F", JPN: "F", SWE: "F", TUN: "F",
+  BEL: "G", EGY: "G", IRN: "G", NZL: "G",
+  ESP: "H", CPV: "H", KSA: "H", URU: "H",
+  FRA: "I", SEN: "I", IRQ: "I", NOR: "I",
+  ARG: "J", ALG: "J", AUT: "J", JOR: "J",
+  POR: "K", COD: "K", UZB: "K", COL: "K",
+  ENG: "L", CRO: "L", GHA: "L", PAN: "L",
 };
 
 // ── Hardcoded squads (11 starters per team) ──────────────────────────────────
@@ -307,17 +326,14 @@ export const maxDuration = 300;
 export async function GET(req: Request) { return seed(req); }
 export async function POST(req: Request) { return seed(req); }
 
-type FDMatch = {
-  id: number;
-  utcDate: string;
-  status: string;
-  minute?: number;
-  stage: string;
-  group?: string | null;
-  homeTeam: { name: string; shortName?: string; tla: string };
-  awayTeam: { name: string; shortName?: string; tla: string };
-  score: { fullTime: { home: number | null; away: number | null } };
-  venue?: string;
+type AFFixture = {
+  fixture: { id: number; date: string; status: { short: string; elapsed: number | null } };
+  league:  { round: string };
+  teams: {
+    home: { id: number; name: string; code: string | null };
+    away: { id: number; name: string; code: string | null };
+  };
+  goals: { home: number | null; away: number | null };
 };
 
 async function seed(req: Request) {
@@ -326,13 +342,13 @@ async function seed(req: Request) {
   const ok = secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
   if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) {
     return new Response(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Seed Error</title>
       <style>body{font-family:sans-serif;background:#0a0e1a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}
       h1{color:#f56565;font-size:1.5rem}code{color:#f5a623}</style></head>
-      <body><h1>⚠️ FOOTBALL_DATA_API_KEY not set</h1>
+      <body><h1>⚠️ API_FOOTBALL_KEY not set</h1>
       <p>Add it to Vercel environment variables and redeploy.</p></body></html>`,
       { headers: { "Content-Type": "text/html" } }
     );
@@ -342,41 +358,49 @@ async function seed(req: Request) {
   const t0 = Date.now();
 
   try {
-    // ── 1. Fetch all WC 2026 matches from football-data.org ──────────────────
+    // ── 1. Fetch all WC 2026 fixtures from api-football.com ──────────────────
     const ctrl = new AbortController();
-    const fetchTimeout = setTimeout(() => ctrl.abort(), 20000);
-    const fdRes = await fetch(`${FD_BASE}/competitions/WC/matches?season=2026`, {
-      headers: { "X-Auth-Token": apiKey, Accept: "application/json" },
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
+    const fetchTimeout = setTimeout(() => ctrl.abort(), 20_000);
+    const afRes = await fetch(
+      `${AF_BASE}/fixtures?league=${AF_LEAGUE}&season=${AF_SEASON}`,
+      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
+    );
     clearTimeout(fetchTimeout);
 
-    if (!fdRes.ok) {
-      log.push(`FD API error: ${fdRes.status} ${fdRes.statusText}`);
+    if (!afRes.ok) {
+      log.push(`api-football error: ${afRes.status} ${afRes.statusText}`);
       return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
     }
 
-    const fdJson = await fdRes.json();
-    const fdMatches: FDMatch[] = fdJson.matches ?? [];
-    log.push(`Fetched ${fdMatches.length} matches from football-data.org`);
+    const afJson = await afRes.json();
+    const afFixtures: AFFixture[] = afJson.response ?? [];
+    log.push(`Fetched ${afFixtures.length} fixtures from api-football.com`);
 
-    // ── 2. Remove old fake-fixture records — delete children first to avoid FK violations ──
-    await prisma.kalshiMarket.deleteMany({ where: { match: { fixture: { in: [1001, 1002] } } } });
-    await prisma.liveMetric.deleteMany({ where: { match: { fixture: { in: [1001, 1002] } } } });
-    const deleted = await prisma.match.deleteMany({ where: { fixture: { in: [1001, 1002] } } });
-    if (deleted.count > 0) log.push(`Removed ${deleted.count} legacy fake-fixture records`);
+    // ── 2. Clear all existing match data to avoid orphaned football-data.org fixture IDs ──
+    await prisma.kalshiMarket.deleteMany({});
+    await prisma.liveMetric.deleteMany({});
+    const deleted = await prisma.match.deleteMany({});
+    if (deleted.count > 0) log.push(`Cleared ${deleted.count} existing match records (fresh seed)`);
+
+    // Normalize fixtures to internal shape
+    const fdMatches = afFixtures.map(f => ({
+      id:       f.fixture.id,
+      utcDate:  f.fixture.date,
+      status:   f.fixture.status.short,
+      minute:   f.fixture.status.elapsed,
+      group:    TEAM_GROUPS[(f.teams.home.code ?? "").toUpperCase()] ?? null,
+      stage:    f.league.round,
+      homeTeam: { tla: (f.teams.home.code ?? "").toUpperCase(), name: f.teams.home.name, shortName: f.teams.home.name },
+      awayTeam: { tla: (f.teams.away.code ?? "").toUpperCase(), name: f.teams.away.name, shortName: f.teams.away.name },
+      score:    { fullTime: { home: f.goals.home, away: f.goals.away } },
+    }));
 
     // ── 3. Collect all unique teams ──────────────────────────────────────────
     const teamMeta = new Map<string, { name: string; group: string }>();
     for (const m of fdMatches) {
-      const group = m.group ? m.group.replace("GROUP_", "") : (m.stage ?? "KO");
-      const norm = (t: { name: string; shortName?: string; tla: string }) => ({
-        name: t.shortName || t.name,
-        group,
-      });
-      if (m.homeTeam?.tla && !teamMeta.has(m.homeTeam.tla)) teamMeta.set(m.homeTeam.tla, norm(m.homeTeam));
-      if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, norm(m.awayTeam));
+      const group = m.group ?? "KO";
+      if (m.homeTeam?.tla && !teamMeta.has(m.homeTeam.tla)) teamMeta.set(m.homeTeam.tla, { name: m.homeTeam.name, group });
+      if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, { name: m.awayTeam.name, group });
     }
 
     // ── 4. Batch upsert teams: createMany for new rows, parallel update for existing ──
@@ -434,8 +458,8 @@ async function seed(req: Request) {
       fixture: m.id,
       homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
       awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
-      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined) ?? "World Cup Stadium",
-      city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined); return v ? (getVenueInfo(v)?.city ?? "") : ""; })(),
+      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? "World Cup Stadium",
+      city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla); return v ? (getVenueInfo(v)?.city ?? "") : ""; })(),
       date: new Date(m.utcDate),
       status: STATUS_MAP[m.status] ?? "NS",
       homeScore: m.score?.fullTime?.home ?? 0,
@@ -446,14 +470,14 @@ async function seed(req: Request) {
 
     // Venue update pass — overwrites any previously stored placeholder with hardcoded values
     await Promise.all(validMatches.map(m => {
-      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? (m.venue as string | undefined) ?? "World Cup Stadium";
+      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? "World Cup Stadium";
       const city = venue !== "World Cup Stadium" ? (getVenueInfo(venue)?.city ?? "") : "";
       return prisma.match.updateMany({ where: { fixture: m.id }, data: { venue, city } });
     }));
 
     // Update status/scores for non-scheduled matches in parallel
     const activeMatches = validMatches.filter(
-      m => m.status !== "SCHEDULED" && m.status !== "TIMED" && m.status !== "POSTPONED" && m.status !== "CANCELLED"
+      m => m.status !== "NS" && m.status !== "PST" && m.status !== "CANC" && m.status !== "ABD"
     );
     if (activeMatches.length > 0) {
       await Promise.all(
