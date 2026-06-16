@@ -369,7 +369,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · FIFA World Cup 2026 · Data via football-data.org
+        studio0x.io · FIFA World Cup 2026 · Data via api-football.com
       </footer>
     </div>
   );

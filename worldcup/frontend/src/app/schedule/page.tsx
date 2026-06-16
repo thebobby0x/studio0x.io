@@ -74,7 +74,7 @@ export default async function SchedulePage() {
             <CalendarDays size={48} className="mx-auto mb-4 text-slate-600" />
             <p className="text-slate-400 font-semibold">Schedule unavailable</p>
             <p className="text-slate-600 text-sm mt-1">
-              Add <code className="text-brand-green">FOOTBALL_DATA_API_KEY</code> to Vercel to load the full schedule.
+              Add <code className="text-brand-green">API_FOOTBALL_KEY</code> to Vercel to load the full schedule.
             </p>
           </div>
         ) : (
@@ -83,7 +83,7 @@ export default async function SchedulePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 Stats Engine · Schedule data via football-data.org
+        Studio0x.io · World Cup 2026 Stats Engine · Schedule data via api-football.com
       </footer>
     </div>
   );
