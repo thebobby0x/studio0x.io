@@ -374,7 +374,17 @@ async function seed(req: Request) {
 
     const afJson = await afRes.json();
     const afFixtures: AFFixture[] = afJson.response ?? [];
-    log.push(`Fetched ${afFixtures.length} fixtures from api-football.com`);
+
+    // Surface API-level errors (auth failures return HTTP 200 with errors field)
+    if (afJson.errors && Object.keys(afJson.errors).length > 0) {
+      log.push(`api-football API errors: ${JSON.stringify(afJson.errors)}`);
+      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
+    }
+    log.push(`Fetched ${afFixtures.length} fixtures from api-football.com (results: ${afJson.results ?? "?"})`);
+    if (afFixtures.length === 0) {
+      log.push(`Raw response preview: ${JSON.stringify(afJson).slice(0, 400)}`);
+      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
+    }
 
     // ── 2. Clear all existing match data to avoid orphaned football-data.org fixture IDs ──
     await prisma.kalshiMarket.deleteMany({});
