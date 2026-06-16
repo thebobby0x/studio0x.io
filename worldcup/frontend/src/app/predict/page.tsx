@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
-import { Trophy, CalendarDays, Radio, Check, Lock, Wifi, Star } from "lucide-react";
+import { Trophy, CalendarDays, Radio, Check, Lock, Wifi, Star, LogIn, LogOut, User } from "lucide-react";
 import type { PredictMatch } from "@/app/api/matches/route";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { getFlag } from "@/lib/flags";
@@ -76,12 +77,17 @@ function formatTime(isoDate: string) {
 }
 
 export default function PredictPage() {
+  const { data: session, status } = useSession();
+  const isLoggedIn = !!session?.user;
+
   const [matches,  setMatches]  = useState<PredictMatch[]>([]);
   const [schedule, setSchedule] = useState<ScheduleMatch[]>([]);
   const [preds,    setPreds]    = useState<Preds>({});
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading,  setLoading]  = useState(true);
+  const [syncing,  setSyncing]  = useState(false);
 
+  // Load matches + schedule
   useEffect(() => {
     Promise.all([
       fetch("/api/matches").then(r => r.json()),
@@ -100,27 +106,69 @@ export default function PredictPage() {
     return () => clearInterval(t);
   }, []);
 
+  // Load predictions: DB if logged in, localStorage otherwise
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("wc26_preds");
-      if (raw) setPreds(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, []);
+    if (status === "loading") return;
 
-  function save(fixture: number, pred: Prediction) {
+    if (isLoggedIn) {
+      fetch("/api/predictions")
+        .then(r => r.ok ? r.json() : {})
+        .then((dbPreds: Preds) => {
+          // Merge: DB takes precedence, but pull in any local ones not yet synced
+          try {
+            const raw = localStorage.getItem("wc26_preds");
+            const local: Preds = raw ? JSON.parse(raw) : {};
+            const merged = { ...local, ...dbPreds };
+            setPreds(merged);
+            // Sync local-only preds to DB
+            const localOnly: Preds = {};
+            for (const [k, v] of Object.entries(local)) {
+              if (!dbPreds[Number(k)]) localOnly[Number(k)] = v;
+            }
+            if (Object.keys(localOnly).length > 0) {
+              fetch("/api/predictions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(localOnly) })
+                .then(() => localStorage.removeItem("wc26_preds"))
+                .catch(() => {});
+            }
+          } catch { setPreds(dbPreds); }
+        })
+        .catch(() => {
+          try {
+            const raw = localStorage.getItem("wc26_preds");
+            if (raw) setPreds(JSON.parse(raw));
+          } catch { /* ignore */ }
+        });
+    } else {
+      try {
+        const raw = localStorage.getItem("wc26_preds");
+        if (raw) setPreds(JSON.parse(raw));
+      } catch { /* ignore */ }
+    }
+  }, [isLoggedIn, status]);
+
+  async function save(fixture: number, pred: Prediction) {
     const next = { ...preds, [fixture]: pred };
     setPreds(next);
-    try { localStorage.setItem("wc26_preds", JSON.stringify(next)); } catch { /* ignore */ }
+
+    if (isLoggedIn) {
+      setSyncing(true);
+      fetch("/api/predictions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fixture]: pred }),
+      }).finally(() => setSyncing(false));
+    } else {
+      try { localStorage.setItem("wc26_preds", JSON.stringify(next)); } catch { /* ignore */ }
+    }
   }
 
-  // Map schedule by match ID (= fixture number in DB)
+  // Map schedule by match ID
   const scheduleMap = useMemo(() => {
     const m = new Map<number, ScheduleMatch>();
     schedule.forEach(s => m.set(s.id, s));
     return m;
   }, [schedule]);
 
-  // Merge DB team data with live statuses/scores
   const liveMatches = useMemo(() =>
     matches.map(m => {
       const live = scheduleMap.get(m.fixture);
@@ -135,7 +183,6 @@ export default function PredictPage() {
     [matches, scheduleMap]
   );
 
-  // Compute form (last N results per team TLA) from live schedule
   const teamForm = useMemo(() => {
     const form: Record<string, FormResult[]> = {};
     const ftMatches = [...schedule]
@@ -157,7 +204,6 @@ export default function PredictPage() {
     return form;
   }, [schedule]);
 
-  // Compute group standings positions
   const { groupPositions, groupPts, groupGD } = useMemo(() => {
     const pts: Record<string, number>  = {};
     const gd:  Record<string, number>  = {};
@@ -202,7 +248,6 @@ export default function PredictPage() {
     return { groupPositions: positions, groupPts: pts, groupGD: gd };
   }, [schedule]);
 
-  // Group by calendar day
   const byDay = liveMatches.reduce<Record<string, typeof liveMatches>>((acc, m) => {
     const day = new Date(m.date).toISOString().slice(0, 10);
     (acc[day] ??= []).push(m);
@@ -240,11 +285,58 @@ export default function PredictPage() {
               <span className="hidden sm:inline">Live</span>
             </div>
             <LiveClock />
+            {/* Auth button */}
+            {status !== "loading" && (
+              isLoggedIn ? (
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                  title={`Signed in as ${session.user.email}`}
+                >
+                  {session.user.image ? (
+                    <img src={session.user.image} alt="" className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <User size={13} />
+                  )}
+                  <LogOut size={11} className="hidden sm:block" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => signIn("google")}
+                  className="flex items-center gap-1.5 text-[10px] text-brand-gold hover:text-amber-300 transition-colors font-semibold"
+                >
+                  <LogIn size={11} />
+                  <span>Sign in</span>
+                </button>
+              )
+            )}
           </div>
         </div>
       </nav>
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-5">
+
+        {/* Auth banner (when not logged in) */}
+        {!isLoggedIn && status !== "loading" && (
+          <div className="rounded-2xl border border-amber-900/40 bg-amber-950/20 px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold text-amber-400 mb-0.5">Predictions aren&apos;t saved yet</div>
+              <div className="text-[11px] text-slate-500">Sign in with Google to save your picks across devices and compete on the leaderboard.</div>
+            </div>
+            <button
+              onClick={() => signIn("google")}
+              className="shrink-0 flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black px-3 py-2 rounded-xl transition-colors"
+            >
+              <LogIn size={12} />
+              Sign in
+            </button>
+          </div>
+        )}
+
+        {/* Syncing indicator */}
+        {syncing && (
+          <div className="text-[10px] text-slate-600 text-center animate-pulse">Saving predictions…</div>
+        )}
 
         {/* Points banner */}
         <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #1a1200 0%, #0f1420 60%)", border: "1px solid #f5a62330" }}>
@@ -258,6 +350,7 @@ export default function PredictPage() {
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
                   {ftWithPred.length} graded · {locked} locked in
+                  {isLoggedIn && <span className="text-brand-green ml-2">· synced to cloud</span>}
                 </div>
               </div>
               <div className="text-right">
@@ -309,7 +402,6 @@ export default function PredictPage() {
                 const homeGD   = groupGD[m.homeTeam.tla.toUpperCase()];
                 const awayGD   = groupGD[m.awayTeam.tla.toUpperCase()];
 
-                /* ── Completed + predicted ── */
                 if (isFT && pred) {
                   const { total: pts, breakdown } = calcPoints(pred, m.homeScore, m.awayScore);
                   const exact = pred.home === m.homeScore && pred.away === m.awayScore;
@@ -395,7 +487,6 @@ export default function PredictPage() {
                   );
                 }
 
-                /* ── Completed without prediction ── */
                 if (isFT) {
                   return (
                     <div key={m.fixture} className="rounded-2xl overflow-hidden border border-slate-800/60 bg-brand-card opacity-60">
@@ -418,7 +509,6 @@ export default function PredictPage() {
                   );
                 }
 
-                /* ── Live match ── */
                 if (isLive) {
                   return (
                     <div key={m.fixture} className="rounded-2xl overflow-hidden border border-red-900/40 bg-brand-card">
@@ -450,7 +540,6 @@ export default function PredictPage() {
                   );
                 }
 
-                /* ── Upcoming (NS) — score picker ── */
                 const cur = pred ?? { home: 0, away: 0 };
                 return (
                   <div key={m.fixture} className="rounded-2xl overflow-hidden bg-brand-card border border-brand-border">
@@ -462,7 +551,6 @@ export default function PredictPage() {
                       </div>
                     </div>
 
-                    {/* Team context strip */}
                     <div className="flex items-center justify-between px-4 pt-3 pb-1 text-[10px] text-slate-600">
                       <div className="flex flex-col gap-1 items-start">
                         {homePos != null && (
@@ -502,7 +590,7 @@ export default function PredictPage() {
                       {pred ? (
                         <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-brand-green">
                           <Lock size={10} />
-                          <span>Saved · tap +/− to edit</span>
+                          <span>{isLoggedIn ? "Saved to cloud · tap +/− to edit" : "Saved locally · sign in to sync"}</span>
                         </div>
                       ) : (
                         <p className="mt-3 text-center text-[10px] text-slate-600">tap +/− to lock in your pick</p>
@@ -517,7 +605,7 @@ export default function PredictPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · Predictions saved locally · Max 30 pts per match
+        studio0x.io · {isLoggedIn ? "Predictions synced to your account" : "Sign in to save predictions across devices"} · Max 30 pts per match
       </footer>
     </div>
   );
