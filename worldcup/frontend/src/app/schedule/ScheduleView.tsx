@@ -179,14 +179,15 @@ function StatusBadge({ m, urgent }: { m: ScheduleMatch; urgent: boolean }) {
 
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
-type Filter = "all" | "live" | "today" | "upcoming" | "results";
+type Filter = "all" | "live" | "today" | "week" | "upcoming" | "played";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all",      label: "All" },
   { key: "live",     label: "Live" },
   { key: "today",    label: "Today" },
+  { key: "week",     label: "This Week" },
   { key: "upcoming", label: "Upcoming" },
-  { key: "results",  label: "Results" },
+  { key: "played",   label: "Played" },
 ];
 
 // ─── Main schedule view ──────────────────────────────────────────────────────
@@ -218,16 +219,22 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
   const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
 
   const filtered = useMemo(() => {
+    const weekFromNow = new Date(now + 7 * 24 * 60 * 60 * 1000);
+    const weekStr = localDateStr(weekFromNow);
     switch (filter) {
       case "live":     return matches.filter(m => m.status === "LIVE" || m.status === "HT");
       case "today":    return matches.filter(m => utcToLocalDateStr(m.utcDate) === todayStr);
+      case "week":     return matches.filter(m => {
+        const d = utcToLocalDateStr(m.utcDate);
+        return d >= todayStr && d <= weekStr;
+      });
       case "upcoming": return matches.filter(m => m.status === "NS" && utcToLocalDateStr(m.utcDate) !== todayStr);
-      case "results":  return matches.filter(m => m.status === "FT");
+      case "played":   return matches.filter(m => m.status === "FT");
       default:         return matches;
     }
-  }, [matches, filter, todayStr]);
+  }, [matches, filter, todayStr, now]);
 
-  // Group by local calendar date
+  // Group by local calendar date; played view is newest-first
   const groups = useMemo(() => {
     const map = new Map<string, ScheduleMatch[]>();
     for (const m of filtered) {
@@ -235,8 +242,9 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(m);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+    const entries = [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    return filter === "played" ? entries.reverse() : entries;
+  }, [filtered, filter]);
 
   function formatDayHeader(localDate: string) {
     const [y, mo, d] = localDate.split("-").map(Number);
