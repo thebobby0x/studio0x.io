@@ -3,10 +3,12 @@ export const dynamic = "force-dynamic";
 import AppNav from "@/components/ui/AppNav";
 import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
+import { getTournamentWinnerMarkets } from "@/lib/polymarket";
 
-// ── Group Death Score™ ────────────────────────────────────────────────────────
-// Measures how competitive and exciting a group is based on pts tightness + goal rate
-function groupDeathScore(teams: TeamStanding[]): { score: number; label: string; emoji: string } {
+// ── Group Intensity™ ──────────────────────────────────────────────────────────
+// LIVE results-based: measures how tight and entertaining the group actually is
+// (pts spread + goals per match). Updates as matches complete.
+function groupIntensityScore(teams: TeamStanding[]): { score: number; label: string; emoji: string } {
   const played = teams.filter(t => t.p > 0);
   if (played.length < 2) return { score: 0, label: "TBD", emoji: "⏳" };
 
@@ -22,9 +24,43 @@ function groupDeathScore(teams: TeamStanding[]): { score: number; label: string;
 
   return {
     score,
-    label: score >= 80 ? "Group of Death" : score >= 60 ? "Competitive" : score >= 40 ? "Taking Shape" : "Clear Leader",
-    emoji: score >= 80 ? "💀" : score >= 60 ? "🔥" : score >= 40 ? "⚡" : "😌",
+    label: score >= 80 ? "Extremely Tight" : score >= 60 ? "Competitive" : score >= 40 ? "Taking Shape" : "Clear Leader",
+    emoji: score >= 80 ? "🔥" : score >= 60 ? "⚡" : score >= 40 ? "📈" : "😌",
   };
+}
+
+// ── Group Danger Index™ ───────────────────────────────────────────────────────
+// PRE-TOURNAMENT: how much tournament-favourite strength is concentrated in one group.
+// Uses Polymarket win-tournament odds. A group where multiple top contenders
+// are packed together = high danger (traditional "Group of Death" concept).
+// multiplier = groupTotalOdds / expectedGroupOdds  (expected = totalOdds / 12)
+function groupDangerIndex(
+  teams: TeamStanding[],
+  oddsMap: Map<string, number>,
+  totalOdds: number,
+): { multiplier: number; label: string; emoji: string; pct: number } | null {
+  if (oddsMap.size === 0 || totalOdds === 0) return null;
+
+  const expectedPerGroup = totalOdds / 12;
+  const groupTotal = teams.reduce((s, t) => s + (oddsMap.get(t.tla) ?? 0), 0);
+  if (groupTotal === 0) return null;
+
+  const multiplier = Math.round((groupTotal / expectedPerGroup) * 10) / 10;
+  const pct = Math.round(groupTotal * 100);
+
+  const label =
+    multiplier >= 3   ? "Group of Death" :
+    multiplier >= 2   ? "Very Dangerous" :
+    multiplier >= 1.4 ? "Above Average"  :
+    multiplier >= 0.7 ? "Standard"       : "Underdog Group";
+
+  const emoji =
+    multiplier >= 3   ? "💀" :
+    multiplier >= 2   ? "⚠️" :
+    multiplier >= 1.4 ? "🎯" :
+    multiplier >= 0.7 ? "⬜" : "🕊️";
+
+  return { multiplier, label, emoji, pct };
 }
 
 // ── Power Rankings™ ──────────────────────────────────────────────────────────
@@ -94,24 +130,43 @@ function gdString(gd: number): string {
   return String(gd);
 }
 
-function GroupCard({ standing }: { standing: GroupStanding }) {
-  const gds = groupDeathScore(standing.teams);
+function GroupCard({
+  standing,
+  oddsMap,
+  totalOdds,
+}: {
+  standing: GroupStanding;
+  oddsMap: Map<string, number>;
+  totalOdds: number;
+}) {
+  const gi  = groupIntensityScore(standing.teams);
+  const gdi = groupDangerIndex(standing.teams, oddsMap, totalOdds);
 
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border bg-brand-card">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border bg-brand-card flex-wrap">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider shrink-0">
           {standing.group}
         </span>
-        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
           Group {standing.group}
         </span>
-        {gds.score > 0 && (
-          <span className="ml-auto flex items-center gap-1 text-[10px] font-bold">
-            <span>{gds.emoji}</span>
-            <span className="text-slate-500">{gds.label}</span>
-            <span className="text-slate-700 font-mono">{gds.score}</span>
+        {/* Group Danger Index™ — pre-tournament Polymarket strength */}
+        {gdi && (
+          <span className="flex items-center gap-1 text-[10px] font-bold border border-brand-border/50 rounded-full px-2 py-0.5">
+            <span>{gdi.emoji}</span>
+            <span className={`${gdi.multiplier >= 2 ? "text-red-400" : gdi.multiplier >= 1.4 ? "text-amber-400" : "text-slate-500"}`}>
+              {gdi.label}
+            </span>
+            <span className="text-slate-700 font-mono">{gdi.multiplier}×</span>
+          </span>
+        )}
+        {/* Group Intensity™ — live results-based competitiveness */}
+        {gi.score > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-slate-600">
+            <span>{gi.emoji}</span>
+            <span>{gi.label}</span>
           </span>
         )}
       </div>
@@ -207,7 +262,20 @@ function GroupCard({ standing }: { standing: GroupStanding }) {
 }
 
 export default async function StandingsPage() {
-  const standings = await fetchStandings();
+  const [standings, oddsData] = await Promise.all([
+    fetchStandings(),
+    getTournamentWinnerMarkets().catch(() => null),
+  ]);
+
+  // Build tla → odds map from Polymarket data
+  const oddsMap = new Map<string, number>();
+  let totalOdds = 0;
+  if (oddsData?.markets) {
+    for (const m of oddsData.markets) {
+      if (m.tla) { oddsMap.set(m.tla.toUpperCase(), m.probability); totalOdds += m.probability; }
+    }
+  }
+
   const entropy = tournamentEntropy(standings);
   const power = powerRankings(standings);
 
@@ -277,7 +345,7 @@ export default async function StandingsPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {standings.map((standing) => (
-              <GroupCard key={standing.group} standing={standing} />
+              <GroupCard key={standing.group} standing={standing} oddsMap={oddsMap} totalOdds={totalOdds} />
             ))}
           </div>
         )}
