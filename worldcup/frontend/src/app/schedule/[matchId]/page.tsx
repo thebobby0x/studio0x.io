@@ -214,7 +214,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
         {/* Match DNA™ + Clutch Index™ — only for played/live matches */}
         {(isDone || isLive) && (
-          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} />
+          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} matchStatus={m.status} currentMinute={m.minute ?? undefined} />
         )}
 
         {/* Upset Factor™ — only for FT matches with Polymarket odds available */}
@@ -372,12 +372,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 }
 
 async function MatchDNAPanel({
-  fixtureId, homeTeamName, awayTeamName, homeTeamCode,
+  fixtureId, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute,
 }: {
   fixtureId: number;
   homeTeamName: string;
   awayTeamName: string;
   homeTeamCode: string;
+  matchStatus?: string;
+  currentMinute?: number;
 }) {
   try {
     const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
@@ -419,6 +421,8 @@ async function MatchDNAPanel({
           homeTeamName={homeTeamName}
           awayTeamName={awayTeamName}
           homeTeamCode={homeTeamCode}
+          matchStatus={matchStatus}
+          currentMinute={currentMinute}
         />
         <GoalGravity
           goals={gravityGoals}

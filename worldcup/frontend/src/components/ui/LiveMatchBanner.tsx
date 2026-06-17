@@ -241,7 +241,7 @@ export default function LiveMatchBanner() {
 
   return (
     <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
-      <div className="flex justify-between items-center px-4 py-1.5 gap-4">
+      <div className="flex justify-between items-center px-4 h-14 gap-4">
         {/* Left: live score or recent/upcoming chips */}
         <LiveSection liveMatch={liveMatch} />
 

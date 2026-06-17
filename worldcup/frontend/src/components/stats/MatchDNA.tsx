@@ -93,12 +93,29 @@ function computeScoreVolatility(goals: GoalEvent[], homeTeam: string) {
 }
 
 // ── Momentum Pulse™ ──────────────────────────────────────────────────────────
-// Reconstructs the score at each 15-minute checkpoint to show momentum swings
-function computeMomentumPulse(goals: GoalEvent[], homeTeam: string) {
-  const CHECKPOINTS = [15, 30, 45, 60, 75, 90];
+// Reconstructs the score at each 15-minute checkpoint to show momentum swings.
+// For LIVE matches, only checkpoints up to the current elapsed minute are shown
+// so future segments aren't pre-filled with stale final-score data.
+function computeMomentumPulse(
+  goals: GoalEvent[],
+  homeTeam: string,
+  matchStatus?: string,
+  currentMinute?: number,
+) {
+  const ALL_CHECKPOINTS = [15, 30, 45, 60, 75, 90];
   const sorted = [...goals].sort((a, b) => a.minute - b.minute);
 
-  return CHECKPOINTS.map(checkpoint => {
+  // Determine the highest checkpoint to display
+  let maxCheckpoint = 90;
+  if (matchStatus === "LIVE" && currentMinute != null) {
+    maxCheckpoint = currentMinute;
+  } else if (matchStatus === "HT") {
+    maxCheckpoint = 45;
+  }
+
+  const checkpoints = ALL_CHECKPOINTS.filter(c => c <= maxCheckpoint);
+
+  return checkpoints.map(checkpoint => {
     let h = 0, a = 0;
     for (const g of sorted) {
       if (g.minute > checkpoint) break;
@@ -154,9 +171,11 @@ interface Props {
   homeTeamName: string;
   awayTeamName: string;
   homeTeamCode: string;
+  matchStatus?: string;
+  currentMinute?: number;
 }
 
-export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCode }: Props) {
+export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute }: Props) {
   if (goals.length === 0) return null;
 
   const homeGoals = goals.filter(g => !g.isOwnGoal ? g.team === homeTeamName : g.team !== homeTeamName);
@@ -165,7 +184,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
   const maxCI = Math.max(...ci.map(p => p.ci), 3);
   const sc  = computeStrikeClock(goals);
   const sv  = computeScoreVolatility(goals, homeTeamName);
-  const mp  = computeMomentumPulse(goals, homeTeamName);
+  const mp  = computeMomentumPulse(goals, homeTeamName, matchStatus, currentMinute);
   const hasVolatility = sv.leadChanges > 0 || sv.equalisers > 0;
   const hasMovement = mp.some(p => p.h > 0 || p.a > 0);
 
