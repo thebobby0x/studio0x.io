@@ -27,6 +27,33 @@ function groupDeathScore(teams: TeamStanding[]): { score: number; label: string;
   };
 }
 
+// ── Power Rankings™ ──────────────────────────────────────────────────────────
+// Composite team strength score across all groups (pts + gd + goals efficiency)
+function powerRankings(standings: GroupStanding[]) {
+  const all: Array<{ tla: string; name: string; flag: string; group: string; score: number; p: number }> = [];
+
+  for (const g of standings) {
+    for (const t of g.teams) {
+      if (t.p === 0) continue;
+      const ptsPerGame = t.pts / t.p;
+      const gdPerGame  = t.gd  / t.p;
+      const gfPerGame  = t.gf  / t.p;
+      const winRate    = t.w   / t.p;
+
+      const score = Math.round(
+        ptsPerGame * 40 / 3 * 100    // max 3 pts/game → max 40
+        + Math.max(0, gdPerGame + 5) / 10 * 30  // centred on gd=0
+        + gfPerGame / 4 * 20          // 4 goals/game → max 20
+        + winRate * 10                // win rate component
+      );
+
+      all.push({ tla: t.tla, name: t.name, flag: t.flag, group: g.group, score: Math.min(100, score), p: t.p });
+    }
+  }
+
+  return all.sort((a, b) => b.score - a.score).slice(0, 16);
+}
+
 // ── Tournament Entropy™ ───────────────────────────────────────────────────────
 // Shannon entropy on W/D/L distribution — higher = more unpredictable tournament
 function tournamentEntropy(standings: GroupStanding[]): { pct: number; label: string } {
@@ -182,6 +209,7 @@ function GroupCard({ standing }: { standing: GroupStanding }) {
 export default async function StandingsPage() {
   const standings = await fetchStandings();
   const entropy = tournamentEntropy(standings);
+  const power = powerRankings(standings);
 
   const totalPlayed = standings.reduce((s, g) =>
     s + g.teams.reduce((ts, t) => ts + t.p, 0) / 2, 0
@@ -251,6 +279,39 @@ export default async function StandingsPage() {
             {standings.map((standing) => (
               <GroupCard key={standing.group} standing={standing} />
             ))}
+          </div>
+        )}
+
+        {/* Power Rankings™ */}
+        {power.length > 0 && (
+          <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden mt-6">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-brand-border">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Power Rankings™</span>
+                <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
+              </div>
+              <span className="text-[9px] text-slate-700 uppercase tracking-wider">Pts efficiency · GD · Goals · Win rate</span>
+            </div>
+            <div className="divide-y divide-brand-border/30">
+              {power.map((t, i) => (
+                <div key={t.tla} className="flex items-center gap-3 px-5 py-2.5">
+                  <span className="text-xs text-slate-600 tabular-nums w-5 text-right font-mono">{i + 1}</span>
+                  <span className="text-base leading-none">{t.flag}</span>
+                  <span className="text-xs font-semibold text-slate-200 flex-1 truncate">{t.name}</span>
+                  <span className="text-[9px] text-slate-600 font-mono w-7 text-center">G{t.group}</span>
+                  <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-brand-gold to-amber-300 rounded-full"
+                      style={{ width: `${t.score}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-black text-brand-gold tabular-nums w-8 text-right">{t.score}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-2 border-t border-brand-border/30 text-[9px] text-slate-700">
+              Top 16 teams by performance · updates live as matches complete
+            </div>
           </div>
         )}
       </main>

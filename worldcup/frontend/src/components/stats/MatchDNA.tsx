@@ -92,6 +92,23 @@ function computeScoreVolatility(goals: GoalEvent[], homeTeam: string) {
   return { leadChanges, equalisers, dramaLabel, dramaEmoji };
 }
 
+// ── Momentum Pulse™ ──────────────────────────────────────────────────────────
+// Reconstructs the score at each 15-minute checkpoint to show momentum swings
+function computeMomentumPulse(goals: GoalEvent[], homeTeam: string) {
+  const CHECKPOINTS = [15, 30, 45, 60, 75, 90];
+  const sorted = [...goals].sort((a, b) => a.minute - b.minute);
+
+  return CHECKPOINTS.map(checkpoint => {
+    let h = 0, a = 0;
+    for (const g of sorted) {
+      if (g.minute > checkpoint) break;
+      const isHome = !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam;
+      if (isHome) h++; else a++;
+    }
+    return { checkpoint, h, a };
+  });
+}
+
 // ── Match DNA timeline ────────────────────────────────────────────────────────
 function DNATimeline({
   goals, side,
@@ -148,7 +165,9 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
   const maxCI = Math.max(...ci.map(p => p.ci), 3);
   const sc  = computeStrikeClock(goals);
   const sv  = computeScoreVolatility(goals, homeTeamName);
+  const mp  = computeMomentumPulse(goals, homeTeamName);
   const hasVolatility = sv.leadChanges > 0 || sv.equalisers > 0;
+  const hasMovement = mp.some(p => p.h > 0 || p.a > 0);
 
   void homeTeamCode;
 
@@ -177,6 +196,39 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
           </div>
           <DNATimeline goals={awayGoals} side="away" />
         </div>
+
+        {/* Momentum Pulse™ */}
+        {hasMovement && (
+          <div className="border-t border-brand-border/50 pt-3">
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
+              <span className="text-[8px] text-slate-600">Score at each 15-min checkpoint</span>
+            </div>
+            <div className="flex items-stretch gap-1">
+              {mp.map(({ checkpoint, h, a }) => {
+                const lead = h > a ? "home" : a > h ? "away" : "level";
+                const bg =
+                  lead === "home"  ? "bg-brand-green/15 border-brand-green/25" :
+                  lead === "away"  ? "bg-amber-500/15 border-amber-500/25" :
+                  checkpoint === 15 && h === 0 && a === 0
+                    ? "bg-slate-900/30 border-brand-border/20"
+                    : "bg-slate-800/40 border-brand-border/40";
+                const scoreColor =
+                  lead === "home"  ? "text-brand-green" :
+                  lead === "away"  ? "text-amber-400"   : "text-slate-500";
+
+                return (
+                  <div key={checkpoint} className={`flex-1 rounded-lg border px-1 py-2 text-center ${bg}`}>
+                    <div className={`text-xs font-black tabular-nums leading-none ${scoreColor}`}>
+                      {h}–{a}
+                    </div>
+                    <div className="text-[8px] text-slate-700 mt-0.5 font-mono">{checkpoint}&apos;</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Strike Clock™ */}
         {sc && (
