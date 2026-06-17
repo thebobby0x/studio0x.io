@@ -39,7 +39,7 @@ const TEAM_GROUPS: Record<string, string> = {
   CAN: "B", BIH: "B", QAT: "B", SUI: "B",
   BRA: "C", MAR: "C", HAI: "C", SCO: "C",
   USA: "D", PAR: "D", AUS: "D", TUR: "D",
-  GER: "E", CUW: "E", CIV: "E", ECU: "E",
+  GER: "E", CUW: "E", CUR: "E", CIV: "E", ECU: "E",
   NED: "F", JPN: "F", SWE: "F", TUN: "F",
   BEL: "G", EGY: "G", IRN: "G", NZL: "G",
   ESP: "H", CPV: "H", KSA: "H", URU: "H",

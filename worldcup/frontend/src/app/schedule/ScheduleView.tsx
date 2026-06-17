@@ -261,12 +261,20 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
   return (
     <div>
       {/* Stats bar */}
-      <div className="flex items-center gap-4 mb-6 text-sm text-slate-500">
-        <span>{matches.length} matches</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-6 text-sm text-slate-500">
+        <span>
+          <span className="text-slate-300 font-semibold">{matches.filter(m => m.status === "FT").length}</span>
+          <span className="ml-1">played</span>
+        </span>
         <span className="text-brand-border">·</span>
-        <span>{matches.filter(m => m.status === "FT").length} played</span>
+        <span>
+          <span className="text-slate-300 font-semibold">{matches.filter(m => m.status === "NS").length}</span>
+          <span className="ml-1">group stage remaining</span>
+        </span>
         <span className="text-brand-border">·</span>
-        <span>{matches.filter(m => m.status === "NS").length} scheduled</span>
+        <span className="text-slate-600">32 knockout TBD</span>
+        <span className="text-brand-border">·</span>
+        <span className="text-slate-600">104 total</span>
         {liveCount > 0 && (
           <>
             <span className="text-brand-border">·</span>
