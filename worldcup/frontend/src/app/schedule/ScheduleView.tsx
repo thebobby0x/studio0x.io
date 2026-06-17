@@ -194,7 +194,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 export default function ScheduleView({ initialMatches }: { initialMatches: ScheduleMatch[] }) {
   const [matches, setMatches]   = useState(initialMatches);
-  const [filter, setFilter]     = useState<Filter>("all");
+  const [filter, setFilter]     = useState<Filter>("today");
   const [now, setNow]           = useState(() => Date.now());
 
   // Tick every second for countdowns

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock, Users } from "lucide-react";
+import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
@@ -11,6 +11,8 @@ import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import MatchDNA from "@/components/stats/MatchDNA";
 import UpsetMeter from "@/components/stats/UpsetMeter";
 import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
+import MatchLineups from "@/components/match/MatchLineups";
+import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -304,8 +306,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           />
         )}
 
-        {/* Starting lineups from DB */}
-        <MatchLineupCard fixtureId={m.id} homeName={m.homeTeam.name} awayName={m.awayTeam.name} />
+        {/* Starting lineups + subs via api-football */}
+        <MatchLineupsPanel fixtureId={m.id} />
+
+        {/* Per-player match stats — only for played/live matches */}
+        {(isDone || isLive) && <MatchPlayerStatsPanel fixtureId={m.id} />}
 
         {/* Team fixtures */}
         {(homeOtherMatches.length > 0 || awayOtherMatches.length > 0) && (
@@ -447,68 +452,21 @@ async function MatchWinMeter({ fixtureId }: { fixtureId: number }) {
   }
 }
 
-const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"];
-const POSITION_LABELS: Record<string, string> = { GK: "Goalkeeper", DEF: "Defenders", MID: "Midfielders", FWD: "Forwards" };
-
-async function MatchLineupCard({ fixtureId, homeName, awayName }: { fixtureId: number; homeName: string; awayName: string }) {
+async function MatchLineupsPanel({ fixtureId }: { fixtureId: number }) {
   try {
-    const dbMatch = await prisma.match.findFirst({
-      where: { fixture: fixtureId },
-      include: {
-        homeTeam: { include: { homePlayers: true } },
-        awayTeam: { include: { homePlayers: true } },
-      },
-    });
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
     if (!dbMatch) return null;
+    return <MatchLineups matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
+}
 
-    const sides = [
-      { team: dbMatch.homeTeam, name: homeName },
-      { team: dbMatch.awayTeam, name: awayName },
-    ] as const;
-
-    const hasPlayers = sides.some(s => (s.team as { homePlayers?: unknown[] }).homePlayers && (s.team as { homePlayers: unknown[] }).homePlayers.length > 0);
-    if (!hasPlayers) return null;
-
-    return (
-      <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border">
-          <Users size={13} className="text-slate-500" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Starting Lineups</span>
-          <span className="ml-auto text-[10px] text-slate-600">Subs coming with paid API</span>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-brand-border">
-          {sides.map(({ team, name }) => {
-            const players = ((team as { homePlayers: Array<{ id: string; number: number; name: string; position: string }> }).homePlayers ?? [])
-              .sort((a, b) => {
-                const pi = POSITION_ORDER.indexOf(a.position) - POSITION_ORDER.indexOf(b.position);
-                return pi !== 0 ? pi : a.number - b.number;
-              });
-            return (
-              <div key={team.id} className="p-3">
-                <Link href={`/team/${team.code}`} className="text-xs font-bold text-white mb-3 block hover:text-brand-gold transition-colors">
-                  {name}
-                </Link>
-                {POSITION_ORDER.map(pos => {
-                  const pp = players.filter(p => p.position === pos);
-                  if (!pp.length) return null;
-                  return (
-                    <div key={pos} className="mb-3">
-                      <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">{POSITION_LABELS[pos]}</div>
-                      {pp.map(p => (
-                        <div key={p.id} className="flex items-center gap-2 py-1">
-                          <span className="text-[10px] text-slate-600 w-4 text-right font-mono tabular-nums">{p.number}</span>
-                          <span className="text-xs text-slate-300">{p.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+async function MatchPlayerStatsPanel({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <MatchPlayerStats matchId={dbMatch.id} />;
   } catch {
     return null;
   }
