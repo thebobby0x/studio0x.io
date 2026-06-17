@@ -8,6 +8,8 @@ import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
+import MatchDNA from "@/components/stats/MatchDNA";
+import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -206,6 +208,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
         )}
 
+        {/* Match DNA™ + Clutch Index™ — only for played/live matches */}
+        {(isDone || isLive) && (
+          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} />
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Group standings */}
           {table.length > 0 && (
@@ -352,6 +359,54 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       </footer>
     </div>
   );
+}
+
+async function MatchDNAPanel({
+  fixtureId, homeTeamName, awayTeamName, homeTeamCode,
+}: {
+  fixtureId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamCode: string;
+}) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+
+    const apiKey = process.env.API_FOOTBALL_KEY;
+    if (!apiKey) return null;
+
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures/events?fixture=${fixtureId}`,
+      { headers: { "x-apisports-key": apiKey }, next: { revalidate: 60 } }
+    );
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const goals: GoalEvent[] = (json.response ?? [])
+      .filter((e: { type: string }) => e.type === "Goal")
+      .map((e: { time: { elapsed: number }; team: { name: string }; player: { name: string }; assist: { name: string | null }; detail: string }) => ({
+        minute: e.time.elapsed,
+        team: e.team.name,
+        scorer: e.player.name,
+        assist: e.assist?.name ?? null,
+        isOwnGoal: e.detail === "Own Goal",
+        isPenalty: e.detail === "Penalty",
+      }));
+
+    if (goals.length === 0) return null;
+
+    return (
+      <MatchDNA
+        goals={goals}
+        homeTeamName={homeTeamName}
+        awayTeamName={awayTeamName}
+        homeTeamCode={homeTeamCode}
+      />
+    );
+  } catch {
+    return null;
+  }
 }
 
 async function MatchWinMeter({ fixtureId }: { fixtureId: number }) {

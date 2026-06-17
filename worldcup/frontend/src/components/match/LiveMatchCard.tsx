@@ -7,6 +7,7 @@ import type { LiveData } from "@/lib/types";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
+import MatchDNA from "@/components/stats/MatchDNA";
 
 const METRIC_LABELS: Record<string, string> = {
   possession:   "Possession %",
@@ -180,6 +181,18 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
           />
         )}
 
+        {/* Match DNA™ */}
+        {(isLive || isDone) && goals && goals.length > 0 && (
+          <div className="px-4 pb-4">
+            <MatchDNA
+              goals={goals}
+              homeTeamName={match.homeTeam.name}
+              awayTeamName={match.awayTeam.name}
+              homeTeamCode={homeCode}
+            />
+          </div>
+        )}
+
         {/* Stats bars if available */}
         {dataSources?.stats !== "sim" && Object.keys(hm).length > 0 && (
           <div className="px-6 pb-5 pt-2 border-t border-white/5 space-y-3">
@@ -281,6 +294,18 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
           homeTeam={match.homeTeam.name}
           awayTeam={match.awayTeam.name}
         />
+      )}
+
+      {/* Match DNA™ */}
+      {(isLive || isDone) && goals && goals.length > 0 && (
+        <div className="px-4 pb-4">
+          <MatchDNA
+            goals={goals}
+            homeTeamName={match.homeTeam.name}
+            awayTeamName={match.awayTeam.name}
+            homeTeamCode={homeCode}
+          />
+        </div>
       )}
 
       {/* Stats bars */}
