@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy, CalendarDays, Radio, Star, Music2, LogIn, LogOut, User } from "lucide-react";
+import { Trophy, CalendarDays, Radio, Star, Music2, LogIn, LogOut, User, BarChart2 } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import LiveClock from "./LiveClock";
 import LiveMatchBanner from "./LiveMatchBanner";
@@ -47,6 +47,7 @@ export default function AppNav() {
             <NavLink href="/schedule"><CalendarDays size={12} />Schedule</NavLink>
             <NavLink href="/pulse"><Radio size={12} />Pulse</NavLink>
             <NavLink href="/predict"><Star size={11} />Predict</NavLink>
+            <NavLink href="/standings"><BarChart2 size={12} className="hidden sm:block" /><span className="hidden sm:inline">Standings</span></NavLink>
             <NavLink href="/anthems">
               <Music2 size={12} className="hidden sm:block" />
               <span className="hidden sm:inline">Anthems</span>
