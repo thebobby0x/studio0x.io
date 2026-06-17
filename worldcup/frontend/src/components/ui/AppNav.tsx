@@ -8,7 +8,7 @@ import LiveClock from "./LiveClock";
 import LiveMatchBanner from "./LiveMatchBanner";
 import { useUnits } from "@/lib/units";
 
-function NavLink({ href, children, exact }: { href: string; children: React.ReactNode; exact?: boolean }) {
+function NavLink({ href, children, exact, className = "" }: { href: string; children: React.ReactNode; exact?: boolean; className?: string }) {
   const path = usePathname();
   const active = exact ? path === href : path.startsWith(href);
   return (
@@ -16,7 +16,7 @@ function NavLink({ href, children, exact }: { href: string; children: React.Reac
       href={href}
       className={`flex items-center gap-1 text-xs transition-colors ${
         active ? "font-semibold text-brand-gold" : "text-slate-500 hover:text-slate-300"
-      }`}
+      } ${className}`}
     >
       {children}
     </Link>
@@ -42,23 +42,21 @@ export default function AppNav() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto scrollbar-none flex-1 justify-end">
-            <NavLink href="/" exact>Dashboard</NavLink>
-            <NavLink href="/schedule"><CalendarDays size={12} />Schedule</NavLink>
-            <NavLink href="/pulse"><Radio size={12} />Pulse</NavLink>
-            <NavLink href="/predict"><Star size={11} />Predict</NavLink>
-            <NavLink href="/standings"><BarChart2 size={12} className="hidden sm:block" /><span className="hidden sm:inline">Standings</span></NavLink>
-            <NavLink href="/anthems">
-              <Music2 size={12} className="hidden sm:block" />
-              <span className="hidden sm:inline">Anthems</span>
-            </NavLink>
+          <div className="flex items-center gap-3 sm:gap-5 flex-1 justify-end">
+            <NavLink href="/" exact className="hidden sm:flex">Dashboard</NavLink>
+            <NavLink href="/schedule"><CalendarDays size={14} /><span className="hidden sm:inline">Schedule</span></NavLink>
+            <NavLink href="/pulse"><Radio size={14} /><span className="hidden sm:inline">Pulse</span></NavLink>
+            <NavLink href="/predict"><Star size={13} /><span className="hidden sm:inline">Predict</span></NavLink>
+            <NavLink href="/standings"><BarChart2 size={14} /><span className="hidden sm:inline">Standings</span></NavLink>
+            <NavLink href="/anthems"><Music2 size={14} /><span className="hidden sm:inline">Anthems</span></NavLink>
 
             <button
               onClick={toggleUnits}
               className="text-[10px] font-mono text-slate-500 hover:text-slate-300 border border-brand-border hover:border-slate-600 rounded px-1.5 py-0.5 transition-colors shrink-0"
               title="Toggle metric / imperial"
             >
-              {units === "metric" ? "°C · km" : "°F · mi"}
+              <span className="hidden sm:inline">{units === "metric" ? "°C · km" : "°F · mi"}</span>
+              <span className="sm:hidden">{units === "metric" ? "°C" : "°F"}</span>
             </button>
 
             <div className="hidden sm:flex items-center gap-1.5">

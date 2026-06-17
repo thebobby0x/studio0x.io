@@ -2,7 +2,7 @@
 
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 
-// ── Clutch Index computation ─────────────────────────────────────────────────
+// ── Clutch Index™ ─────────────────────────────────────────────────────────────
 // Weight per goal: lead-changing = 3, equalising = 2.5, extending = 1, OG = 0.5
 // Late-goal multiplier: ×1.5 if minute ≥ 80
 function computeClutchIndex(goals: GoalEvent[], homeTeam: string) {
@@ -20,7 +20,7 @@ function computeClutchIndex(goals: GoalEvent[], homeTeam: string) {
     if (!g.isOwnGoal) {
       let w = 1;
       if (isHome) {
-        if (prevH <= prevA) w = prevH === prevA ? 3 : 2.5; // took lead or equalised
+        if (prevH <= prevA) w = prevH === prevA ? 3 : 2.5;
       } else {
         if (prevA <= prevH) w = prevA === prevH ? 3 : 2.5;
       }
@@ -37,12 +37,66 @@ function computeClutchIndex(goals: GoalEvent[], homeTeam: string) {
     .sort((a, b) => b.ci - a.ci || b.goals - a.goals);
 }
 
-// ── Match DNA timeline ───────────────────────────────────────────────────────
+// ── Strike Clock™ ─────────────────────────────────────────────────────────────
+// Measures goal timing patterns: first strike minute, avg gap, rhythm label
+function computeStrikeClock(goals: GoalEvent[]) {
+  if (goals.length === 0) return null;
+  const sorted = [...goals].sort((a, b) => a.minute - b.minute);
+  const first = sorted[0].minute;
+  const last = sorted[sorted.length - 1].minute;
+
+  let avgGap: number | null = null;
+  if (sorted.length > 1) {
+    const gaps = sorted.slice(1).map((g, i) => g.minute - sorted[i].minute);
+    avgGap = Math.round(gaps.reduce((s, g) => s + g, 0) / gaps.length);
+  }
+
+  const rhythm =
+    first <= 10           ? "Explosive"    :
+    sorted.length >= 4    ? "High-Scoring" :
+    last >= 85            ? "Late Drama"   : "Steady";
+  const rhythmEmoji =
+    first <= 10           ? "⚡" :
+    sorted.length >= 4    ? "🎯" :
+    last >= 85            ? "🔥" : "⏱";
+
+  return { first, last, avgGap, rhythm, rhythmEmoji, total: sorted.length };
+}
+
+// ── Score Volatility™ ─────────────────────────────────────────────────────────
+// Counts lead changes and equalisers to quantify match drama
+function computeScoreVolatility(goals: GoalEvent[], homeTeam: string) {
+  const sorted = [...goals].sort((a, b) => a.minute - b.minute);
+  let h = 0, a = 0, leadChanges = 0, equalisers = 0;
+  let prevLead: "home" | "away" | "level" = "level";
+
+  for (const g of sorted) {
+    const isHome = !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam;
+    if (isHome) h++; else a++;
+
+    const lead: "home" | "away" | "level" = h > a ? "home" : a > h ? "away" : "level";
+    if (lead === "level" && prevLead !== "level") equalisers++;
+    if (lead !== "level" && prevLead !== "level" && lead !== prevLead) leadChanges++;
+    prevLead = lead;
+  }
+
+  const dramaLabel =
+    leadChanges >= 2 ? "High Drama"  :
+    equalisers >= 2  ? "Tense"       :
+    leadChanges === 1 ? "Shifted"    : "Dominant";
+  const dramaEmoji =
+    leadChanges >= 2 ? "🎭" :
+    equalisers >= 2  ? "😤" :
+    leadChanges === 1 ? "↔️" : "⬛";
+
+  return { leadChanges, equalisers, dramaLabel, dramaEmoji };
+}
+
+// ── Match DNA timeline ────────────────────────────────────────────────────────
 function DNATimeline({
-  goals, teamName, side,
+  goals, side,
 }: {
   goals: GoalEvent[];
-  teamName: string;
   side: "home" | "away";
 }) {
   const MAX_MIN = 95;
@@ -77,7 +131,7 @@ function DNATimeline({
   );
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 interface Props {
   goals: GoalEvent[];
   homeTeamName: string;
@@ -90,8 +144,13 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
 
   const homeGoals = goals.filter(g => !g.isOwnGoal ? g.team === homeTeamName : g.team !== homeTeamName);
   const awayGoals = goals.filter(g => !g.isOwnGoal ? g.team !== homeTeamName : g.team === homeTeamName);
-  const ci = computeClutchIndex(goals, homeTeamName);
+  const ci  = computeClutchIndex(goals, homeTeamName);
   const maxCI = Math.max(...ci.map(p => p.ci), 3);
+  const sc  = computeStrikeClock(goals);
+  const sv  = computeScoreVolatility(goals, homeTeamName);
+  const hasVolatility = sv.leadChanges > 0 || sv.equalisers > 0;
+
+  void homeTeamCode;
 
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
@@ -104,10 +163,11 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         <span className="text-[9px] text-slate-700 uppercase tracking-wider">Goal timeline · 0–95&apos;</span>
       </div>
 
-      {/* Timeline */}
       <div className="px-4 py-4 space-y-4">
+
+        {/* Timeline */}
         <div className="space-y-3">
-          <DNATimeline goals={homeGoals} teamName={homeTeamName} side="home" />
+          <DNATimeline goals={homeGoals} side="home" />
           <div className="flex items-center gap-2">
             <span className="w-6" />
             <div className="flex-1 flex justify-between text-[8px] text-slate-800 font-mono px-0.5">
@@ -115,20 +175,70 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
             </div>
             <span className="w-3" />
           </div>
-          <DNATimeline goals={awayGoals} teamName={awayTeamName} side="away" />
+          <DNATimeline goals={awayGoals} side="away" />
         </div>
 
-        {/* Clutch Index */}
+        {/* Strike Clock™ */}
+        {sc && (
+          <div className="border-t border-brand-border/50 pt-3">
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Strike Clock™</span>
+              <span className="text-[8px] text-slate-600">Goal timing patterns</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+                <div className="text-xl font-black text-white tabular-nums leading-none">{sc.first}&apos;</div>
+                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">First Strike</div>
+              </div>
+              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+                <div className="text-xl font-black text-white tabular-nums leading-none">
+                  {sc.avgGap !== null ? `${sc.avgGap}m` : `${sc.total}G`}
+                </div>
+                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">
+                  {sc.avgGap !== null ? "Avg Gap" : "Goals"}
+                </div>
+              </div>
+              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+                <div className="text-xl leading-none">{sc.rhythmEmoji}</div>
+                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">{sc.rhythm}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Score Volatility™ */}
+        {hasVolatility && (
+          <div className="border-t border-brand-border/50 pt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Score Volatility™</span>
+              <span className="text-[8px] text-slate-600">{sv.dramaEmoji} {sv.dramaLabel}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
+                <span className="text-[10px] text-slate-400">Lead changes</span>
+                <span className="text-sm font-black text-white tabular-nums">{sv.leadChanges}</span>
+              </div>
+              <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
+                <span className="text-[10px] text-slate-400">Equalisers</span>
+                <span className="text-sm font-black text-white tabular-nums">{sv.equalisers}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clutch Index™ */}
         {ci.length > 0 && (
-          <div className="border-t border-brand-border/50 pt-3 mt-1">
+          <div className="border-t border-brand-border/50 pt-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Clutch Index™</span>
-              <span className="text-[8px] text-slate-700">Lead-change weight × late-goal bonus</span>
+              <span className="text-[8px] text-slate-600">Lead-change weight × late-goal bonus</span>
             </div>
             <div className="space-y-1.5">
               {ci.map(p => (
                 <div key={p.name} className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 w-24 truncate">{p.name.split(" ").map((w, i) => i === 0 ? w[0] + "." : w).join(" ")}</span>
+                  <span className="text-[10px] text-slate-400 w-24 truncate">
+                    {p.name.split(" ").map((w, i) => i === 0 ? w[0] + "." : w).join(" ")}
+                  </span>
                   <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-brand-gold to-amber-300 rounded-full transition-all"
@@ -136,14 +246,13 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
                     />
                   </div>
                   <span className="text-[10px] font-black text-brand-gold tabular-nums w-6 text-right">{p.ci}</span>
-                  <span className="text-[8px] text-slate-700 w-8 shrink-0">
-                    {p.goals}G
-                  </span>
+                  <span className="text-[8px] text-slate-700 w-8 shrink-0">{p.goals}G</span>
                 </div>
               ))}
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
