@@ -234,7 +234,7 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
     }
   }, [matches, filter, todayStr, now]);
 
-  // Group by local calendar date; played view is newest-first
+  // Group by local calendar date; newest-first for "all" and "played" views
   const groups = useMemo(() => {
     const map = new Map<string, ScheduleMatch[]>();
     for (const m of filtered) {
@@ -243,7 +243,7 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
       map.get(day)!.push(m);
     }
     const entries = [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-    return filter === "played" ? entries.reverse() : entries;
+    return (filter === "played" || filter === "all") ? entries.reverse() : entries;
   }, [filtered, filter]);
 
   function formatDayHeader(localDate: string) {

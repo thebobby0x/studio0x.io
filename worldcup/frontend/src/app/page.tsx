@@ -18,10 +18,34 @@ import type { ScheduleMatch } from "@/app/api/schedule/route";
 
 async function getInitialData() {
   try {
-    const matches = await prisma.match.findMany({
-      include: { homeTeam: true, awayTeam: true },
-      orderBy: { date: "asc" },
+    const [dbMatches, scheduleRes] = await Promise.all([
+      prisma.match.findMany({
+        include: { homeTeam: true, awayTeam: true },
+        orderBy: { date: "asc" },
+      }),
+      import("@/app/api/schedule/route").then(m => m.GET()).catch(() => null),
+    ]);
+
+    // Overlay live status/scores from schedule API onto DB matches
+    // so featured match selection always reflects the true current state
+    let liveByFixture = new Map<number, ScheduleMatch>();
+    if (scheduleRes) {
+      const live = (await scheduleRes.json()) as ScheduleMatch[];
+      liveByFixture = new Map(live.map(m => [m.id, m]));
+    }
+
+    const matches = dbMatches.map(m => {
+      const live = liveByFixture.get(m.fixture);
+      if (!live) return m;
+      return {
+        ...m,
+        status: live.status,
+        homeScore: live.homeScore ?? m.homeScore,
+        awayScore: live.awayScore ?? m.awayScore,
+        elapsed: live.minute ?? m.elapsed,
+      };
     });
+
     return { matches: matches as unknown as Match[] };
   } catch {
     return { matches: [] };
