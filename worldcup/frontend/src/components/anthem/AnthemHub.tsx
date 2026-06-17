@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
-  Volume2, VolumeX, Music2, ChevronLeft, Share2, ExternalLink,
+  Volume2, VolumeX, Music2, Share2, ExternalLink,
 } from "lucide-react";
+import AppNav from "@/components/ui/AppNav";
 import type { AudioStream } from "@/lib/types";
 
 type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } };
@@ -207,21 +208,7 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200 flex flex-col">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
-            <ChevronLeft size={16} />
-            Dashboard
-          </Link>
-          <span className="text-brand-border">·</span>
-          <Music2 size={16} className="text-brand-gold" />
-          <span className="font-bold text-white">Anthem Hub</span>
-          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-400">
-            {streams.length} track{streams.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-      </nav>
+      <AppNav />
 
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
 

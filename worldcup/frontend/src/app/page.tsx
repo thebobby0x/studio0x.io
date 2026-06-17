@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Trophy, Wifi, CalendarDays, ChevronRight, Radio, Star } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
+import AppNav from "@/components/ui/AppNav";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
@@ -63,31 +64,11 @@ export default async function DashboardPage() {
         ? ftMatches[ftMatches.length - 1]
         : (nsMatches[0] ?? matches[matches.length - 1]);
 
+  const isMatchLiveNow = featuredMatch && (featuredMatch.status === "LIVE" || featuredMatch.status === "HT");
+
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy size={18} className="text-brand-gold" />
-            <span className="font-black text-white tracking-tight">WC 2026</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/schedule" className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors">
-              <CalendarDays size={13} />Schedule
-            </Link>
-            <Link href="/pulse" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"><Radio size={11} />Pulse</Link>
-            <Link href="/predict" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"><Star size={11} />Predict</Link>
-            <Link href="/anthems" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Anthems</Link>
-            <Link href="/admin/anthems" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">Admin</Link>
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <Wifi size={11} className="text-brand-green" />
-              <span className="hidden sm:inline">Live</span>
-            </div>
-            <LiveClock />
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Page header */}
@@ -146,10 +127,20 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        {/* Live NOW hero banner */}
+        {isMatchLiveNow && (
+          <div className="flex items-center gap-3 -mb-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="text-sm font-black text-white uppercase tracking-wider">Match In Progress</span>
+            <div className="flex-1 h-px bg-red-900/40" />
+            <span className="text-xs text-red-400 font-semibold">{featuredMatch!.elapsed}&apos; played</span>
+          </div>
+        )}
+
         {featuredMatch ? (
           <div className="space-y-6">
             {/* Featured match label */}
-            <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-3 ${isMatchLiveNow ? "hidden" : ""}`}>
               {(() => {
                 const realVenue = featuredMatch.venue && featuredMatch.venue !== "World Cup Stadium" ? featuredMatch.venue : null;
                 const city = realVenue ? venueCity(realVenue, featuredMatch.city) : null;
@@ -176,8 +167,8 @@ export default async function DashboardPage() {
               })()}
             </div>
 
-            <Suspense fallback={<div className="h-80 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}>
-              <LiveMatchCard matchId={featuredMatch.id} />
+            <Suspense fallback={<div className={`rounded-2xl bg-brand-card border border-brand-border animate-pulse ${isMatchLiveNow ? "h-96" : "h-80"}`} />}>
+              <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
             </Suspense>
 
             {(() => {

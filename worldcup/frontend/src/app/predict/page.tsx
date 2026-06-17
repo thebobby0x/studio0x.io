@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
-import Link from "next/link";
-import { Trophy, CalendarDays, Radio, Check, Lock, Wifi, Star, LogIn, LogOut, User } from "lucide-react";
+import { useSession, signIn } from "next-auth/react";
+import { Check, Lock, LogIn } from "lucide-react";
 import type { PredictMatch } from "@/app/api/matches/route";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { getFlag } from "@/lib/flags";
-import LiveClock from "@/components/ui/LiveClock";
+import AppNav from "@/components/ui/AppNav";
 
 interface Prediction { home: number; away: number }
 type Preds = Record<number, Prediction>;
@@ -262,57 +261,7 @@ export default function PredictPage() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy size={18} className="text-brand-gold" />
-            <span className="font-black text-white tracking-tight">WC 2026</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Dashboard</Link>
-            <Link href="/schedule" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-              <CalendarDays size={13} />Schedule
-            </Link>
-            <Link href="/pulse" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-              <Radio size={13} />Pulse
-            </Link>
-            <Link href="/predict" className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold">
-              <Star size={12} />Predict
-            </Link>
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <Wifi size={11} className="text-brand-green" />
-              <span className="hidden sm:inline">Live</span>
-            </div>
-            <LiveClock />
-            {/* Auth button */}
-            {status !== "loading" && (
-              isLoggedIn ? (
-                <button
-                  onClick={() => signOut()}
-                  className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                  title={`Signed in as ${session.user.email}`}
-                >
-                  {session.user.image ? (
-                    <img src={session.user.image} alt="" className="w-5 h-5 rounded-full" />
-                  ) : (
-                    <User size={13} />
-                  )}
-                  <LogOut size={11} className="hidden sm:block" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => signIn("google")}
-                  className="flex items-center gap-1.5 text-[10px] text-brand-gold hover:text-amber-300 transition-colors font-semibold"
-                >
-                  <LogIn size={11} />
-                  <span>Sign in</span>
-                </button>
-              )
-            )}
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-5">
 

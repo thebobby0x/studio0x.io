@@ -1,12 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { Trophy, CalendarDays, Wifi, Radio, Star, Plane, Users, DollarSign, Thermometer, ChevronRight, MapPin } from "lucide-react";
+import { Plane, Users, DollarSign, Thermometer, ChevronRight, MapPin, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { FlightArc } from "@/app/api/flight-paths/route";
 import type { CityTravelStats } from "@/app/api/travel-stats/route";
-import LiveClock from "@/components/ui/LiveClock";
+import AppNav from "@/components/ui/AppNav";
+import { useUnits } from "@/lib/units";
 
 const WorldFlightMap = dynamic(
   () => import("@/components/map/WorldFlightMap"),
@@ -53,8 +53,9 @@ function formatNextMatch(iso: string | null): string {
 }
 
 function TempBadge({ c }: { c: number }) {
+  const { tempC } = useUnits();
   const color = c >= 32 ? "text-red-400" : c >= 25 ? "text-amber-400" : "text-sky-400";
-  return <span className={`text-[10px] font-semibold ${color}`}>{c}°C</span>;
+  return <span className={`text-[10px] font-semibold ${color}`}>{tempC(c)}</span>;
 }
 
 function CityCard({ city, expanded, onToggle }: {
@@ -224,31 +225,7 @@ export default function PulsePage() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy size={18} className="text-brand-gold" />
-            <span className="font-black text-white tracking-tight">WC 2026</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Dashboard</Link>
-            <Link href="/schedule" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-              <CalendarDays size={13} />Schedule
-            </Link>
-            <Link href="/pulse" className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors">
-              <Radio size={13} />Pulse
-            </Link>
-            <Link href="/predict" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-              <Star size={12} />Predict
-            </Link>
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <Wifi size={11} className="text-brand-green" />
-              <span className="hidden sm:inline">Live</span>
-            </div>
-            <LiveClock />
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
 
