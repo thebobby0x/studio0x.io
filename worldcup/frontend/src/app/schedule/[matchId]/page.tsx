@@ -9,6 +9,7 @@ import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import MatchDNA from "@/components/stats/MatchDNA";
+import UpsetMeter from "@/components/stats/UpsetMeter";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -213,6 +214,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} />
         )}
 
+        {/* Upset Factor™ — only for FT matches with Polymarket odds available */}
+        {isDone && <UpsetMeterForMatch fixtureId={m.id} />}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Group standings */}
           {table.length > 0 && (
@@ -404,6 +408,16 @@ async function MatchDNAPanel({
         homeTeamCode={homeTeamCode}
       />
     );
+  } catch {
+    return null;
+  }
+}
+
+async function UpsetMeterForMatch({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <UpsetMeter matchId={dbMatch.id} />;
   } catch {
     return null;
   }

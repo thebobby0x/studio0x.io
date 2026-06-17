@@ -67,6 +67,8 @@ export interface LiveData {
   markets: KalshiMarket[]
   dataSources?: DataSources
   kalshiTickers?: { home_win: string; draw: string; away_win: string } | null
+  liveProbs?: { home: number; draw: number; away: number } | null
+  tournamentOdds?: { home: number | null; away: number | null } | null
 }
 
 // OpenSky Network flight data (full field set)
