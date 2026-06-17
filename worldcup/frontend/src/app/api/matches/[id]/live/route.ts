@@ -6,6 +6,37 @@ import { getFDLiveMatch } from "@/lib/footballData";
 import { getTeamTournamentProb } from "@/lib/polymarket";
 import { liveWinProbability, preMatchWinProbFromTournamentOdds } from "@/lib/probabilities";
 
+const AF_BASE = "https://v3.football.api-sports.io";
+const STATUS_MAP: Record<string, string> = {
+  NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
+  ET: "LIVE", BT: "HT", P: "LIVE",
+  FT: "FT", AET: "FT", PEN: "FT",
+  PST: "NS", CANC: "NS", AWD: "FT", WO: "FT",
+};
+
+async function getAFFixture(fixtureId: number) {
+  const key = process.env.API_FOOTBALL_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(`${AF_BASE}/fixtures?id=${fixtureId}`, {
+      headers: { "x-apisports-key": key },
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const f = json.response?.[0];
+    if (!f) return null;
+    return {
+      homeScore: f.goals.home as number | null,
+      awayScore: f.goals.away as number | null,
+      status: (STATUS_MAP[f.fixture.status.short] ?? "NS") as string,
+      elapsed: (f.fixture.status.elapsed ?? 0) as number,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -18,27 +49,31 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
 
-  // Fetch live data in parallel — tournament odds alongside match/market data
-  const [fdResult, kalshiResult, homeTournamentProb, awayTournamentProb] = await Promise.allSettled([
+  // Fetch live data in parallel — api-football (primary) + fd.org + markets + odds
+  const [afResult, fdResult, kalshiResult, homeTournamentProb, awayTournamentProb] = await Promise.allSettled([
+    getAFFixture(match.fixture),
     getFDLiveMatch(homeCode, awayCode, match.date),
     getKalshiMarkets(homeCode, awayCode, new Date(match.date)),
     getTeamTournamentProb(homeCode),
     getTeamTournamentProb(awayCode),
   ]);
 
+  // api-football is primary source for score/status; fall back to football-data.org then DB
+  const afMatch  = afResult.status  === "fulfilled" ? afResult.value  : null;
   const fdMatch  = fdResult.status  === "fulfilled" ? fdResult.value  : null;
   const kalshi   = kalshiResult.status === "fulfilled" ? kalshiResult.value : null;
   const homeW    = homeTournamentProb.status === "fulfilled" ? homeTournamentProb.value : null;
   const awayW    = awayTournamentProb.status === "fulfilled" ? awayTournamentProb.value : null;
 
-  // Match state
+  // Match state — api-football > football-data.org > simulation
   const simElapsed = elapsedFromDate(match.date);
-  const status     = fdMatch?.status ?? statusFromElapsed(simElapsed);
-  const elapsed    = status === "HT" ? 45
-                   : (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed
-                   : simElapsed;
-  const homeScore  = fdMatch?.homeScore ?? match.homeScore;
-  const awayScore  = fdMatch?.awayScore ?? match.awayScore;
+  const status = afMatch?.status ?? fdMatch?.status ?? statusFromElapsed(simElapsed);
+  const elapsed = status === "HT" ? 45
+    : (afMatch && afMatch.elapsed > 0) ? afMatch.elapsed
+    : (fdMatch && fdMatch.elapsed > 0) ? fdMatch.elapsed
+    : simElapsed;
+  const homeScore = afMatch?.homeScore ?? fdMatch?.homeScore ?? match.homeScore;
+  const awayScore = afMatch?.awayScore ?? fdMatch?.awayScore ?? match.awayScore;
 
   // Detailed stats — always simulated
   const metrics: Record<string, Record<string, number>> = {
@@ -76,13 +111,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     markets: enrichedMarkets,
     kalshiTickers: kalshi ? kalshi.tickers : null,
     liveProbs,
-    tournamentOdds: {
-      home: homeW,
-      away: awayW,
-    },
+    tournamentOdds: { home: homeW, away: awayW },
     dataSources: {
-      match:   fdMatch  ? fdMatch.source  : "sim",
-      markets: kalshi   ? kalshi.source   : "sim",
+      match:   afMatch ? "api-football" : fdMatch ? fdMatch.source : "sim",
+      markets: kalshi  ? kalshi.source  : "sim",
       stats:   "sim",
       probs:   (homeW !== null && awayW !== null) ? "polymarket" : "unavailable",
     },

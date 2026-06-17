@@ -206,7 +206,7 @@ export async function GET() {
   });
 
   const totalRevenue = cities.reduce((s, c) => s + c.totalEstimatedRevenue, 0);
-  const totalMatches = cities.reduce((s, c) => s + c.matchCount, 0);
+  const totalMatches = 104; // FIFA WC 2026: 72 group stage + 32 knockout
   const totalFansPerDay = cities
     .filter(c => c.hasMatchToday)
     .reduce((s, c) => s + c.peakArrivals, 0);
