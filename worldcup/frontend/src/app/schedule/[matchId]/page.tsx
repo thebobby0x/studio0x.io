@@ -10,6 +10,7 @@ import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import MatchDNA from "@/components/stats/MatchDNA";
 import UpsetMeter from "@/components/stats/UpsetMeter";
+import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -400,13 +401,26 @@ async function MatchDNAPanel({
 
     if (goals.length === 0) return null;
 
+    const gravityGoals = computeGoalGravity(
+      goals,
+      homeTeamName,
+      `${homeTeamName} vs ${awayTeamName}`,
+    );
+
     return (
-      <MatchDNA
-        goals={goals}
-        homeTeamName={homeTeamName}
-        awayTeamName={awayTeamName}
-        homeTeamCode={homeTeamCode}
-      />
+      <div className="space-y-4">
+        <MatchDNA
+          goals={goals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          homeTeamCode={homeTeamCode}
+        />
+        <GoalGravity
+          goals={gravityGoals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+        />
+      </div>
     );
   } catch {
     return null;
