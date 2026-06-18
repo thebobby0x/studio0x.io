@@ -351,20 +351,20 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
 
         {/* Score Volatility™ */}
         <div className="border-t border-brand-border/50 pt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Score Volatility™</span>
-              <span className="text-[8px] text-slate-600">{svEmoji} {svLabel}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Score Volatility™</span>
+            <span className="text-[8px] text-slate-600">{svEmoji} {svLabel}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
+              <span className="text-[10px] text-slate-400">Lead changes</span>
+              <span className="text-sm font-black text-white tabular-nums">{sv.leadChanges}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
-                <span className="text-[10px] text-slate-400">Lead changes</span>
-                <span className="text-sm font-black text-white tabular-nums">{sv.leadChanges}</span>
-              </div>
-              <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
-                <span className="text-[10px] text-slate-400">Equalisers</span>
-                <span className="text-sm font-black text-white tabular-nums">{sv.equalisers}</span>
-              </div>
+            <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
+              <span className="text-[10px] text-slate-400">Equalisers</span>
+              <span className="text-sm font-black text-white tabular-nums">{sv.equalisers}</span>
             </div>
+          </div>
         </div>
 
         {/* Clutch Index™ */}

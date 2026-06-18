@@ -236,6 +236,8 @@ export default function LiveMatchBanner() {
 
   if (!hasContent) return null;
 
+  void audioTrack;
+
   return (
     <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
       <div className="max-w-7xl mx-auto flex justify-between items-center px-4 h-16 gap-4">
