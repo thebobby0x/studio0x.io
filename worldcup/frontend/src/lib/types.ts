@@ -43,8 +43,8 @@ export interface KalshiMarket {
 
 export interface AudioStream {
   id: string
-  teamId: string
-  team: Team
+  teamId: string | null
+  team: Team | null
   title: string
   artistCredit: string
   audioUrl: string
@@ -52,6 +52,7 @@ export interface AudioStream {
   durationSecs: number
   playCount: number
   listenSeconds: number
+  shareClicks: number
   tiktokDeepLink: string | null
 }
 
@@ -67,6 +68,8 @@ export interface LiveData {
   markets: KalshiMarket[]
   dataSources?: DataSources
   kalshiTickers?: { home_win: string; draw: string; away_win: string } | null
+  liveProbs?: { home: number; draw: number; away: number } | null
+  tournamentOdds?: { home: number | null; away: number | null } | null
 }
 
 // OpenSky Network flight data (full field set)

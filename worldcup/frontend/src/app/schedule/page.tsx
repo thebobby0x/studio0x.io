@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Trophy, Music2, Wifi, CalendarDays } from "lucide-react";
+import { CalendarDays } from "lucide-react";
+import AppNav from "@/components/ui/AppNav";
 import ScheduleView from "./ScheduleView";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
@@ -21,42 +22,7 @@ export default async function SchedulePage() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      {/* Nav — same as homepage */}
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Trophy size={20} className="text-brand-gold" />
-            <Link href="/" className="font-bold text-white tracking-tight hover:text-brand-gold transition-colors">
-              Studio0x
-            </Link>
-            <span className="text-brand-border">·</span>
-            <span className="text-sm text-slate-400">World Cup 2026</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/schedule"
-              className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors"
-            >
-              <CalendarDays size={13} />
-              Schedule
-            </Link>
-            <Link
-              href="/anthems"
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              <Music2 size={13} />
-              Anthems
-            </Link>
-            <Link href="/admin/anthems" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
-              Admin
-            </Link>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Wifi size={12} className="text-brand-green" />
-              <span className="hidden sm:inline">Live data feed active</span>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Page header */}

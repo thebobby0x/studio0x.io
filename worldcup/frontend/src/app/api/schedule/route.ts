@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // FIFA World Cup
 const SEASON = 2026;
-const CACHE_TTL = 300_000; // 5 min
+const CACHE_TTL = 60_000; // 60s — keeps NS→LIVE transitions responsive
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -38,7 +39,7 @@ const TEAM_GROUPS: Record<string, string> = {
   CAN: "B", BIH: "B", QAT: "B", SUI: "B",
   BRA: "C", MAR: "C", HAI: "C", SCO: "C",
   USA: "D", PAR: "D", AUS: "D", TUR: "D",
-  GER: "E", CUW: "E", CIV: "E", ECU: "E",
+  GER: "E", CUW: "E", CUR: "E", CIV: "E", ECU: "E",
   NED: "F", JPN: "F", SWE: "F", TUN: "F",
   BEL: "G", EGY: "G", IRN: "G", NZL: "G",
   ESP: "H", CPV: "H", KSA: "H", URU: "H",
@@ -74,6 +75,19 @@ export interface ScheduleMatch {
 }
 
 let _cache: { ts: number; data: ScheduleMatch[] } | null = null;
+// name→code lookup loaded once from DB (teams rarely change)
+let _nameToCode: Map<string, string> | null = null;
+
+async function getNameToCode(): Promise<Map<string, string>> {
+  if (_nameToCode && _nameToCode.size > 0) return _nameToCode;
+  try {
+    const teams = await prisma.team.findMany({ select: { name: true, code: true } });
+    _nameToCode = new Map(teams.map(t => [t.name.toLowerCase(), t.code]));
+  } catch {
+    _nameToCode = new Map();
+  }
+  return _nameToCode;
+}
 
 export async function GET() {
   if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
@@ -82,6 +96,8 @@ export async function GET() {
 
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return NextResponse.json([], { status: 503 });
+
+  const nameToCode = await getNameToCode();
 
   try {
     const ctrl = new AbortController();
@@ -104,8 +120,9 @@ export async function GET() {
       const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
       const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
       const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
-      const homeTla  = (f.teams.home.code ?? "").toUpperCase();
-      const awayTla  = (f.teams.away.code ?? "").toUpperCase();
+      // api-football fixtures endpoint returns code:null; fall back to DB name→code lookup
+      const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
+      const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
       const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
       const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
 

@@ -1,208 +1,344 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
-// ─── Local-date helpers ──────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function utcToLocalDateStr(utcDate: string): string {
+function utcToLocal(utcDate: string): string {
   return localDateStr(new Date(utcDate));
 }
 
-// ─── Countdown helpers ───────────────────────────────────────────────────────
-
 function fmt2(n: number) { return String(n).padStart(2, "0"); }
 
-function countdown(utcDate: string, now: number): { top: string; sub: string; urgent: boolean } {
+function countdown(utcDate: string, now: number): { label: string; urgent: boolean } {
   const diff = new Date(utcDate).getTime() - now;
-  if (diff <= 0) return { top: "Kick off", sub: "", urgent: false };
-
-  const totalSecs = Math.floor(diff / 1000);
-  const d = Math.floor(totalSecs / 86400);
-  const h = Math.floor((totalSecs % 86400) / 3600);
-  const m = Math.floor((totalSecs % 3600) / 60);
-  const s = totalSecs % 60;
-
+  if (diff <= 0) return { label: "Kick off", urgent: false };
+  const s = Math.floor(diff / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
   if (d >= 7) {
     const dt = new Date(utcDate);
-    return {
-      top: dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      sub: dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      urgent: false,
-    };
+    return { label: dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }), urgent: false };
   }
-  if (d > 0) return { top: `${d}d ${h}h`, sub: `${fmt2(m)}m`, urgent: false };
-  if (h > 0) return { top: `${h}h ${fmt2(m)}m`, sub: "kicks off", urgent: false };
-  return { top: `${fmt2(m)}:${fmt2(s)}`, sub: "kicks off", urgent: true };
+  if (d > 0) return { label: `${d}d ${h}h`, urgent: false };
+  if (h > 0) return { label: `${h}h ${fmt2(m)}m`, urgent: false };
+  return { label: `${fmt2(m)}:${fmt2(sec)}`, urgent: true };
 }
 
-// ─── Match Card ──────────────────────────────────────────────────────────────
+function localTime(utcDate: string): string {
+  return new Date(utcDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
 
-function MatchCard({ m, now }: { m: ScheduleMatch; now: number }) {
+function formatDayLabel(dateStr: string): string {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, mo - 1, d, 12);
+  return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+// ─── Featured Hero Card ───────────────────────────────────────────────────────
+
+function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?: string }) {
   const isLive = m.status === "LIVE" || m.status === "HT";
   const isDone = m.status === "FT";
-  const isNS   = m.status === "NS";
-
-  const { top, sub, urgent } = isNS ? countdown(m.utcDate, now) : { top: "", sub: "", urgent: false };
-
-  const borderClass = isLive
-    ? "border-brand-green/40 shadow-lg shadow-brand-green/5"
-    : isDone
-    ? "border-brand-border/50 opacity-60"
-    : urgent
-    ? "border-amber-500/40 shadow-amber-500/5 shadow-md"
-    : "border-brand-border";
-
-  const groupLabel = m.group ? `Group ${m.group}` : m.stageLabel;
+  const { label: ctLabel, urgent } = m.status === "NS" ? countdown(m.utcDate, now) : { label: "", urgent: false };
 
   return (
-    <div className={`relative rounded-2xl bg-brand-card border overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:shadow-xl ${borderClass}`}>
-      {/* Card-level link to match detail (below interactive team links) */}
-      <Link
-        href={`/schedule/${m.id}`}
-        className="absolute inset-0 z-0"
-        aria-label={`${m.homeTeam.name} vs ${m.awayTeam.name} match details`}
-      />
-
-      {/* Content layer — pointer-events-none so clicks fall through to card link */}
-      <div className="relative z-10 pointer-events-none">
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border/50">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            {groupLabel}
+    <Link
+      href={`/schedule/${m.id}`}
+      className={`group block rounded-2xl bg-brand-card border overflow-hidden transition-all hover:shadow-2xl mb-6 ${
+        isLive
+          ? "border-brand-green/50 shadow-lg shadow-brand-green/10"
+          : isDone
+          ? "border-brand-border/50"
+          : urgent
+          ? "border-amber-500/40 shadow-md shadow-amber-500/10"
+          : "border-brand-border"
+      }`}
+    >
+      <div className="flex items-center justify-between px-5 py-2.5 border-b border-brand-border/40">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          {label ?? (m.group ? `Group ${m.group}` : m.stageLabel)}
+          {m.matchday > 0 ? ` · MD ${m.matchday}` : ""}
+        </span>
+        {isLive && (
+          <span className="flex items-center gap-1.5 text-[10px] font-black text-red-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            LIVE
           </span>
-          <StatusBadge m={m} urgent={urgent} />
-        </div>
+        )}
+        {isDone && <span className="text-[10px] text-slate-500">Full Time</span>}
+        {!isLive && !isDone && (
+          <span suppressHydrationWarning className="text-[10px] text-slate-500">
+            {localTime(m.utcDate)}
+          </span>
+        )}
+      </div>
 
-        {/* Main content */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-5">
-          {/* Home team — team page link re-enables pointer events */}
-          <Link
-            href={`/team/${m.homeTeam.tla}`}
-            className="pointer-events-auto text-center block group/team transition-opacity hover:opacity-80"
-          >
-            <div className="text-4xl select-none">{getFlag(m.homeTeam.tla)}</div>
-            <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1 group-hover/team:text-brand-gold transition-colors">
-              {m.homeTeam.name}
-            </div>
-            <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
-              {m.homeTeam.tla}
-            </div>
-          </Link>
-
-          {/* Center — score or countdown (passes clicks through to card link) */}
-          <div className="text-center min-w-[90px]">
-            {isLive && (
-              <>
-                <div className="text-4xl font-black tabular-nums text-white tracking-tighter">
-                  {m.homeScore ?? 0}<span className="text-brand-border mx-1">—</span>{m.awayScore ?? 0}
-                </div>
-                <div className="flex items-center justify-center gap-1 mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-[11px] text-slate-400">
-                    {m.status === "HT" ? "HT" : `${m.minute}'`}
-                  </span>
-                </div>
-              </>
-            )}
-            {isDone && (
-              <>
-                <div className="text-4xl font-black tabular-nums text-slate-400 tracking-tighter">
-                  {m.homeScore ?? 0}<span className="text-brand-border/60 mx-1">—</span>{m.awayScore ?? 0}
-                </div>
-                <div className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Full Time</div>
-              </>
-            )}
-            {isNS && (
-              <>
-                <div suppressHydrationWarning className={`font-black tabular-nums tracking-tight leading-none ${
-                  urgent ? "text-3xl font-mono text-amber-400" : "text-2xl text-white"
-                }`}>
-                  {top}
-                </div>
-                {sub && (
-                  <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">{sub}</div>
-                )}
-              </>
-            )}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-8">
+        {/* Home */}
+        <div className="text-center">
+          <div className="text-6xl sm:text-7xl mb-3">{getFlag(m.homeTeam.tla)}</div>
+          <div className="text-sm sm:text-base font-bold text-white group-hover:text-brand-gold transition-colors">
+            {m.homeTeam.name}
           </div>
-
-          {/* Away team */}
-          <Link
-            href={`/team/${m.awayTeam.tla}`}
-            className="pointer-events-auto text-center block group/team transition-opacity hover:opacity-80"
-          >
-            <div className="text-4xl select-none">{getFlag(m.awayTeam.tla)}</div>
-            <div className="mt-1.5 text-xs font-bold text-white leading-tight line-clamp-1 group-hover/team:text-brand-gold transition-colors">
-              {m.awayTeam.name}
-            </div>
-            <div className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">
-              {m.awayTeam.tla}
-            </div>
-          </Link>
+          <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-0.5">
+            {m.homeTeam.tla}
+          </div>
         </div>
+
+        {/* Score / countdown */}
+        <div className="text-center min-w-[110px]">
+          {isLive && (
+            <>
+              <div className="text-5xl font-black tabular-nums text-white tracking-tighter">
+                {m.homeScore ?? 0}
+                <span className="text-brand-border mx-2">–</span>
+                {m.awayScore ?? 0}
+              </div>
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm font-mono text-red-400">
+                  {m.status === "HT" ? "HT" : `${m.minute}'`}
+                </span>
+              </div>
+            </>
+          )}
+          {isDone && (
+            <>
+              <div className="text-5xl font-black tabular-nums text-slate-300 tracking-tighter">
+                {m.homeScore ?? 0}
+                <span className="text-brand-border/60 mx-2">–</span>
+                {m.awayScore ?? 0}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-2 uppercase tracking-widest">Full Time</div>
+            </>
+          )}
+          {m.status === "NS" && (
+            <>
+              <div
+                suppressHydrationWarning
+                className={`font-black tabular-nums tracking-tight ${
+                  urgent ? "text-4xl font-mono text-amber-400" : "text-3xl text-white"
+                }`}
+              >
+                {ctLabel}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1.5 uppercase tracking-wider">
+                {urgent ? "kicks off" : "countdown"}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Away */}
+        <div className="text-center">
+          <div className="text-6xl sm:text-7xl mb-3">{getFlag(m.awayTeam.tla)}</div>
+          <div className="text-sm sm:text-base font-bold text-white group-hover:text-brand-gold transition-colors">
+            {m.awayTeam.name}
+          </div>
+          <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-0.5">
+            {m.awayTeam.tla}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Compact Match Row ────────────────────────────────────────────────────────
+
+function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
+  const isLive = m.status === "LIVE" || m.status === "HT";
+  const isDone = m.status === "FT";
+  const { label: ctLabel, urgent } = m.status === "NS" ? countdown(m.utcDate, now) : { label: "", urgent: false };
+
+  return (
+    <Link
+      href={`/schedule/${m.id}`}
+      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-card border border-brand-border hover:border-slate-600 transition-all group"
+    >
+      {/* Home */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="text-xl shrink-0">{getFlag(m.homeTeam.tla)}</span>
+        <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
+          {m.homeTeam.name}
+        </span>
+      </div>
+
+      {/* Score / time */}
+      <div className="shrink-0 text-center min-w-[72px]">
+        {isLive && (
+          <span className="flex items-center justify-center gap-1.5">
+            <span className="text-sm font-black text-white tabular-nums">
+              {m.homeScore ?? 0}–{m.awayScore ?? 0}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          </span>
+        )}
+        {isDone && (
+          <span className="text-sm font-black text-slate-400 tabular-nums">
+            {m.homeScore ?? 0}–{m.awayScore ?? 0}
+          </span>
+        )}
+        {m.status === "NS" && (
+          <span
+            suppressHydrationWarning
+            className={`text-xs font-semibold ${urgent ? "text-amber-400" : "text-slate-400"}`}
+          >
+            {ctLabel}
+          </span>
+        )}
+      </div>
+
+      {/* Away */}
+      <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+        <span className="text-sm font-semibold text-slate-300 truncate text-right group-hover:text-white transition-colors">
+          {m.awayTeam.name}
+        </span>
+        <span className="text-xl shrink-0">{getFlag(m.awayTeam.tla)}</span>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Sub-filter bar (Remaining + Results) ────────────────────────────────────
+
+const GROUPS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+
+interface SubFilters {
+  group: string;
+  matchday: number;
+  team: string;
+}
+
+function SubFilterBar({
+  filters,
+  onChange,
+  teams,
+}: {
+  filters: SubFilters;
+  onChange: (f: SubFilters) => void;
+  teams: string[];
+}) {
+  return (
+    <div className="space-y-2 mb-6">
+      {/* Group chips */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] text-slate-600 uppercase tracking-widest w-12 shrink-0">Group</span>
+        {["", ...GROUPS].map((g) => (
+          <button
+            key={g || "all"}
+            onClick={() => onChange({ ...filters, group: g })}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+              filters.group === g
+                ? "bg-brand-gold text-brand-dark"
+                : "bg-brand-card border border-brand-border text-slate-400 hover:text-white hover:border-slate-500"
+            }`}
+          >
+            {g || "All"}
+          </button>
+        ))}
+      </div>
+
+      {/* Matchday + team row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] text-slate-600 uppercase tracking-widest w-12 shrink-0">MD</span>
+        {[0, 1, 2, 3].map((d) => (
+          <button
+            key={d}
+            onClick={() => onChange({ ...filters, matchday: d })}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+              filters.matchday === d
+                ? "bg-brand-gold text-brand-dark"
+                : "bg-brand-card border border-brand-border text-slate-400 hover:text-white hover:border-slate-500"
+            }`}
+          >
+            {d === 0 ? "All" : d}
+          </button>
+        ))}
+
+        <select
+          value={filters.team}
+          onChange={(e) => onChange({ ...filters, team: e.target.value })}
+          className="ml-auto text-xs bg-brand-card border border-brand-border text-slate-400 rounded-full px-3 py-1.5 hover:border-slate-500 focus:outline-none focus:border-brand-gold cursor-pointer"
+        >
+          <option value="">All Teams</option>
+          {teams.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
 }
 
-function StatusBadge({ m, urgent }: { m: ScheduleMatch; urgent: boolean }) {
-  if (m.status === "LIVE") {
-    return (
-      <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
-      </span>
-    );
-  }
-  if (m.status === "HT") {
-    return <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">HT</span>;
-  }
-  if (m.status === "FT") {
-    return <span className="text-[10px] text-slate-600 bg-slate-800/50 px-2 py-0.5 rounded-full">FT</span>;
-  }
-  if (urgent) {
-    return <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Soon</span>;
-  }
-  const dt = new Date(m.utcDate);
+// ─── Date group section ───────────────────────────────────────────────────────
+
+function DateSection({
+  dateStr,
+  isToday,
+  matches,
+  now,
+}: {
+  dateStr: string;
+  isToday: boolean;
+  matches: ScheduleMatch[];
+  now: number;
+}) {
   return (
-    <span suppressHydrationWarning className="text-[10px] text-slate-500">
-      {dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-    </span>
+    <section>
+      <div className="flex items-center gap-3 mb-3">
+        <h2
+          suppressHydrationWarning
+          className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0"
+        >
+          {formatDayLabel(dateStr)}
+        </h2>
+        {isToday && (
+          <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
+            Today
+          </span>
+        )}
+        <div className="flex-1 h-px bg-brand-border" />
+        <span className="text-xs text-slate-600 shrink-0">{matches.length}</span>
+      </div>
+      <div className="space-y-2">
+        {matches.map((m) => (
+          <MatchRow key={m.id} m={m} now={now} />
+        ))}
+      </div>
+    </section>
   );
 }
 
-// ─── Filter bar ──────────────────────────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 
-type Filter = "all" | "live" | "today" | "upcoming" | "results";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all",      label: "All" },
-  { key: "live",     label: "Live" },
-  { key: "today",    label: "Today" },
-  { key: "upcoming", label: "Upcoming" },
-  { key: "results",  label: "Results" },
-];
-
-// ─── Main schedule view ──────────────────────────────────────────────────────
+type View = "today" | "remaining" | "results";
 
 export default function ScheduleView({ initialMatches }: { initialMatches: ScheduleMatch[] }) {
-  const [matches, setMatches]   = useState(initialMatches);
-  const [filter, setFilter]     = useState<Filter>("all");
-  const [now, setNow]           = useState(() => Date.now());
+  const [matches, setMatches] = useState(initialMatches);
+  const [view, setView] = useState<View>("today");
+  const [now, setNow] = useState(() => Date.now());
+  const [filters, setFilters] = useState<SubFilters>({ group: "", matchday: 0, team: "" });
 
-  // Tick every second for countdowns
+  // Tick every second for live countdowns
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Refresh schedule every 30 seconds
+  // Refresh schedule every 30s
   useEffect(() => {
     const id = setInterval(async () => {
       try {
@@ -214,55 +350,128 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
   }, []);
 
   const todayStr = localDateStr(new Date(now));
+  const liveCount = matches.filter((m) => m.status === "LIVE" || m.status === "HT").length;
+  const playedCount = matches.filter((m) => m.status === "FT").length;
+  const remainingCount = matches.filter((m) => m.status === "NS").length;
 
-  const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
+  // All unique team TLAs for dropdown
+  const allTeams = useMemo(() => {
+    const set = new Set<string>();
+    matches.forEach((m) => {
+      if (m.homeTeam.tla) set.add(m.homeTeam.tla);
+      if (m.awayTeam.tla) set.add(m.awayTeam.tla);
+    });
+    return [...set].filter(Boolean).sort();
+  }, [matches]);
 
-  const filtered = useMemo(() => {
-    switch (filter) {
-      case "live":     return matches.filter(m => m.status === "LIVE" || m.status === "HT");
-      case "today":    return matches.filter(m => utcToLocalDateStr(m.utcDate) === todayStr);
-      case "upcoming": return matches.filter(m => m.status === "NS" && utcToLocalDateStr(m.utcDate) !== todayStr);
-      case "results":  return matches.filter(m => m.status === "FT");
-      default:         return matches;
-    }
-  }, [matches, filter, todayStr]);
+  // Today's matches sorted ascending
+  const todayMatches = useMemo(
+    () =>
+      matches
+        .filter((m) => utcToLocal(m.utcDate) === todayStr)
+        .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()),
+    [matches, todayStr]
+  );
 
-  // Group by local calendar date
-  const groups = useMemo(() => {
-    const map = new Map<string, ScheduleMatch[]>();
-    for (const m of filtered) {
-      const day = utcToLocalDateStr(m.utcDate);
-      if (!map.has(day)) map.set(day, []);
-      map.get(day)!.push(m);
-    }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  // Featured: live → next today → next any day → most recent FT
+  const featured = useMemo(() => {
+    const live = matches.find((m) => m.status === "LIVE" || m.status === "HT");
+    if (live) return live;
+    const nextToday = todayMatches.find((m) => m.status === "NS");
+    if (nextToday) return nextToday;
+    const allNS = matches
+      .filter((m) => m.status === "NS")
+      .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
+    if (allNS.length) return allNS[0];
+    return (
+      matches
+        .filter((m) => m.status === "FT")
+        .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime())[0] ?? null
+    );
+  }, [matches, todayMatches]);
 
-  function formatDayHeader(localDate: string) {
-    const [y, mo, d] = localDate.split("-").map(Number);
-    const dt = new Date(y, mo - 1, d, 12, 0, 0);
-    const todayLocal = new Date(now);
-    const isToday =
-      dt.getFullYear() === todayLocal.getFullYear() &&
-      dt.getMonth()    === todayLocal.getMonth() &&
-      dt.getDate()     === todayLocal.getDate();
-    const label = dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-    return { label, isToday };
-  }
+  const featuredLabel = useMemo(() => {
+    if (!featured) return undefined;
+    if (featured.status === "LIVE" || featured.status === "HT") return "Live Now";
+    if (featured.status === "FT") return "Most Recent Result";
+    return utcToLocal(featured.utcDate) === todayStr ? "Next Up Today" : "Next Match";
+  }, [featured, todayStr]);
+
+  const otherToday = useMemo(
+    () => todayMatches.filter((m) => m.id !== featured?.id),
+    [todayMatches, featured]
+  );
+
+  // Sub-filter function
+  const applyFilters = useCallback(
+    (list: ScheduleMatch[]) =>
+      list.filter((m) => {
+        if (filters.group && m.group !== filters.group) return false;
+        if (filters.matchday && m.matchday !== filters.matchday) return false;
+        if (
+          filters.team &&
+          m.homeTeam.tla !== filters.team &&
+          m.awayTeam.tla !== filters.team
+        )
+          return false;
+        return true;
+      }),
+    [filters]
+  );
+
+  // Group list by local date → [[dateStr, matches[]]]
+  const groupByDate = useCallback(
+    (list: ScheduleMatch[]): [string, ScheduleMatch[]][] => {
+      const map = new Map<string, ScheduleMatch[]>();
+      list.forEach((m) => {
+        const d = utcToLocal(m.utcDate);
+        if (!map.has(d)) map.set(d, []);
+        map.get(d)!.push(m);
+      });
+      return [...map.entries()];
+    },
+    []
+  );
+
+  const remainingGroups = useMemo(
+    () =>
+      groupByDate(
+        applyFilters(
+          matches
+            .filter((m) => m.status === "NS")
+            .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime())
+        )
+      ),
+    [matches, applyFilters, groupByDate]
+  );
+
+  const resultsGroups = useMemo(
+    () =>
+      groupByDate(
+        applyFilters(
+          matches
+            .filter((m) => m.status === "FT")
+            .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime())
+        )
+      ),
+    [matches, applyFilters, groupByDate]
+  );
 
   return (
     <div>
       {/* Stats bar */}
-      <div className="flex items-center gap-4 mb-6 text-sm text-slate-500">
-        <span>{matches.length} matches</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-6 text-sm text-slate-500">
+        <span>
+          <span className="font-semibold text-slate-300">{playedCount}</span> played
+        </span>
         <span className="text-brand-border">·</span>
-        <span>{matches.filter(m => m.status === "FT").length} played</span>
-        <span className="text-brand-border">·</span>
-        <span>{matches.filter(m => m.status === "NS").length} scheduled</span>
+        <span>
+          <span className="font-semibold text-slate-300">{remainingCount}</span> remaining
+        </span>
         {liveCount > 0 && (
           <>
             <span className="text-brand-border">·</span>
-            <span className="flex items-center gap-1.5 text-red-400 font-semibold">
+            <span className="flex items-center gap-1.5 font-semibold text-red-400">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               {liveCount} live now
             </span>
@@ -270,62 +479,104 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
         )}
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1.5 mb-8 overflow-x-auto pb-1">
-        {FILTERS.map(({ key, label }) => (
+      {/* View tabs */}
+      <div className="bg-brand-card border border-brand-border rounded-2xl p-1 inline-flex gap-1 mb-8">
+        {(["today", "remaining", "results"] as View[]).map((v) => (
           <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`
-              relative shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all
-              ${filter === key
-                ? "bg-white text-brand-dark shadow"
-                : "text-slate-400 hover:text-white hover:bg-brand-card"}
-            `}
+            key={v}
+            onClick={() => setView(v)}
+            className={`relative px-5 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+              view === v ? "bg-white text-brand-dark shadow" : "text-slate-400 hover:text-white"
+            }`}
           >
-            {key === "live" && liveCount > 0 && (
+            {v === "today" && liveCount > 0 && view !== "today" && (
               <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             )}
-            {label}
+            {v === "today" ? "Today" : v === "remaining" ? "Remaining" : "Results"}
           </button>
         ))}
       </div>
 
-      {/* Match groups */}
-      {groups.length === 0 && (
-        <div className="text-center py-20 text-slate-600">
-          <div className="text-4xl mb-4">📅</div>
-          <p>No matches for this filter.</p>
+      {/* ── TODAY ──────────────────────────────────────────────────────────── */}
+      {view === "today" && (
+        <div>
+          {featured ? (
+            <FeaturedCard m={featured} now={now} label={featuredLabel} />
+          ) : (
+            <div className="text-center py-20 text-slate-600">
+              <div className="text-4xl mb-4">📅</div>
+              <p>No matches scheduled.</p>
+            </div>
+          )}
+
+          {otherToday.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 mb-3 mt-8">
+                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest shrink-0">
+                  Also today
+                </h2>
+                <div className="flex-1 h-px bg-brand-border" />
+                <span className="text-xs text-slate-600">{otherToday.length}</span>
+              </div>
+              <div className="space-y-2">
+                {otherToday.map((m) => (
+                  <MatchRow key={m.id} m={m} now={now} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      <div className="space-y-10">
-        {groups.map(([dateStr, dayMatches]) => {
-          const { label, isToday } = formatDayHeader(dateStr);
-          return (
-            <section key={dateStr}>
-              {/* Date header */}
-              <div className="flex items-center gap-3 mb-4">
-                <h2 suppressHydrationWarning className="text-sm font-bold text-slate-400 uppercase tracking-widest">{label}</h2>
-                {isToday && (
-                  <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                    Today
-                  </span>
-                )}
-                <div className="flex-1 h-px bg-brand-border" />
-                <span className="text-xs text-slate-600">{dayMatches.length} match{dayMatches.length !== 1 ? "es" : ""}</span>
-              </div>
+      {/* ── REMAINING ──────────────────────────────────────────────────────── */}
+      {view === "remaining" && (
+        <div>
+          <SubFilterBar filters={filters} onChange={setFilters} teams={allTeams} />
+          {remainingGroups.length === 0 ? (
+            <div className="text-center py-20 text-slate-600">
+              <div className="text-4xl mb-4">✅</div>
+              <p>No upcoming matches match your filters.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {remainingGroups.map(([dateStr, dayMatches]) => (
+                <DateSection
+                  key={dateStr}
+                  dateStr={dateStr}
+                  isToday={dateStr === todayStr}
+                  matches={dayMatches}
+                  now={now}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-              {/* Cards grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {dayMatches.map(m => (
-                  <MatchCard key={m.id} m={m} now={now} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      {/* ── RESULTS ────────────────────────────────────────────────────────── */}
+      {view === "results" && (
+        <div>
+          <SubFilterBar filters={filters} onChange={setFilters} teams={allTeams} />
+          {resultsGroups.length === 0 ? (
+            <div className="text-center py-20 text-slate-600">
+              <div className="text-4xl mb-4">📋</div>
+              <p>No results yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {resultsGroups.map(([dateStr, dayMatches]) => (
+                <DateSection
+                  key={dateStr}
+                  dateStr={dateStr}
+                  isToday={dateStr === todayStr}
+                  matches={dayMatches}
+                  now={now}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

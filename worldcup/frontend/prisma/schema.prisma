@@ -7,6 +7,91 @@ datasource db {
   url = env("DATABASE_URL")
 }
 
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  WHITE_LABEL  // Paid partner — gets branded embed + API access
+  USER
+}
+
+enum SponsorTier {
+  TITLE        // "Presented by X" — top placement everywhere
+  MATCH        // Sponsors individual match pages
+  GROUP        // Sponsors a group stage
+  ANTHEM       // Sponsors the anthems page / specific team anthem
+  BANNER       // Standard banner slot
+}
+
+enum AdSlotPlacement {
+  HOME_HERO    // Top of dashboard
+  SCHEDULE_TOP // Above schedule list
+  MATCH_DETAIL // Match detail page header
+  STANDINGS    // Below standings table
+  ANTHEMS      // Anthems page
+  SIDEBAR      // Right sidebar (desktop)
+}
+
+model User {
+  id               String              @id @default(cuid())
+  name             String?
+  email            String              @unique
+  emailVerified    DateTime?
+  image            String?
+  role             Role                @default(USER)
+  accounts         Account[]
+  sessions         Session[]
+  predictions      Prediction[]
+  whiteLabelConfig WhiteLabelPartner?
+  createdAt        DateTime            @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Prediction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fixtureId Int
+  home      Int
+  away      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, fixtureId])
+}
+
 model Team {
   id          String        @id @default(cuid())
   name        String        @unique
@@ -75,15 +160,64 @@ model KalshiMarket {
 
 model AudioStream {
   id             String   @id @default(cuid())
-  teamId         String   @unique
-  team           Team     @relation(fields: [teamId], references: [id])
+  teamId         String?  @unique
+  team           Team?    @relation(fields: [teamId], references: [id])
   title          String
-  artistCredit   String   @default("Suno AI")
+  artistCredit   String   @default("Suno AI × Studio0x")
   audioUrl       String
   coverArt       String?
-  durationSecs   Int
+  durationSecs   Int      @default(180)
   playCount      Int      @default(0)
   listenSeconds  Int      @default(0)
+  shareClicks    Int      @default(0)
   tiktokDeepLink String?
   createdAt      DateTime @default(now())
+}
+
+// ── Sponsors & Advertising ─────────────────────────────────────────────────
+
+model Sponsor {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  logoUrl     String?
+  websiteUrl  String?
+  tier        SponsorTier
+  active      Boolean     @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  adSlots     AdSlot[]
+  createdAt   DateTime    @default(now())
+}
+
+model AdSlot {
+  id          String          @id @default(cuid())
+  sponsorId   String
+  sponsor     Sponsor         @relation(fields: [sponsorId], references: [id])
+  placement   AdSlotPlacement
+  imageUrl    String?         // banner creative
+  linkUrl     String?
+  ctaText     String?         // "Visit →"
+  active      Boolean         @default(true)
+  impressions Int             @default(0)
+  clicks      Int             @default(0)
+  // Optional targeting
+  matchId     String?         // null = all matches
+  groupCode   String?         // null = all groups
+  createdAt   DateTime        @default(now())
+}
+
+// ── White Label Partners ───────────────────────────────────────────────────
+
+model WhiteLabelPartner {
+  id           String   @id @default(cuid())
+  userId       String   @unique  // must have role = WHITE_LABEL
+  user         User     @relation(fields: [userId], references: [id])
+  orgName      String
+  logoUrl      String?
+  primaryColor String   @default("#F5B800")  // defaults to brand-gold
+  domain       String?  // custom domain if they have one
+  embedKey     String   @unique @default(cuid())  // API key for embed widget
+  active       Boolean  @default(true)
+  planName     String   @default("starter")  // starter, pro, enterprise
+  createdAt    DateTime @default(now())
 }

@@ -1,12 +1,20 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Trophy, Music2, Wifi, CalendarDays, ArrowLeft, MapPin, Clock, Users } from "lucide-react";
+import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
+import AppNav from "@/components/ui/AppNav";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
+import MatchDNA from "@/components/stats/MatchDNA";
+import UpsetMeter from "@/components/stats/UpsetMeter";
+import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
+import MatchLineups from "@/components/match/MatchLineups";
+import MatchPlayerStats from "@/components/match/MatchPlayerStats";
+import MatchCommentary from "@/components/match/MatchCommentary";
+import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -115,29 +123,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Trophy size={20} className="text-brand-gold" />
-            <Link href="/" className="font-bold text-white tracking-tight hover:text-brand-gold transition-colors">Studio0x</Link>
-            <span className="text-brand-border">·</span>
-            <span className="text-sm text-slate-400">World Cup 2026</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/schedule" className="flex items-center gap-1.5 text-xs font-semibold text-brand-gold hover:text-amber-300 transition-colors">
-              <CalendarDays size={13} />Schedule
-            </Link>
-            <Link href="/anthems" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
-              <Music2 size={13} />Anthems
-            </Link>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Wifi size={12} className="text-brand-green" />
-              <span className="hidden sm:inline">Live data feed active</span>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         {/* Back */}
@@ -227,6 +213,17 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
         )}
 
+        {/* AI Commentary — shown for live and finished matches */}
+        {(isLive || isDone) && <CommentaryPanel fixtureId={m.id} />}
+
+        {/* Match DNA™ + Clutch Index™ — only for played/live matches */}
+        {(isDone || isLive) && (
+          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} matchStatus={m.status} currentMinute={m.minute ?? undefined} />
+        )}
+
+        {/* Upset Factor™ — only for FT matches with Polymarket odds available */}
+        {isDone && <UpsetMeterForMatch fixtureId={m.id} />}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Group standings */}
           {table.length > 0 && (
@@ -313,8 +310,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           />
         )}
 
-        {/* Starting lineups from DB */}
-        <MatchLineupCard fixtureId={m.id} homeName={m.homeTeam.name} awayName={m.awayTeam.name} />
+        {/* Starting lineups + subs via api-football */}
+        <MatchLineupsPanel fixtureId={m.id} />
+
+        {/* Per-player match stats — only for played/live matches */}
+        {(isDone || isLive) && <MatchPlayerStatsPanel fixtureId={m.id} />}
 
         {/* Team fixtures */}
         {(homeOtherMatches.length > 0 || awayOtherMatches.length > 0) && (
@@ -375,6 +375,81 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
   );
 }
 
+async function MatchDNAPanel({
+  fixtureId, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute,
+}: {
+  fixtureId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamCode: string;
+  matchStatus?: string;
+  currentMinute?: number;
+}) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+
+    const apiKey = process.env.API_FOOTBALL_KEY;
+    if (!apiKey) return null;
+
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures/events?fixture=${fixtureId}`,
+      { headers: { "x-apisports-key": apiKey }, next: { revalidate: 60 } }
+    );
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const goals: GoalEvent[] = (json.response ?? [])
+      .filter((e: { type: string }) => e.type === "Goal")
+      .map((e: { time: { elapsed: number }; team: { name: string }; player: { name: string }; assist: { name: string | null }; detail: string }) => ({
+        minute: e.time.elapsed,
+        team: e.team.name,
+        scorer: e.player.name,
+        assist: e.assist?.name ?? null,
+        isOwnGoal: e.detail === "Own Goal",
+        isPenalty: e.detail === "Penalty",
+      }));
+
+    if (goals.length === 0) return null;
+
+    const gravityGoals = computeGoalGravity(
+      goals,
+      homeTeamName,
+      `${homeTeamName} vs ${awayTeamName}`,
+    );
+
+    return (
+      <div className="space-y-4">
+        <MatchDNA
+          goals={goals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          homeTeamCode={homeTeamCode}
+          matchStatus={matchStatus}
+          currentMinute={currentMinute}
+        />
+        <GoalGravity
+          goals={gravityGoals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+        />
+      </div>
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function UpsetMeterForMatch({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <UpsetMeter matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
+}
+
 async function MatchWinMeter({ fixtureId }: { fixtureId: number }) {
   try {
     const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
@@ -385,68 +460,31 @@ async function MatchWinMeter({ fixtureId }: { fixtureId: number }) {
   }
 }
 
-const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"];
-const POSITION_LABELS: Record<string, string> = { GK: "Goalkeeper", DEF: "Defenders", MID: "Midfielders", FWD: "Forwards" };
-
-async function MatchLineupCard({ fixtureId, homeName, awayName }: { fixtureId: number; homeName: string; awayName: string }) {
+async function MatchLineupsPanel({ fixtureId }: { fixtureId: number }) {
   try {
-    const dbMatch = await prisma.match.findFirst({
-      where: { fixture: fixtureId },
-      include: {
-        homeTeam: { include: { homePlayers: true } },
-        awayTeam: { include: { homePlayers: true } },
-      },
-    });
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
     if (!dbMatch) return null;
+    return <MatchLineups matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
+}
 
-    const sides = [
-      { team: dbMatch.homeTeam, name: homeName },
-      { team: dbMatch.awayTeam, name: awayName },
-    ] as const;
+async function MatchPlayerStatsPanel({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <MatchPlayerStats matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
+}
 
-    const hasPlayers = sides.some(s => (s.team as { homePlayers?: unknown[] }).homePlayers && (s.team as { homePlayers: unknown[] }).homePlayers.length > 0);
-    if (!hasPlayers) return null;
-
-    return (
-      <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border">
-          <Users size={13} className="text-slate-500" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Starting Lineups</span>
-          <span className="ml-auto text-[10px] text-slate-600">Subs coming with paid API</span>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-brand-border">
-          {sides.map(({ team, name }) => {
-            const players = ((team as { homePlayers: Array<{ id: string; number: number; name: string; position: string }> }).homePlayers ?? [])
-              .sort((a, b) => {
-                const pi = POSITION_ORDER.indexOf(a.position) - POSITION_ORDER.indexOf(b.position);
-                return pi !== 0 ? pi : a.number - b.number;
-              });
-            return (
-              <div key={team.id} className="p-3">
-                <Link href={`/team/${team.code}`} className="text-xs font-bold text-white mb-3 block hover:text-brand-gold transition-colors">
-                  {name}
-                </Link>
-                {POSITION_ORDER.map(pos => {
-                  const pp = players.filter(p => p.position === pos);
-                  if (!pp.length) return null;
-                  return (
-                    <div key={pos} className="mb-3">
-                      <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">{POSITION_LABELS[pos]}</div>
-                      {pp.map(p => (
-                        <div key={p.id} className="flex items-center gap-2 py-1">
-                          <span className="text-[10px] text-slate-600 w-4 text-right font-mono tabular-nums">{p.number}</span>
-                          <span className="text-xs text-slate-300">{p.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+async function CommentaryPanel({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <MatchCommentary matchId={dbMatch.id} />;
   } catch {
     return null;
   }

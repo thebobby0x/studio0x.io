@@ -17,3 +17,4 @@ worldcup/prisma/dev.db-journal
 worldcup/backend/dist/
 worldcup/frontend/.next/
 worldcup/**/.prisma/
+.claude/
