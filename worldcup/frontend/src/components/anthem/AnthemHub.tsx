@@ -9,7 +9,7 @@ import {
 import AppNav from "@/components/ui/AppNav";
 import type { AudioStream } from "@/lib/types";
 
-type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } };
+type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } | null };
 type LoopMode = "none" | "all" | "one";
 
 function formatTime(sec: number) {
@@ -88,13 +88,16 @@ function buildShareLinks(stream: Stream, pageUrl: string) {
   ];
 }
 
-function teamGradient(code: string) {
+function teamGradient(code: string | undefined) {
+  if (!code) return "from-[#1e3a5f] via-[#c2860a] to-slate-900"; // FIFA gold-blue
   const map: Record<string, string> = {
     MEX: "from-[#006847] via-[#ce1126] to-slate-900",
     RSA: "from-[#007A4D] via-[#FFB612] to-[#002395]",
+    BIH: "from-[#002395] via-[#FFCC00] to-slate-900",
     BRA: "from-[#009c3b] via-[#FFDF00] to-[#002776]",
     ARG: "from-[#74acdf] via-white to-[#74acdf]",
     USA: "from-[#B22234] via-white to-[#3C3B6E]",
+    CAN: "from-[#FF0000] via-white to-[#FF0000]",
     ENG: "from-[#CF142B] via-white to-[#012169]",
     FRA: "from-[#002395] via-white to-[#ED2939]",
     ESP: "from-[#AA151B] via-[#F1BF00] to-[#AA151B]",
@@ -216,10 +219,10 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
         <div className="lg:col-span-3 flex flex-col gap-5">
 
           {/* Album card */}
-          <div className={`rounded-2xl bg-gradient-to-br ${teamGradient(current?.team.code ?? "")} p-8 flex items-center gap-5 shadow-xl`}>
-            <div className="text-7xl drop-shadow-xl select-none">{current?.team.flagEmoji}</div>
+          <div className={`rounded-2xl bg-gradient-to-br ${teamGradient(current?.team?.code)} p-8 flex items-center gap-5 shadow-xl`}>
+            <div className="text-7xl drop-shadow-xl select-none">{current?.team?.flagEmoji ?? "🏆"}</div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-white/60 uppercase tracking-widest">{current?.team.name}</div>
+              <div className="text-xs font-semibold text-white/60 uppercase tracking-widest">{current?.team?.name ?? "FIFA World Cup 2026"}</div>
               <h2 className="text-xl font-bold text-white mt-1 leading-snug">{current?.title}</h2>
               <div className="text-sm text-white/50 mt-1">{current?.artistCredit}</div>
             </div>
@@ -344,12 +347,12 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
                   onClick={() => playTrack(idx)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${idx === currentIdx ? "bg-brand-green/10" : "hover:bg-white/5"}`}
                 >
-                  <span className="text-xl flex-shrink-0">{s.team.flagEmoji}</span>
+                  <span className="text-xl flex-shrink-0">{s.team?.flagEmoji ?? "🏆"}</span>
                   <div className="min-w-0 flex-1">
                     <div className={`text-sm font-semibold truncate ${idx === currentIdx ? "text-brand-green" : "text-white"}`}>
                       {s.title}
                     </div>
-                    <div className="text-xs text-slate-500">{s.team.name}</div>
+                    <div className="text-xs text-slate-500">{s.team?.name ?? "FIFA World Cup 2026"}</div>
                   </div>
                   {idx === currentIdx && isPlaying
                     ? <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>

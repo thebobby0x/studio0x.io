@@ -43,8 +43,8 @@ export interface KalshiMarket {
 
 export interface AudioStream {
   id: string
-  teamId: string
-  team: Team
+  teamId: string | null
+  team: Team | null
   title: string
   artistCredit: string
   audioUrl: string

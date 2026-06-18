@@ -160,13 +160,13 @@ model KalshiMarket {
 
 model AudioStream {
   id             String   @id @default(cuid())
-  teamId         String   @unique
-  team           Team     @relation(fields: [teamId], references: [id])
+  teamId         String?  @unique
+  team           Team?    @relation(fields: [teamId], references: [id])
   title          String
-  artistCredit   String   @default("Suno AI")
+  artistCredit   String   @default("Suno AI × Studio0x")
   audioUrl       String
   coverArt       String?
-  durationSecs   Int
+  durationSecs   Int      @default(180)
   playCount      Int      @default(0)
   listenSeconds  Int      @default(0)
   tiktokDeepLink String?

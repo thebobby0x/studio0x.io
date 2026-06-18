@@ -72,14 +72,14 @@ function Track({ stream }: { stream: AudioStream }) {
       <div
         className="h-20 bg-gradient-to-br flex items-end px-4 pb-3"
         style={{
-          backgroundImage: stream.team.code === "MEX"
+          backgroundImage: stream.team?.code === "MEX"
             ? "linear-gradient(135deg, #006847 0%, #ce1126 50%, #ffffff20 100%)"
             : "linear-gradient(135deg, #007A4D 0%, #FFB612 50%, #002395 100%)",
         }}
       >
-        <div className="text-3xl">{stream.team.flagEmoji}</div>
+        <div className="text-3xl">{stream.team?.flagEmoji ?? "🏆"}</div>
         <div className="ml-3">
-          <div className="text-xs font-semibold text-white/80 uppercase tracking-widest">{stream.team.name}</div>
+          <div className="text-xs font-semibold text-white/80 uppercase tracking-widest">{stream.team?.name ?? "FIFA World Cup 2026"}</div>
           <div className="text-white font-bold text-sm leading-tight">{stream.title}</div>
         </div>
       </div>

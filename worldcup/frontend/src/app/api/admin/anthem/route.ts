@@ -32,8 +32,29 @@ export async function PUT(req: Request) {
   };
 
   const { teamCode, audioUrl, title, artistCredit, durationSecs, tiktokDeepLink, coverArt } = body;
-  if (!teamCode || !audioUrl) {
-    return NextResponse.json({ error: "teamCode and audioUrl are required" }, { status: 400 });
+  if (!audioUrl || !title) {
+    return NextResponse.json({ error: "audioUrl and title are required" }, { status: 400 });
+  }
+
+  const updateData = {
+    audioUrl,
+    ...(artistCredit && { artistCredit }),
+    ...(durationSecs && { durationSecs }),
+    ...(tiktokDeepLink !== undefined && { tiktokDeepLink }),
+    ...(coverArt !== undefined && { coverArt }),
+    title,
+  };
+
+  // FIFA / universal track — no team association
+  if (!teamCode) {
+    const existing = await prisma.audioStream.findFirst({ where: { teamId: null, title } });
+    const stream = existing
+      ? await prisma.audioStream.update({ where: { id: existing.id }, data: updateData, include: { team: true } })
+      : await prisma.audioStream.create({
+          data: { teamId: null, audioUrl, title, artistCredit: artistCredit ?? "Suno AI × Studio0x", durationSecs: durationSecs ?? 180, tiktokDeepLink: tiktokDeepLink ?? null, coverArt: coverArt ?? null },
+          include: { team: true },
+        });
+    return NextResponse.json(stream);
   }
 
   const team = await prisma.team.findUnique({ where: { code: teamCode.toUpperCase() } });
@@ -41,14 +62,7 @@ export async function PUT(req: Request) {
 
   const stream = await prisma.audioStream.upsert({
     where: { teamId: team.id },
-    update: {
-      audioUrl,
-      ...(title && { title }),
-      ...(artistCredit && { artistCredit }),
-      ...(durationSecs && { durationSecs }),
-      ...(tiktokDeepLink !== undefined && { tiktokDeepLink }),
-      ...(coverArt !== undefined && { coverArt }),
-    },
+    update: updateData,
     create: {
       teamId: team.id,
       audioUrl,
