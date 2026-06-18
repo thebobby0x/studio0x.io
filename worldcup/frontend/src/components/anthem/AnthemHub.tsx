@@ -141,6 +141,9 @@ export default function AnthemHub({
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const playSessionStartRef = useRef<number | null>(null);
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playSessionFiredRef = useRef(false);
 
   const [currentStreamId, setCurrentStreamId] = useState<string | null>(streams[0]?.id ?? null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -160,8 +163,70 @@ export default function AnthemHub({
 
   useEffect(() => { setPageUrl(window.location.href); }, []);
 
-  // Derived: current stream
+  // Derived: current stream (must be before effects that reference it)
   const current = streams.find((s) => s.id === currentStreamId) ?? streams[0] ?? null;
+
+  // Keep a ref to current so effect callbacks always see the latest value
+  const currentRef = useRef(current);
+  currentRef.current = current;
+
+  // Fire the listen POST — fire-and-forget
+  const fireListenPost = useCallback((streamId: string, seconds: number) => {
+    if (seconds < 1) return;
+    fetch(`/api/audio/${streamId}/listen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seconds: Math.round(seconds) }),
+    }).catch(() => {});
+  }, []);
+
+  // Fire the share POST — fire-and-forget
+  const fireSharePost = useCallback((streamId: string, platform: string) => {
+    fetch(`/api/audio/${streamId}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform }),
+    }).catch(() => {});
+  }, []);
+
+  // Start/stop play session timer when isPlaying changes
+  useEffect(() => {
+    const stream = currentRef.current;
+    if (isPlaying && stream) {
+      playSessionStartRef.current = Date.now();
+      playSessionFiredRef.current = false;
+      // Fire at the 10-second mark
+      playTimerRef.current = setTimeout(() => {
+        const s = currentRef.current;
+        if (s) {
+          fireListenPost(s.id, 10);
+          playSessionFiredRef.current = true;
+        }
+      }, 10_000);
+    } else {
+      // Paused — clear timer and send remaining elapsed time if session >= 10s
+      if (playTimerRef.current) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+      if (playSessionStartRef.current !== null && stream) {
+        const sessionElapsed = (Date.now() - playSessionStartRef.current) / 1000;
+        if (sessionElapsed >= 10) {
+          // If we already fired at 10s, only send the delta beyond that
+          const toSend = playSessionFiredRef.current ? sessionElapsed - 10 : sessionElapsed;
+          if (toSend >= 1) fireListenPost(stream.id, toSend);
+        }
+        playSessionStartRef.current = null;
+      }
+    }
+    return () => {
+      if (playTimerRef.current) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]);
 
   // Derived: filteredStreams
   const filteredStreams = (() => {
@@ -204,6 +269,16 @@ export default function AnthemHub({
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !current) return;
+
+    // Flush any in-progress play session for the previous track
+    if (playTimerRef.current) {
+      clearTimeout(playTimerRef.current);
+      playTimerRef.current = null;
+    }
+    // (Session stats for the old track are handled by the isPlaying effect above)
+    playSessionStartRef.current = null;
+    playSessionFiredRef.current = false;
+
     a.src = current.audioUrl;
     a.load();
     setElapsed(0);
@@ -438,6 +513,7 @@ export default function AnthemHub({
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => { if (current) fireSharePost(current.id, s.key); }}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${s.cls} hover:opacity-80 transition-opacity`}
                   >
                     {s.icon}

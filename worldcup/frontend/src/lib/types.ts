@@ -52,6 +52,7 @@ export interface AudioStream {
   durationSecs: number
   playCount: number
   listenSeconds: number
+  shareClicks: number
   tiktokDeepLink: string | null
 }
 

@@ -169,6 +169,7 @@ model AudioStream {
   durationSecs   Int      @default(180)
   playCount      Int      @default(0)
   listenSeconds  Int      @default(0)
+  shareClicks    Int      @default(0)
   tiktokDeepLink String?
   createdAt      DateTime @default(now())
 }
