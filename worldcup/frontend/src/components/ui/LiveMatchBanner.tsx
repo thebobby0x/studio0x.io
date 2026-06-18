@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Play, Pause, SkipBack, SkipForward, Music2 } from "lucide-react";
 import { useAudio } from "@/lib/AudioContext";
 import { getFlag } from "@/lib/flags";
 
@@ -56,20 +57,20 @@ function LiveSection({ liveMatch }: { liveMatch: LiveMatch | null }) {
     return (
       <Link
         href={`/schedule/${liveMatch.fixture}`}
-        className="flex items-center gap-1.5 min-w-0 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-        <span className="text-[10px] font-black text-red-400 uppercase tracking-widest shrink-0">
-          LIVE
+        <span className="flex items-center gap-1.5 shrink-0 bg-red-500/15 px-2.5 py-1 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs font-black text-red-400 uppercase tracking-widest">LIVE</span>
         </span>
-        <span className="text-[11px] text-slate-300 font-medium">
-          {liveMatch.homeTeam.flagEmoji}&nbsp;
-          <span className="font-black text-white">
+        <span className="flex items-center gap-2 text-lg sm:text-xl text-slate-200 font-medium">
+          <span className="text-2xl">{liveMatch.homeTeam.flagEmoji}</span>
+          <span className="font-black text-white tabular-nums">
             {liveMatch.homeScore}–{liveMatch.awayScore}
           </span>
-          &nbsp;{liveMatch.awayTeam.flagEmoji}
+          <span className="text-2xl">{liveMatch.awayTeam.flagEmoji}</span>
         </span>
-        <span className="text-[10px] text-red-400 font-mono shrink-0">{minute}</span>
+        <span className="text-sm text-red-400 font-mono font-bold shrink-0">{minute}</span>
       </Link>
     );
   }
@@ -122,32 +123,34 @@ function RecentAndNextChips() {
   const isImminent = nextMs < 60 * 60 * 1000; // < 60 min
 
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex items-center gap-3 min-w-0">
       {recent && (
         <Link
           href={`/schedule/${recent.id}`}
-          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition-colors shrink-0"
+          className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors shrink-0"
         >
-          {getFlag(recent.homeTeam.tla)}&nbsp;
-          <span className="text-slate-300 font-semibold">
+          <span className="text-xl">{getFlag(recent.homeTeam.tla)}</span>
+          <span className="text-slate-200 font-bold tabular-nums">
             {recent.homeScore}–{recent.awayScore}
           </span>
-          &nbsp;{getFlag(recent.awayTeam.tla)}
-          <span className="ml-1 text-[10px] text-slate-500">FT</span>
+          <span className="text-xl">{getFlag(recent.awayTeam.tla)}</span>
+          <span className="ml-0.5 text-[10px] font-bold text-slate-500 uppercase">FT</span>
         </Link>
       )}
       {recent && next && (
-        <span className="text-slate-700 text-[10px]">·</span>
+        <span className="text-slate-700">·</span>
       )}
       {next && nextMs > 0 && (
         <Link
           href={`/schedule/${next.id}`}
-          className={`flex items-center gap-1 text-[11px] hover:opacity-80 transition-opacity shrink-0 ${
+          className={`flex items-center gap-1.5 text-sm sm:text-base font-medium hover:opacity-80 transition-opacity shrink-0 ${
             isImminent ? "text-amber-400" : "text-slate-300"
           }`}
         >
-          {getFlag(next.homeTeam.tla)}&nbsp;vs&nbsp;{getFlag(next.awayTeam.tla)}
-          <span className="ml-1 text-[10px] opacity-80">{formatCountdown(nextMs)}</span>
+          <span className="text-xl">{getFlag(next.homeTeam.tla)}</span>
+          <span className="text-slate-500 text-xs">vs</span>
+          <span className="text-xl">{getFlag(next.awayTeam.tla)}</span>
+          <span className="ml-0.5 text-xs font-semibold opacity-90">{formatCountdown(nextMs)}</span>
         </Link>
       )}
     </div>
@@ -163,49 +166,43 @@ function AudioSection() {
     return (
       <Link
         href="/anthems"
-        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition-colors shrink-0"
+        className="flex items-center gap-2 text-sm sm:text-base font-semibold text-brand-gold hover:text-amber-300 transition-colors shrink-0 bg-brand-gold/10 px-3.5 py-1.5 rounded-full border border-brand-gold/20"
       >
-        <span>♪</span>
-        <span>Anthems</span>
+        <Music2 size={16} />
+        <span>Team Anthems</span>
       </Link>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 shrink-0 min-w-0">
-      <span className="text-[11px] text-slate-300 truncate max-w-[100px]">
-        {current.flagEmoji} {truncate(current.title, 14)}
+    <div className="flex items-center gap-2.5 shrink-0 min-w-0 bg-white/5 pl-3 pr-2 py-1.5 rounded-full border border-brand-border/60">
+      <span className="text-sm sm:text-base text-slate-200 font-semibold truncate max-w-[140px] flex items-center gap-1.5">
+        <span className="text-lg">{current.flagEmoji}</span>
+        {truncate(current.title, 16)}
       </span>
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1.5">
         <button
           onClick={prev}
           aria-label="Previous track"
-          className="text-slate-400 hover:text-slate-200 transition-colors text-[11px] px-0.5 leading-none"
+          className="text-slate-400 hover:text-white transition-colors"
         >
-          ◀
+          <SkipBack size={15} fill="currentColor" />
         </button>
         <button
           onClick={togglePlay}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className="text-slate-200 hover:text-white transition-colors text-[11px] px-0.5 leading-none"
+          className="w-7 h-7 rounded-full bg-brand-green text-brand-dark flex items-center justify-center hover:bg-green-400 transition-colors"
         >
-          {isPlaying ? "⏸" : "▶"}
+          {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
         </button>
         <button
           onClick={next}
           aria-label="Next track"
-          className="text-slate-400 hover:text-slate-200 transition-colors text-[11px] px-0.5 leading-none"
+          className="text-slate-400 hover:text-white transition-colors"
         >
-          ▶▶
+          <SkipForward size={15} fill="currentColor" />
         </button>
       </div>
-      <Link
-        href="/anthems"
-        aria-label="Go to Anthems"
-        className="text-slate-500 hover:text-slate-300 transition-colors text-[11px] leading-none"
-      >
-        →
-      </Link>
     </div>
   );
 }
@@ -239,9 +236,11 @@ export default function LiveMatchBanner() {
 
   if (!hasContent) return null;
 
+  void audioTrack;
+
   return (
     <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
-      <div className="flex justify-between items-center px-4 h-14 gap-4">
+      <div className="max-w-7xl mx-auto flex justify-between items-center px-4 h-16 gap-4">
         {/* Left: live score or recent/upcoming chips */}
         <LiveSection liveMatch={liveMatch} />
 

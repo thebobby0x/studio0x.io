@@ -182,13 +182,15 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         )}
 
         {/* Match DNA™ */}
-        {(isLive || isDone) && goals && goals.length > 0 && (
+        {(isLive || isDone) && goals && (
           <div className="px-4 pb-4">
             <MatchDNA
               goals={goals}
               homeTeamName={match.homeTeam.name}
               awayTeamName={match.awayTeam.name}
               homeTeamCode={homeCode}
+              matchStatus={match.status}
+              currentMinute={match.elapsed}
             />
           </div>
         )}
@@ -304,6 +306,8 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
             homeTeamCode={homeCode}
+            matchStatus={match.status}
+            currentMinute={match.elapsed}
           />
         </div>
       )}
