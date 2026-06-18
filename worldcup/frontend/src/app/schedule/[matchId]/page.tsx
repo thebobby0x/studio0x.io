@@ -14,6 +14,7 @@ import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity"
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
+import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -121,6 +122,25 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
   const localDt = new Date(m.utcDate);
 
+  // Fetch anthems for both teams (show anthem buttons on live matches)
+  const anthemStreams = await prisma.audioStream.findMany({
+    where: { team: { code: { in: [m.homeTeam.tla, m.awayTeam.tla] } } },
+    include: { team: true },
+  }).catch(() => []);
+
+  const toAnthemTrack = (s: typeof anthemStreams[0]) => s.team ? {
+    id: s.id,
+    title: s.title,
+    audioUrl: s.audioUrl,
+    durationSecs: s.durationSecs ?? 180,
+    teamName: s.team.name,
+    teamCode: s.team.code,
+    flagEmoji: s.team.flagEmoji ?? "🏳",
+  } : null;
+
+  const homeAnthem = anthemStreams.find(s => s.team?.code === m.homeTeam.tla);
+  const awayAnthem = anthemStreams.find(s => s.team?.code === m.awayTeam.tla);
+
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
@@ -187,6 +207,18 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
               <div className="mt-3 text-xs text-brand-gold opacity-0 group-hover:opacity-100 transition-opacity">View team →</div>
             </Link>
           </div>
+
+          {/* Anthem buttons — shown on all matches that have songs */}
+          {(homeAnthem || awayAnthem) && (
+            <div className="border-t border-brand-border/30 px-6 py-3">
+              <LiveAnthemButtons
+                homeAnthem={homeAnthem ? toAnthemTrack(homeAnthem) : null}
+                awayAnthem={awayAnthem ? toAnthemTrack(awayAnthem) : null}
+                homeTeamName={m.homeTeam.name}
+                awayTeamName={m.awayTeam.name}
+              />
+            </div>
+          )}
 
           {/* Match metadata */}
           <div className="border-t border-brand-border/50 px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500">

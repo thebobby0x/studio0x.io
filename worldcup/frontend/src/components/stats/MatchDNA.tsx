@@ -93,37 +93,136 @@ function computeScoreVolatility(goals: GoalEvent[], homeTeam: string) {
 }
 
 // ── Momentum Pulse™ ──────────────────────────────────────────────────────────
-// Reconstructs the score at each 15-minute checkpoint to show momentum swings.
-// For LIVE matches, only checkpoints up to the current elapsed minute are shown
-// so future segments aren't pre-filled with stale final-score data.
+// Returns annotated goal events with running score for the timeline.
 function computeMomentumPulse(
   goals: GoalEvent[],
   homeTeam: string,
   matchStatus?: string,
   currentMinute?: number,
 ) {
-  const ALL_CHECKPOINTS = [15, 30, 45, 60, 75, 90];
-  const sorted = [...goals].sort((a, b) => a.minute - b.minute);
+  const MAX_MINUTE = matchStatus === "LIVE" && currentMinute != null
+    ? Math.max(currentMinute, 1)
+    : matchStatus === "HT" ? 45 : 90;
 
-  // Determine the highest checkpoint to display
-  let maxCheckpoint = 90;
-  if (matchStatus === "LIVE" && currentMinute != null) {
-    maxCheckpoint = currentMinute;
-  } else if (matchStatus === "HT") {
-    maxCheckpoint = 45;
-  }
+  const sorted = [...goals]
+    .filter(g => g.minute <= MAX_MINUTE + 5)
+    .sort((a, b) => a.minute - b.minute);
 
-  const checkpoints = ALL_CHECKPOINTS.filter(c => c <= maxCheckpoint);
-
-  return checkpoints.map(checkpoint => {
-    let h = 0, a = 0;
-    for (const g of sorted) {
-      if (g.minute > checkpoint) break;
-      const isHome = !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam;
-      if (isHome) h++; else a++;
-    }
-    return { checkpoint, h, a };
+  let h = 0, a = 0;
+  const events = sorted.map(g => {
+    const isHome = !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam;
+    if (isHome) h++; else a++;
+    return { ...g, isHome, h, a };
   });
+
+  return { events, maxMinute: MAX_MINUTE };
+}
+
+// ── Momentum Timeline component ───────────────────────────────────────────────
+type PulseResult = ReturnType<typeof computeMomentumPulse>;
+
+function MomentumTimeline({
+  pulse,
+  matchStatus,
+  currentMinute,
+}: {
+  pulse: PulseResult;
+  matchStatus?: string;
+  currentMinute?: number;
+}) {
+  const { events, maxMinute } = pulse;
+  const DISPLAY_MAX = Math.max(maxMinute, 90);
+  const pct = (m: number) => `${Math.min((m / DISPLAY_MAX) * 100, 100).toFixed(2)}%`;
+  const isLive = matchStatus === "LIVE";
+  const filledPct = isLive && currentMinute != null
+    ? `${Math.min((currentMinute / DISPLAY_MAX) * 100, 100).toFixed(2)}%`
+    : "100%";
+
+  const timeMarkers = [0, 15, 30, 45, 60, 75, 90];
+
+  return (
+    <div className="space-y-1">
+      {/* Home goals — above the bar */}
+      <div className="relative h-7">
+        {events.filter(e => e.isHome).map((e, i) => (
+          <div
+            key={i}
+            className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center"
+            style={{ left: pct(e.minute) }}
+          >
+            <span className="text-[9px] font-black text-brand-green tabular-nums whitespace-nowrap">
+              {e.h}–{e.a}
+            </span>
+            <span className="text-[10px] leading-none">⚽</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Timeline bar */}
+      <div className="relative h-2">
+        {/* Track */}
+        <div className="absolute inset-0 bg-slate-800 rounded-full" />
+        {/* Filled portion */}
+        <div
+          className="absolute top-0 left-0 h-full bg-slate-600 rounded-full transition-all duration-500"
+          style={{ width: filledPct }}
+        />
+        {/* HT marker */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-px h-3.5 bg-slate-500"
+          style={{ left: pct(45) }}
+        />
+        {/* Goal dots on bar */}
+        {events.map((e, i) => (
+          <div
+            key={i}
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-brand-dark ${
+              e.isHome ? "bg-brand-green" : "bg-amber-400"
+            }`}
+            style={{ left: pct(e.minute) }}
+          />
+        ))}
+        {/* Live "now" pulsing indicator */}
+        {isLive && currentMinute != null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+            style={{ left: filledPct }}
+          >
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          </div>
+        )}
+      </div>
+
+      {/* Away goals — below the bar */}
+      <div className="relative h-7">
+        {events.filter(e => !e.isHome).map((e, i) => (
+          <div
+            key={i}
+            className="absolute top-0 -translate-x-1/2 flex flex-col items-center"
+            style={{ left: pct(e.minute) }}
+          >
+            <span className="text-[10px] leading-none">⚽</span>
+            <span className="text-[9px] font-black text-amber-400 tabular-nums whitespace-nowrap">
+              {e.h}–{e.a}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Minute labels */}
+      <div className="relative flex justify-between text-[8px] text-slate-700 font-mono px-0">
+        {timeMarkers.filter(t => t <= DISPLAY_MAX || t === 0).map(t => (
+          <span key={t} style={{ position: "absolute", left: pct(t), transform: "translateX(-50%)" }}>
+            {t === 0 ? "0" : `${t}'`}
+          </span>
+        ))}
+        <span style={{ position: "absolute", left: "100%", transform: "translateX(-100%)" }}>
+          {DISPLAY_MAX > 90 ? `${DISPLAY_MAX}'` : "90'"}
+        </span>
+      </div>
+      <div className="h-3" />
+    </div>
+  );
 }
 
 // ── Match DNA timeline ────────────────────────────────────────────────────────
@@ -186,7 +285,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
   const sv  = computeScoreVolatility(goals, homeTeamName);
   const mp  = computeMomentumPulse(goals, homeTeamName, matchStatus, currentMinute);
   const hasVolatility = sv.leadChanges > 0 || sv.equalisers > 0;
-  const hasMovement = mp.some(p => p.h > 0 || p.a > 0);
+  const hasMovement = mp.events.length > 0;
 
   void homeTeamCode;
 
@@ -219,33 +318,11 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         {/* Momentum Pulse™ */}
         {hasMovement && (
           <div className="border-t border-brand-border/50 pt-3">
-            <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex items-center gap-2 mb-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
-              <span className="text-[8px] text-slate-600">Score at each 15-min checkpoint</span>
+              <span className="text-[8px] text-slate-600">Live goal timeline</span>
             </div>
-            <div className="flex items-stretch gap-1">
-              {mp.map(({ checkpoint, h, a }) => {
-                const lead = h > a ? "home" : a > h ? "away" : "level";
-                const bg =
-                  lead === "home"  ? "bg-brand-green/15 border-brand-green/25" :
-                  lead === "away"  ? "bg-amber-500/15 border-amber-500/25" :
-                  checkpoint === 15 && h === 0 && a === 0
-                    ? "bg-slate-900/30 border-brand-border/20"
-                    : "bg-slate-800/40 border-brand-border/40";
-                const scoreColor =
-                  lead === "home"  ? "text-brand-green" :
-                  lead === "away"  ? "text-amber-400"   : "text-slate-500";
-
-                return (
-                  <div key={checkpoint} className={`flex-1 rounded-lg border px-1 py-2 text-center ${bg}`}>
-                    <div className={`text-xs font-black tabular-nums leading-none ${scoreColor}`}>
-                      {h}–{a}
-                    </div>
-                    <div className="text-[8px] text-slate-700 mt-0.5 font-mono">{checkpoint}&apos;</div>
-                  </div>
-                );
-              })}
-            </div>
+            <MomentumTimeline pulse={mp} matchStatus={matchStatus} currentMinute={currentMinute} />
           </div>
         )}
 
