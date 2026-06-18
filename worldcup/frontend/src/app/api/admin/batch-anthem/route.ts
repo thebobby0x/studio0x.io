@@ -85,12 +85,17 @@ async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?
   return { title, ok: true, url: blob.url };
 }
 
-// GET ?secret=...&preset=true  — import the hardcoded 12-file WC2026 list
+// GET ?secret=...&preset=true[&clear=true]  — import the hardcoded 12-file WC2026 list
+// Add &clear=true to wipe all existing audio streams first (removes placeholder/demo songs)
 export async function GET(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   if (searchParams.get("preset") !== "true") {
-    return NextResponse.json({ hint: "Add &preset=true to import all 12 WC2026 anthems", count: PRESET.length, tracks: PRESET.map(p => p.title) });
+    return NextResponse.json({ hint: "Add &preset=true to import all 12 WC2026 anthems. Add &clear=true to wipe placeholder songs first.", count: PRESET.length, tracks: PRESET.map(p => p.title) });
+  }
+
+  if (searchParams.get("clear") === "true") {
+    await prisma.audioStream.deleteMany({});
   }
 
   const results = [];
