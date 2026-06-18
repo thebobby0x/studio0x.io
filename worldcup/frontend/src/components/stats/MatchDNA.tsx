@@ -275,8 +275,6 @@ interface Props {
 }
 
 export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute }: Props) {
-  if (goals.length === 0) return null;
-
   const homeGoals = goals.filter(g => !g.isOwnGoal ? g.team === homeTeamName : g.team !== homeTeamName);
   const awayGoals = goals.filter(g => !g.isOwnGoal ? g.team !== homeTeamName : g.team === homeTeamName);
   const ci  = computeClutchIndex(goals, homeTeamName);
@@ -284,8 +282,9 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
   const sc  = computeStrikeClock(goals);
   const sv  = computeScoreVolatility(goals, homeTeamName);
   const mp  = computeMomentumPulse(goals, homeTeamName, matchStatus, currentMinute);
-  const hasVolatility = sv.leadChanges > 0 || sv.equalisers > 0;
-  const hasMovement = mp.events.length > 0;
+  const noGoals = goals.length === 0;
+  const svLabel = noGoals ? "Level" : sv.dramaLabel;
+  const svEmoji = noGoals ? "⚖️" : sv.dramaEmoji;
 
   void homeTeamCode;
 
@@ -316,50 +315,45 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         </div>
 
         {/* Momentum Pulse™ */}
-        {hasMovement && (
-          <div className="border-t border-brand-border/50 pt-3">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
-              <span className="text-[8px] text-slate-600">Live goal timeline</span>
-            </div>
-            <MomentumTimeline pulse={mp} matchStatus={matchStatus} currentMinute={currentMinute} />
+        <div className="border-t border-brand-border/50 pt-3">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
+            <span className="text-[8px] text-slate-600">Live goal timeline</span>
           </div>
-        )}
+          <MomentumTimeline pulse={mp} matchStatus={matchStatus} currentMinute={currentMinute} />
+        </div>
 
         {/* Strike Clock™ */}
-        {sc && (
-          <div className="border-t border-brand-border/50 pt-3">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Strike Clock™</span>
-              <span className="text-[8px] text-slate-600">Goal timing patterns</span>
+        <div className="border-t border-brand-border/50 pt-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Strike Clock™</span>
+            <span className="text-[8px] text-slate-600">Goal timing patterns</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+              <div className="text-xl font-black text-white tabular-nums leading-none">{sc ? `${sc.first}'` : "—"}</div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">First Strike</div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
-                <div className="text-xl font-black text-white tabular-nums leading-none">{sc.first}&apos;</div>
-                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">First Strike</div>
+            <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+              <div className="text-xl font-black text-white tabular-nums leading-none">
+                {sc ? (sc.avgGap !== null ? `${sc.avgGap}m` : `${sc.total}G`) : "—"}
               </div>
-              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
-                <div className="text-xl font-black text-white tabular-nums leading-none">
-                  {sc.avgGap !== null ? `${sc.avgGap}m` : `${sc.total}G`}
-                </div>
-                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">
-                  {sc.avgGap !== null ? "Avg Gap" : "Goals"}
-                </div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">
+                {sc && sc.avgGap !== null ? "Avg Gap" : "Goals"}
               </div>
-              <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
-                <div className="text-xl leading-none">{sc.rhythmEmoji}</div>
-                <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">{sc.rhythm}</div>
-              </div>
+            </div>
+            <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+              <div className="text-xl leading-none">{sc ? sc.rhythmEmoji : "⏱"}</div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">{sc ? sc.rhythm : "Awaiting"}</div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Score Volatility™ */}
-        {hasVolatility && (
-          <div className="border-t border-brand-border/50 pt-3">
+        <div className="border-t border-brand-border/50 pt-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Score Volatility™</span>
-              <span className="text-[8px] text-slate-600">{sv.dramaEmoji} {sv.dramaLabel}</span>
+              <span className="text-[8px] text-slate-600">{svEmoji} {svLabel}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center justify-between bg-slate-900/40 rounded-lg px-3 py-2">
@@ -371,16 +365,15 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
                 <span className="text-sm font-black text-white tabular-nums">{sv.equalisers}</span>
               </div>
             </div>
-          </div>
-        )}
+        </div>
 
         {/* Clutch Index™ */}
-        {ci.length > 0 && (
-          <div className="border-t border-brand-border/50 pt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Clutch Index™</span>
-              <span className="text-[8px] text-slate-600">Lead-change weight × late-goal bonus</span>
-            </div>
+        <div className="border-t border-brand-border/50 pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Clutch Index™</span>
+            <span className="text-[8px] text-slate-600">Lead-change weight × late-goal bonus</span>
+          </div>
+          {ci.length > 0 ? (
             <div className="space-y-1.5">
               {ci.map(p => (
                 <div key={p.name} className="flex items-center gap-2">
@@ -398,8 +391,10 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-[10px] text-slate-600 italic py-1">Awaiting first goal…</div>
+          )}
+        </div>
 
       </div>
     </div>

@@ -182,7 +182,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         )}
 
         {/* Match DNA™ */}
-        {(isLive || isDone) && goals && goals.length > 0 && (
+        {(isLive || isDone) && goals && (
           <div className="px-4 pb-4">
             <MatchDNA
               goals={goals}
