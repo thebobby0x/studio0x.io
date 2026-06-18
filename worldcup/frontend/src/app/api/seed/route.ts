@@ -327,13 +327,17 @@ export async function GET(req: Request) { return seed(req); }
 export async function POST(req: Request) { return seed(req); }
 
 type AFFixture = {
-  fixture: { id: number; date: string; status: { short: string; elapsed: number | null } };
+  fixture: { id: number; date: string; status: { short: string; elapsed: number | null }; venue: { name: string | null; city: string | null } };
   league:  { round: string };
   teams: {
-    home: { id: number; name: string; code: string | null };
-    away: { id: number; name: string; code: string | null };
+    home: { id: number; name: string; logo: string | null };
+    away: { id: number; name: string; logo: string | null };
   };
   goals: { home: number | null; away: number | null };
+};
+
+type AFTeam = {
+  team: { id: number; name: string; code: string | null; logo: string | null };
 };
 
 async function seed(req: Request) {
@@ -386,24 +390,47 @@ async function seed(req: Request) {
       return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
     }
 
-    // ── 2. Clear all existing match data to avoid orphaned football-data.org fixture IDs ──
+    // ── 1b. Fetch team codes (fixtures endpoint omits the 3-letter code field) ──
+    const teamsRes = await fetch(
+      `${AF_BASE}/teams?league=${AF_LEAGUE}&season=${AF_SEASON}`,
+      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, cache: "no-store" }
+    );
+    const teamsJson = teamsRes.ok ? await teamsRes.json() : { response: [] };
+    const afTeams: AFTeam[] = teamsJson.response ?? [];
+    const teamCodeById = new Map<number, string>(
+      afTeams
+        .filter(t => t.team.code)
+        .map(t => [t.team.id, t.team.code!.toUpperCase()])
+    );
+    log.push(`Fetched ${afTeams.length} team records (${teamCodeById.size} with codes)`);
+
+    // ── 2. Full wipe in FK order so re-seed starts from a clean slate ──────────
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
-    const deleted = await prisma.match.deleteMany({});
-    if (deleted.count > 0) log.push(`Cleared ${deleted.count} existing match records (fresh seed)`);
+    await prisma.match.deleteMany({});
+    await prisma.audioStream.deleteMany({});
+    await prisma.player.deleteMany({});
+    const deletedTeams = await prisma.team.deleteMany({});
+    if (deletedTeams.count > 0) log.push(`Cleared ${deletedTeams.count} stale team records`);
 
     // Normalize fixtures to internal shape
-    const fdMatches = afFixtures.map(f => ({
-      id:       f.fixture.id,
-      utcDate:  f.fixture.date,
-      status:   f.fixture.status.short,
-      minute:   f.fixture.status.elapsed,
-      group:    TEAM_GROUPS[(f.teams.home.code ?? "").toUpperCase()] ?? null,
-      stage:    f.league.round,
-      homeTeam: { tla: (f.teams.home.code ?? "").toUpperCase(), name: f.teams.home.name, shortName: f.teams.home.name },
-      awayTeam: { tla: (f.teams.away.code ?? "").toUpperCase(), name: f.teams.away.name, shortName: f.teams.away.name },
-      score:    { fullTime: { home: f.goals.home, away: f.goals.away } },
-    }));
+    const fdMatches = afFixtures.map(f => {
+      const homeTla = teamCodeById.get(f.teams.home.id) ?? "";
+      const awayTla = teamCodeById.get(f.teams.away.id) ?? "";
+      return {
+        id:       f.fixture.id,
+        utcDate:  f.fixture.date,
+        status:   f.fixture.status.short,
+        minute:   f.fixture.status.elapsed,
+        group:    TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? null,
+        stage:    f.league.round,
+        apiVenue: f.fixture.venue.name ?? null,
+        apiCity:  f.fixture.venue.city ?? null,
+        homeTeam: { tla: homeTla, name: f.teams.home.name, shortName: f.teams.home.name },
+        awayTeam: { tla: awayTla, name: f.teams.away.name, shortName: f.teams.away.name },
+        score:    { fullTime: { home: f.goals.home, away: f.goals.away } },
+      };
+    });
 
     // ── 3. Collect all unique teams ──────────────────────────────────────────
     const teamMeta = new Map<string, { name: string; group: string }>();
@@ -413,19 +440,19 @@ async function seed(req: Request) {
       if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, { name: m.awayTeam.name, group });
     }
 
-    // ── 4. Batch upsert teams: createMany for new rows, parallel update for existing ──
+    // ── 4. Upsert teams ──────────────────────────────────────────────────────
     const teamsData = [...teamMeta.entries()].map(([tla, meta]) => ({
       code: tla,
       name: meta.name,
       flagEmoji: getFlag(tla),
       groupStage: meta.group,
     }));
-    await prisma.team.createMany({ data: teamsData, skipDuplicates: true });
     await Promise.all(
       teamsData.map(t =>
-        prisma.team.update({
+        prisma.team.upsert({
           where: { code: t.code },
-          data: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
+          create: t,
+          update: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
         })
       )
     );
@@ -468,8 +495,8 @@ async function seed(req: Request) {
       fixture: m.id,
       homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
       awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
-      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? "World Cup Stadium",
-      city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla); return v ? (getVenueInfo(v)?.city ?? "") : ""; })(),
+      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? "World Cup Stadium",
+      city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla); return v ? (getVenueInfo(v)?.city ?? "") : (m.apiCity ?? ""); })(),
       date: new Date(m.utcDate),
       status: STATUS_MAP[m.status] ?? "NS",
       homeScore: m.score?.fullTime?.home ?? 0,
@@ -480,7 +507,7 @@ async function seed(req: Request) {
 
     // Venue update pass — overwrites any previously stored placeholder with hardcoded values
     await Promise.all(validMatches.map(m => {
-      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? "World Cup Stadium";
+      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? "World Cup Stadium";
       const city = venue !== "World Cup Stadium" ? (getVenueInfo(venue)?.city ?? "") : "";
       return prisma.match.updateMany({ where: { fixture: m.id }, data: { venue, city } });
     }));
