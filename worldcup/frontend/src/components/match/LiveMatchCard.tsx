@@ -189,6 +189,8 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
               homeTeamName={match.homeTeam.name}
               awayTeamName={match.awayTeam.name}
               homeTeamCode={homeCode}
+              matchStatus={match.status}
+              currentMinute={match.elapsed}
             />
           </div>
         )}
@@ -304,6 +306,8 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
             homeTeamCode={homeCode}
+            matchStatus={match.status}
+            currentMinute={match.elapsed}
           />
         </div>
       )}

@@ -269,25 +269,57 @@ export default async function DashboardPage({
 
         {/* ── LIST VIEW ───────────────────────────────────────────────────── */}
         {viewMode === "list" && (
-          <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-            <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
-              All Matches
-            </div>
-            {matches.length === 0 ? (
-              <div className="px-4 py-8 text-center text-slate-600 text-sm">
-                No matches loaded — run the seed endpoint.
-              </div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {matches.map((m) => (
-                  <MatchListRow
-                    key={m.id}
-                    m={m}
-                    isFeatured={featuredMatch?.id === m.id}
-                  />
-                ))}
-              </div>
+          <div className="space-y-4">
+            {/* Live match card — same as tile view */}
+            {featuredMatch && (
+              <>
+                {isMatchLiveNow && (
+                  <div className="flex items-center gap-3 -mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    <span className="text-sm font-black text-white uppercase tracking-wider">
+                      Match In Progress
+                    </span>
+                    <div className="flex-1 h-px bg-red-900/40" />
+                    <span className="text-xs text-red-400 font-semibold">
+                      {featuredMatch.elapsed}&apos; played
+                    </span>
+                  </div>
+                )}
+                <Suspense
+                  fallback={
+                    <div
+                      className={`rounded-2xl bg-brand-card border border-brand-border animate-pulse ${
+                        isMatchLiveNow ? "h-96" : "h-80"
+                      }`}
+                    />
+                  }
+                >
+                  <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
+                </Suspense>
+              </>
             )}
+
+            {/* All matches list */}
+            <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
+              <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
+                All Matches
+              </div>
+              {matches.length === 0 ? (
+                <div className="px-4 py-8 text-center text-slate-600 text-sm">
+                  No matches loaded — run the seed endpoint.
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {matches.map((m) => (
+                    <MatchListRow
+                      key={m.id}
+                      m={m}
+                      isFeatured={featuredMatch?.id === m.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -360,24 +392,18 @@ export default async function DashboardPage({
                   <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
                 </Suspense>
 
-                {/* Collapsible sections below the hero */}
+                {/* Sections below the hero */}
                 {realVenue && venueInfo && (
-                  <CollapsibleSection title="Stadium Info">
-                    <StadiumInfoCard venueName={realVenue} venueInfo={venueInfo} />
-                  </CollapsibleSection>
+                  <StadiumInfoCard venueName={realVenue} venueInfo={venueInfo} />
                 )}
 
-                <CollapsibleSection title="Win Probability">
-                  <LiveWinMeter matchId={featuredMatch.id} />
-                </CollapsibleSection>
+                <LiveWinMeter matchId={featuredMatch.id} />
 
                 {featuredMatch.homeTeam.groupStage && (
-                  <CollapsibleSection title={`Group ${featuredMatch.homeTeam.groupStage} Standings`}>
-                    <GroupWinnerTickers
-                      group={featuredMatch.homeTeam.groupStage}
-                      highlightTeams={[featuredMatch.homeTeam.name, featuredMatch.awayTeam.name]}
-                    />
-                  </CollapsibleSection>
+                  <GroupWinnerTickers
+                    group={featuredMatch.homeTeam.groupStage}
+                    highlightTeams={[featuredMatch.homeTeam.name, featuredMatch.awayTeam.name]}
+                  />
                 )}
 
                 <CollapsibleSection title="Tournament Odds">
