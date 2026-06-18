@@ -1,16 +1,41 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
-  Volume2, VolumeX, Music2, Share2, ExternalLink,
+  Volume2, VolumeX, Music2, ChevronLeft, Share2, ExternalLink, Clock, Search,
 } from "lucide-react";
-import AppNav from "@/components/ui/AppNav";
 import type { AudioStream } from "@/lib/types";
 
 type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } | null };
 type LoopMode = "none" | "all" | "one";
+type FilterMode = "all" | "team" | "fifa";
+type SortMode = "az" | "group" | "continent";
+
+const CONTINENT_MAP: Record<string, string> = {
+  // CONMEBOL
+  ARG: "South America", BRA: "South America", URU: "South America", COL: "South America",
+  ECU: "South America", VEN: "South America", BOL: "South America", PAR: "South America",
+  CHI: "South America", PER: "South America",
+  // CONCACAF
+  USA: "CONCACAF", MEX: "CONCACAF", CAN: "CONCACAF", CRC: "CONCACAF", PAN: "CONCACAF",
+  JAM: "CONCACAF", HON: "CONCACAF", SLV: "CONCACAF", TRI: "CONCACAF", GUA: "CONCACAF",
+  // UEFA
+  FRA: "Europe", ENG: "Europe", ESP: "Europe", POR: "Europe", DEU: "Europe", GER: "Europe",
+  NED: "Europe", BEL: "Europe", ITA: "Europe", HRV: "Europe", POL: "Europe", SRB: "Europe",
+  SUI: "Europe", DNK: "Europe", AUT: "Europe", SVN: "Europe", CZE: "Europe", ROU: "Europe",
+  SVK: "Europe", TUR: "Europe", UKR: "Europe", HUN: "Europe", ALB: "Europe", GEO: "Europe",
+  BIH: "Europe", MKD: "Europe", SCO: "Europe", WAL: "Europe", NOR: "Europe",
+  // CAF
+  MAR: "Africa", SEN: "Africa", NGA: "Africa", CMR: "Africa", EGY: "Africa", TUN: "Africa",
+  GHA: "Africa", RSA: "Africa", MLI: "Africa", CIV: "Africa", DRC: "Africa", AGO: "Africa",
+  // AFC
+  JPN: "Asia", KOR: "Asia", AUS: "Asia", IRN: "Asia", SAU: "Asia", QAT: "Asia",
+  CHN: "Asia", IRQ: "Asia", JOR: "Asia", UZB: "Asia", IDN: "Asia", BHR: "Asia",
+  // OFC
+  NZL: "Oceania",
+};
 
 function formatTime(sec: number) {
   if (!isFinite(sec) || sec < 0) return "0:00";
@@ -89,7 +114,7 @@ function buildShareLinks(stream: Stream, pageUrl: string) {
 }
 
 function teamGradient(code: string | undefined) {
-  if (!code) return "from-[#1e3a5f] via-[#c2860a] to-slate-900"; // FIFA gold-blue
+  if (!code) return "from-[#1e3a5f] via-[#c2860a] to-slate-900";
   const map: Record<string, string> = {
     MEX: "from-[#006847] via-[#ce1126] to-slate-900",
     RSA: "from-[#007A4D] via-[#FFB612] to-[#002395]",
@@ -107,11 +132,17 @@ function teamGradient(code: string | undefined) {
   return map[code] ?? "from-brand-green via-brand-gold to-slate-800";
 }
 
-export default function AnthemHub({ streams }: { streams: Stream[] }) {
+export default function AnthemHub({
+  streams,
+  allTeams,
+}: {
+  streams: Stream[];
+  allTeams: { id: string; code: string; name: string; flagEmoji: string; groupStage: string }[];
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
 
-  const [currentIdx, setCurrentIdx] = useState(0);
+  const [currentStreamId, setCurrentStreamId] = useState<string | null>(streams[0]?.id ?? null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loopMode, setLoopMode] = useState<LoopMode>("none");
   const [isShuffling, setIsShuffling] = useState(false);
@@ -122,11 +153,54 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
   const [showShare, setShowShare] = useState(false);
   const [pageUrl, setPageUrl] = useState("https://worldcup-2026-sandy.vercel.app/anthems");
 
+  // Playlist controls
+  const [filter, setFilter] = useState<FilterMode>("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortMode>("az");
+
   useEffect(() => { setPageUrl(window.location.href); }, []);
 
-  const current = streams[currentIdx];
+  // Derived: current stream
+  const current = streams.find((s) => s.id === currentStreamId) ?? streams[0] ?? null;
 
-  // Load new track when index changes
+  // Derived: filteredStreams
+  const filteredStreams = (() => {
+    let list = streams;
+
+    if (filter === "team") list = list.filter((s) => s.team !== null);
+    else if (filter === "fifa") list = list.filter((s) => s.team === null);
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          (s.team?.name ?? "").toLowerCase().includes(q)
+      );
+    }
+
+    list = [...list].sort((a, b) => {
+      if (sort === "az") {
+        return (a.team?.name ?? a.title).localeCompare(b.team?.name ?? b.title);
+      } else if (sort === "group") {
+        const aGroup = (a.team as { groupStage?: string } | null)?.groupStage ?? "Z";
+        const bGroup = (b.team as { groupStage?: string } | null)?.groupStage ?? "Z";
+        if (aGroup !== bGroup) return aGroup.localeCompare(bGroup);
+        return (a.team?.name ?? a.title).localeCompare(b.team?.name ?? b.title);
+      } else {
+        const aCont = (a.team?.code ? CONTINENT_MAP[a.team.code] : undefined) ?? "ZZZ";
+        const bCont = (b.team?.code ? CONTINENT_MAP[b.team.code] : undefined) ?? "ZZZ";
+        if (aCont !== bCont) return aCont.localeCompare(bCont);
+        return (a.team?.name ?? a.title).localeCompare(b.team?.name ?? b.title);
+      }
+    });
+
+    return list;
+  })();
+
+  const currentIdxInFiltered = filteredStreams.findIndex((s) => s.id === currentStreamId);
+
+  // Load new track when currentStreamId changes
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !current) return;
@@ -136,7 +210,7 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
     setDuration(current.durationSecs);
     if (isPlaying) a.play().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIdx]);
+  }, [currentStreamId]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -145,23 +219,25 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
   }, [volume, isMuted]);
 
   const nextTrack = useCallback(() => {
+    if (filteredStreams.length === 0) return;
     if (isShuffling) {
-      setCurrentIdx(Math.floor(Math.random() * streams.length));
+      setCurrentStreamId(filteredStreams[Math.floor(Math.random() * filteredStreams.length)].id);
     } else {
-      setCurrentIdx((i) => (i + 1) % streams.length);
+      const idx = filteredStreams.findIndex((s) => s.id === currentStreamId);
+      setCurrentStreamId(filteredStreams[(idx + 1) % filteredStreams.length].id);
     }
     setIsPlaying(true);
-  }, [isShuffling, streams.length]);
+  }, [isShuffling, filteredStreams, currentStreamId]);
 
   const handleEnded = useCallback(() => {
     if (loopMode === "one") {
       if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
-    } else if (loopMode === "all" || isShuffling || currentIdx < streams.length - 1) {
+    } else if (loopMode === "all" || isShuffling || currentIdxInFiltered < filteredStreams.length - 1) {
       nextTrack();
     } else {
       setIsPlaying(false);
     }
-  }, [loopMode, isShuffling, currentIdx, streams.length, nextTrack]);
+  }, [loopMode, isShuffling, currentIdxInFiltered, filteredStreams.length, nextTrack]);
 
   const togglePlay = () => {
     const a = audioRef.current;
@@ -170,8 +246,8 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
     else { a.play().catch(() => {}); setIsPlaying(true); }
   };
 
-  const playTrack = (idx: number) => {
-    setCurrentIdx(idx);
+  const playTrack = (id: string) => {
+    setCurrentStreamId(id);
     setIsPlaying(true);
   };
 
@@ -181,7 +257,8 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
       setElapsed(0);
       return;
     }
-    setCurrentIdx((i) => (i - 1 + streams.length) % streams.length);
+    const idx = filteredStreams.findIndex((s) => s.id === currentStreamId);
+    setCurrentStreamId(filteredStreams[(idx - 1 + filteredStreams.length) % filteredStreams.length].id);
     setIsPlaying(true);
   };
 
@@ -197,6 +274,37 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
   const progress = (duration > 0 ? elapsed / duration : 0) * 100;
   const shareLinks = current ? buildShareLinks(current, pageUrl) : [];
 
+  // Coming-soon logic
+  const hasStream = new Set(streams.map((s) => s.teamId).filter(Boolean));
+  const comingSoonTeams = allTeams.filter((t) => !hasStream.has(t.id));
+
+  const filteredComingSoon = search.trim()
+    ? comingSoonTeams.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : comingSoonTeams;
+
+  const sortedComingSoon = [...filteredComingSoon].sort((a, b) => {
+    if (sort === "group") {
+      if (a.groupStage !== b.groupStage) return a.groupStage.localeCompare(b.groupStage);
+      return a.name.localeCompare(b.name);
+    } else if (sort === "continent") {
+      const aCont = CONTINENT_MAP[a.code] ?? "ZZZ";
+      const bCont = CONTINENT_MAP[b.code] ?? "ZZZ";
+      if (aCont !== bCont) return aCont.localeCompare(bCont);
+      return a.name.localeCompare(b.name);
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  const showFifa = filter === "all" || filter === "fifa";
+  const showTeam = filter === "all" || filter === "team";
+
+  const fifaStreams = filteredStreams.filter((s) => s.team === null);
+  const teamStreams = filteredStreams.filter((s) => s.team !== null);
+
+  const totalVisible =
+    (showFifa ? fifaStreams.length : 0) +
+    (showTeam ? teamStreams.length + sortedComingSoon.length : 0);
+
   if (!streams.length) {
     return (
       <div className="min-h-screen bg-brand-dark flex items-center justify-center">
@@ -211,7 +319,21 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200 flex flex-col">
-      <AppNav />
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+            <ChevronLeft size={16} />
+            Dashboard
+          </Link>
+          <span className="text-brand-border">·</span>
+          <Music2 size={16} className="text-brand-gold" />
+          <span className="font-bold text-white">Anthem Hub</span>
+          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-400">
+            {streams.length} track{streams.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </nav>
 
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
 
@@ -337,29 +459,214 @@ export default function AnthemHub({ streams }: { streams: Stream[] }) {
         {/* ── Playlist (right) ── */}
         <div className="lg:col-span-2">
           <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden sticky top-20">
-            <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-              <Music2 size={12} /> Playlist · {streams.length} tracks
+
+            {/* Search */}
+            <div className="px-4 pt-4 pb-3 border-b border-brand-border">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search anthems…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-brand-dark border border-brand-border rounded-lg pl-8 pr-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                />
+              </div>
             </div>
-            <div className="divide-y divide-brand-border overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-220px)]">
-              {streams.map((s, idx) => (
-                <button
-                  key={s.id}
-                  onClick={() => playTrack(idx)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${idx === currentIdx ? "bg-brand-green/10" : "hover:bg-white/5"}`}
-                >
-                  <span className="text-xl flex-shrink-0">{s.team?.flagEmoji ?? "🏆"}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className={`text-sm font-semibold truncate ${idx === currentIdx ? "text-brand-green" : "text-white"}`}>
-                      {s.title}
-                    </div>
-                    <div className="text-xs text-slate-500">{s.team?.name ?? "FIFA World Cup 2026"}</div>
+
+            {/* Filter tabs + sort */}
+            <div className="px-4 py-2.5 border-b border-brand-border flex items-center gap-2 flex-wrap">
+              <div className="flex gap-1 flex-1">
+                {(["all", "team", "fifa"] as FilterMode[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                      filter === f
+                        ? "bg-white text-black"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f === "team" ? "Team" : "FIFA"}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortMode)}
+                className="bg-brand-dark border border-brand-border text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-slate-500 cursor-pointer"
+              >
+                <option value="az">A–Z</option>
+                <option value="group">By Group</option>
+                <option value="continent">By Continent</option>
+              </select>
+            </div>
+
+            {/* Track count */}
+            <div className="px-4 py-2 border-b border-brand-border">
+              <span className="text-xs text-slate-500">
+                <Music2 size={11} className="inline mr-1" />
+                {totalVisible} track{totalVisible !== 1 ? "s" : ""}
+                {sortedComingSoon.length > 0 && showTeam && (
+                  <span className="ml-1 text-slate-600">
+                    · {sortedComingSoon.length} coming soon
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* List */}
+            <div className="divide-y divide-brand-border overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-340px)]">
+
+              {/* FIFA section */}
+              {showFifa && fifaStreams.length > 0 && (
+                <>
+                  <div className="px-4 py-2 bg-brand-dark/40 text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                    🏆 FIFA World Cup
                   </div>
-                  {idx === currentIdx && isPlaying
-                    ? <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>
-                    : null}
-                  <span className="text-xs text-slate-600 flex-shrink-0">{formatTime(s.durationSecs)}</span>
-                </button>
-              ))}
+                  {fifaStreams.map((s) => {
+                    const isActive = s.id === currentStreamId;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => playTrack(s.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? "bg-brand-green/10" : "hover:bg-white/5"}`}
+                      >
+                        <span className="text-xl flex-shrink-0">🏆</span>
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
+                            {s.title}
+                          </div>
+                          <div className="text-xs text-slate-500">FIFA World Cup 2026</div>
+                        </div>
+                        {isActive && isPlaying && (
+                          <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>
+                        )}
+                        <span className="text-xs text-slate-600 flex-shrink-0">{formatTime(s.durationSecs)}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Team section */}
+              {showTeam && (teamStreams.length > 0 || sortedComingSoon.length > 0) && (
+                <>
+                  <div className="px-4 py-2 bg-brand-dark/40 text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                    Team Anthems
+                  </div>
+
+                  {sort === "group"
+                    ? (() => {
+                        type ComingSoonTeam = { id: string; code: string; name: string; flagEmoji: string; groupStage: string };
+                        const groupMap = new Map<string, Stream[]>();
+                        for (const s of teamStreams) {
+                          const g = (s.team as { groupStage?: string } | null)?.groupStage ?? "Other";
+                          if (!groupMap.has(g)) groupMap.set(g, []);
+                          groupMap.get(g)!.push(s);
+                        }
+                        const csGroupMap = new Map<string, ComingSoonTeam[]>();
+                        for (const t of sortedComingSoon) {
+                          const g = t.groupStage ?? "Other";
+                          if (!csGroupMap.has(g)) csGroupMap.set(g, []);
+                          csGroupMap.get(g)!.push(t);
+                        }
+                        const allGroups = Array.from(
+                          new Set([...groupMap.keys(), ...csGroupMap.keys()])
+                        ).sort();
+                        return allGroups.map((g) => (
+                          <div key={g}>
+                            <div className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider bg-brand-dark/20">
+                              Group {g}
+                            </div>
+                            {(groupMap.get(g) ?? []).map((s) => {
+                              const isActive = s.id === currentStreamId;
+                              return (
+                                <button
+                                  key={s.id}
+                                  onClick={() => playTrack(s.id)}
+                                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? "bg-brand-green/10" : "hover:bg-white/5"}`}
+                                >
+                                  <span className="text-xl flex-shrink-0">{s.team?.flagEmoji ?? "🏳️"}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
+                                      {s.title}
+                                    </div>
+                                    <div className="text-xs text-slate-500">{s.team?.name}</div>
+                                  </div>
+                                  {isActive && isPlaying && (
+                                    <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>
+                                  )}
+                                  <span className="text-xs text-slate-600 flex-shrink-0">{formatTime(s.durationSecs)}</span>
+                                </button>
+                              );
+                            })}
+                            {(csGroupMap.get(g) ?? []).map((t) => (
+                              <div
+                                key={t.id}
+                                title="Coming soon"
+                                className="w-full flex items-center gap-3 px-4 py-3 opacity-50 cursor-default"
+                              >
+                                <span className="text-xl flex-shrink-0">{t.flagEmoji}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold truncate text-white">{t.name}</div>
+                                  <div className="text-xs text-slate-500">Anthem coming soon</div>
+                                </div>
+                                <Clock size={14} className="text-slate-600 flex-shrink-0" />
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()
+                    : (
+                        <>
+                          {teamStreams.map((s) => {
+                            const isActive = s.id === currentStreamId;
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => playTrack(s.id)}
+                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? "bg-brand-green/10" : "hover:bg-white/5"}`}
+                              >
+                                <span className="text-xl flex-shrink-0">{s.team?.flagEmoji ?? "🏳️"}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
+                                    {s.title}
+                                  </div>
+                                  <div className="text-xs text-slate-500">{s.team?.name}</div>
+                                </div>
+                                {isActive && isPlaying && (
+                                  <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>
+                                )}
+                                <span className="text-xs text-slate-600 flex-shrink-0">{formatTime(s.durationSecs)}</span>
+                              </button>
+                            );
+                          })}
+                          {sortedComingSoon.map((t) => (
+                            <div
+                              key={t.id}
+                              title="Coming soon"
+                              className="w-full flex items-center gap-3 px-4 py-3 opacity-50 cursor-default"
+                            >
+                              <span className="text-xl flex-shrink-0">{t.flagEmoji}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold truncate text-white">{t.name}</div>
+                                <div className="text-xs text-slate-500">Anthem coming soon</div>
+                              </div>
+                              <Clock size={14} className="text-slate-600 flex-shrink-0" />
+                            </div>
+                          ))}
+                        </>
+                      )
+                  }
+                </>
+              )}
+
+              {totalVisible === 0 && (
+                <div className="px-4 py-10 text-center text-slate-600 text-sm">
+                  No anthems match your search.
+                </div>
+              )}
             </div>
           </div>
         </div>

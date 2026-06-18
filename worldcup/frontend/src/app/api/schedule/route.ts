@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // FIFA World Cup
 const SEASON = 2026;
-const CACHE_TTL = 300_000; // 5 min
+const CACHE_TTL = 60_000; // 60s — keeps NS→LIVE transitions responsive
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",

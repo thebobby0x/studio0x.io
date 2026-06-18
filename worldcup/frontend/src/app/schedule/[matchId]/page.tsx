@@ -13,6 +13,7 @@ import UpsetMeter from "@/components/stats/UpsetMeter";
 import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
+import MatchCommentary from "@/components/match/MatchCommentary";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -211,6 +212,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {venueInfo && venueFromDB?.venue && (
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
         )}
+
+        {/* AI Commentary — shown for live and finished matches */}
+        {(isLive || isDone) && <CommentaryPanel fixtureId={m.id} />}
 
         {/* Match DNA™ + Clutch Index™ — only for played/live matches */}
         {(isDone || isLive) && (
@@ -471,6 +475,16 @@ async function MatchPlayerStatsPanel({ fixtureId }: { fixtureId: number }) {
     const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
     if (!dbMatch) return null;
     return <MatchPlayerStats matchId={dbMatch.id} />;
+  } catch {
+    return null;
+  }
+}
+
+async function CommentaryPanel({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <MatchCommentary matchId={dbMatch.id} />;
   } catch {
     return null;
   }

@@ -20,7 +20,7 @@ async function getAFFixture(fixtureId: number) {
   try {
     const res = await fetch(`${AF_BASE}/fixtures?id=${fixtureId}`, {
       headers: { "x-apisports-key": key },
-      next: { revalidate: 30 },
+      next: { revalidate: 10 },
     });
     if (!res.ok) return null;
     const json = await res.json();

@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       `https://v3.football.api-sports.io/fixtures/events?fixture=${match.fixture}`,
       {
         headers: { "x-apisports-key": apiKey },
-        next: { revalidate: 30 },
+        next: { revalidate: 10 },
       }
     );
 
