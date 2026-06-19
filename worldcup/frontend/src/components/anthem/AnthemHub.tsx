@@ -7,11 +7,23 @@ import {
   Volume2, VolumeX, Music2, ChevronLeft, Share2, ExternalLink, Clock, Search,
 } from "lucide-react";
 import type { AudioStream } from "@/lib/types";
+import { useAudio, type Track } from "@/lib/AudioContext";
 
 type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } | null };
-type LoopMode = "none" | "all" | "one";
 type FilterMode = "all" | "team" | "fifa";
 type SortMode = "az" | "group" | "continent";
+
+function streamToTrack(s: Stream): Track {
+  return {
+    id: s.id,
+    title: s.title,
+    audioUrl: s.audioUrl,
+    durationSecs: s.durationSecs ?? 180,
+    teamName: s.team?.name ?? "FIFA World Cup 2026",
+    teamCode: s.team?.code ?? "",
+    flagEmoji: s.team?.flagEmoji ?? "🏆",
+  };
+}
 
 const CONTINENT_MAP: Record<string, string> = {
   // CONMEBOL
@@ -139,20 +151,11 @@ export default function AnthemHub({
   streams: Stream[];
   allTeams: { id: string; code: string; name: string; flagEmoji: string; groupStage: string }[];
 }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audio = useAudio();
   const progressRef = useRef<HTMLDivElement | null>(null);
-  const playSessionStartRef = useRef<number | null>(null);
-  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playSessionFiredRef = useRef(false);
 
-  const [currentStreamId, setCurrentStreamId] = useState<string | null>(streams[0]?.id ?? null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [loopMode, setLoopMode] = useState<LoopMode>("none");
-  const [isShuffling, setIsShuffling] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [elapsed, setElapsed] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // Locally selected track (drives the big card before/without playback).
+  const [selectedId, setSelectedId] = useState<string | null>(streams[0]?.id ?? null);
   const [showShare, setShowShare] = useState(false);
   const [pageUrl, setPageUrl] = useState("https://worldcup-2026-sandy.vercel.app/anthems");
 
@@ -163,22 +166,21 @@ export default function AnthemHub({
 
   useEffect(() => { setPageUrl(window.location.href); }, []);
 
-  // Derived: current stream (must be before effects that reference it)
-  const current = streams.find((s) => s.id === currentStreamId) ?? streams[0] ?? null;
+  // The track shown in the big card: whatever is globally playing (if it's one of
+  // ours) takes priority, otherwise the locally selected track.
+  const playingStream = audio.current
+    ? streams.find((s) => s.id === audio.current!.id) ?? null
+    : null;
+  const current = playingStream ?? streams.find((s) => s.id === selectedId) ?? streams[0] ?? null;
+  const currentStreamId = current?.id ?? null;
 
-  // Keep a ref to current so effect callbacks always see the latest value
-  const currentRef = useRef(current);
-  currentRef.current = current;
+  // Is the displayed track the one currently loaded in the global player?
+  const isDisplayCurrent = !!current && audio.current?.id === current.id;
+  const isPlaying = isDisplayCurrent && audio.isPlaying;
 
-  // Fire the listen POST — fire-and-forget
-  const fireListenPost = useCallback((streamId: string, seconds: number) => {
-    if (seconds < 1) return;
-    fetch(`/api/audio/${streamId}/listen`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seconds: Math.round(seconds) }),
-    }).catch(() => {});
-  }, []);
+  // Progress reflects the global player only when it's our displayed track.
+  const elapsed = isDisplayCurrent ? audio.currentTime : 0;
+  const duration = isDisplayCurrent ? audio.duration : (current?.durationSecs ?? 0);
 
   // Fire the share POST — fire-and-forget
   const fireSharePost = useCallback((streamId: string, platform: string) => {
@@ -188,45 +190,6 @@ export default function AnthemHub({
       body: JSON.stringify({ platform }),
     }).catch(() => {});
   }, []);
-
-  // Start/stop play session timer when isPlaying changes
-  useEffect(() => {
-    const stream = currentRef.current;
-    if (isPlaying && stream) {
-      playSessionStartRef.current = Date.now();
-      playSessionFiredRef.current = false;
-      // Fire at the 10-second mark
-      playTimerRef.current = setTimeout(() => {
-        const s = currentRef.current;
-        if (s) {
-          fireListenPost(s.id, 10);
-          playSessionFiredRef.current = true;
-        }
-      }, 10_000);
-    } else {
-      // Paused — clear timer and send remaining elapsed time if session >= 10s
-      if (playTimerRef.current) {
-        clearTimeout(playTimerRef.current);
-        playTimerRef.current = null;
-      }
-      if (playSessionStartRef.current !== null && stream) {
-        const sessionElapsed = (Date.now() - playSessionStartRef.current) / 1000;
-        if (sessionElapsed >= 10) {
-          // If we already fired at 10s, only send the delta beyond that
-          const toSend = playSessionFiredRef.current ? sessionElapsed - 10 : sessionElapsed;
-          if (toSend >= 1) fireListenPost(stream.id, toSend);
-        }
-        playSessionStartRef.current = null;
-      }
-    }
-    return () => {
-      if (playTimerRef.current) {
-        clearTimeout(playTimerRef.current);
-        playTimerRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying]);
 
   // Derived: filteredStreams
   const filteredStreams = (() => {
@@ -263,87 +226,41 @@ export default function AnthemHub({
     return list;
   })();
 
-  const currentIdxInFiltered = filteredStreams.findIndex((s) => s.id === currentStreamId);
+  // Play a specific track, using the current filtered list as the playlist so
+  // next/prev navigate within the active filter. Delegates to the shared player
+  // so audio persists across page navigation.
+  const playTrack = useCallback((id: string) => {
+    const idx = filteredStreams.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    setSelectedId(id);
+    const tracks = filteredStreams.map(streamToTrack);
+    audio.play(tracks[idx], tracks, idx);
+  }, [filteredStreams, audio]);
 
-  // Load new track when currentStreamId changes
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a || !current) return;
-
-    // Flush any in-progress play session for the previous track
-    if (playTimerRef.current) {
-      clearTimeout(playTimerRef.current);
-      playTimerRef.current = null;
+  const togglePlay = useCallback(() => {
+    if (!current) return;
+    if (audio.current?.id === current.id) {
+      audio.togglePlay();
+    } else {
+      playTrack(current.id);
     }
-    // (Session stats for the old track are handled by the isPlaying effect above)
-    playSessionStartRef.current = null;
-    playSessionFiredRef.current = false;
-
-    a.src = current.audioUrl;
-    a.load();
-    setElapsed(0);
-    setDuration(current.durationSecs);
-    if (isPlaying) a.play().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStreamId]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.volume = volume;
-    audioRef.current.muted = isMuted;
-  }, [volume, isMuted]);
+  }, [current, audio, playTrack]);
 
   const nextTrack = useCallback(() => {
-    if (filteredStreams.length === 0) return;
-    if (isShuffling) {
-      setCurrentStreamId(filteredStreams[Math.floor(Math.random() * filteredStreams.length)].id);
-    } else {
-      const idx = filteredStreams.findIndex((s) => s.id === currentStreamId);
-      setCurrentStreamId(filteredStreams[(idx + 1) % filteredStreams.length].id);
-    }
-    setIsPlaying(true);
-  }, [isShuffling, filteredStreams, currentStreamId]);
+    if (audio.current && audio.playlist.length > 0) audio.next();
+    else if (filteredStreams[0]) playTrack(filteredStreams[0].id);
+  }, [audio, filteredStreams, playTrack]);
 
-  const handleEnded = useCallback(() => {
-    if (loopMode === "one") {
-      if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
-    } else if (loopMode === "all" || isShuffling || currentIdxInFiltered < filteredStreams.length - 1) {
-      nextTrack();
-    } else {
-      setIsPlaying(false);
-    }
-  }, [loopMode, isShuffling, currentIdxInFiltered, filteredStreams.length, nextTrack]);
-
-  const togglePlay = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (isPlaying) { a.pause(); setIsPlaying(false); }
-    else { a.play().catch(() => {}); setIsPlaying(true); }
-  };
-
-  const playTrack = (id: string) => {
-    setCurrentStreamId(id);
-    setIsPlaying(true);
-  };
-
-  const prevTrack = () => {
-    if (elapsed > 3) {
-      if (audioRef.current) audioRef.current.currentTime = 0;
-      setElapsed(0);
-      return;
-    }
-    const idx = filteredStreams.findIndex((s) => s.id === currentStreamId);
-    setCurrentStreamId(filteredStreams[(idx - 1 + filteredStreams.length) % filteredStreams.length].id);
-    setIsPlaying(true);
-  };
+  const prevTrack = useCallback(() => {
+    if (audio.current && audio.playlist.length > 0) audio.prev();
+    else if (filteredStreams[0]) playTrack(filteredStreams[0].id);
+  }, [audio, filteredStreams, playTrack]);
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressRef.current || !audioRef.current) return;
+    if (!progressRef.current || !isDisplayCurrent) return;
     const rect = progressRef.current.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const t = pct * (duration || current?.durationSecs || 0);
-    audioRef.current.currentTime = t;
-    setElapsed(t);
+    audio.seekTo(pct);
   };
 
   const progress = (duration > 0 ? elapsed / duration : 0) * 100;
@@ -448,9 +365,9 @@ export default function AnthemHub({
           {/* Playback controls */}
           <div className="flex items-center justify-center gap-7">
             <button
-              onClick={() => setIsShuffling((s) => !s)}
+              onClick={audio.toggleShuffle}
               title="Shuffle"
-              className={`transition-colors ${isShuffling ? "text-brand-green" : "text-slate-500 hover:text-white"}`}
+              className={`transition-colors ${audio.isShuffling ? "text-brand-green" : "text-slate-500 hover:text-white"}`}
             >
               <Shuffle size={20} />
             </button>
@@ -469,12 +386,12 @@ export default function AnthemHub({
               <SkipForward size={26} fill="currentColor" />
             </button>
             <button
-              onClick={() => setLoopMode((m) => m === "none" ? "all" : m === "all" ? "one" : "none")}
-              title={loopMode === "one" ? "Loop one" : loopMode === "all" ? "Loop all" : "No loop"}
-              className={`transition-colors relative ${loopMode !== "none" ? "text-brand-green" : "text-slate-500 hover:text-white"}`}
+              onClick={audio.cycleLoop}
+              title={audio.loopMode === "one" ? "Loop one" : audio.loopMode === "all" ? "Loop all" : "No loop"}
+              className={`transition-colors relative ${audio.loopMode !== "none" ? "text-brand-green" : "text-slate-500 hover:text-white"}`}
             >
               <Repeat size={20} />
-              {loopMode === "one" && (
+              {audio.loopMode === "one" && (
                 <span className="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-brand-green text-black rounded-full w-3.5 h-3.5 flex items-center justify-center">1</span>
               )}
             </button>
@@ -482,13 +399,13 @@ export default function AnthemHub({
 
           {/* Volume */}
           <div className="flex items-center gap-3 px-1">
-            <button onClick={() => setIsMuted((m) => !m)} className="text-slate-400 hover:text-white transition-colors flex-shrink-0">
-              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            <button onClick={audio.toggleMute} className="text-slate-400 hover:text-white transition-colors flex-shrink-0">
+              {audio.isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
             <input
               type="range" min="0" max="1" step="0.02"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
+              value={audio.isMuted ? 0 : audio.volume}
+              onChange={(e) => audio.setVolume(Number(e.target.value))}
               className="flex-1 accent-brand-green cursor-pointer"
             />
           </div>
@@ -747,15 +664,6 @@ export default function AnthemHub({
           </div>
         </div>
       </div>
-
-      {/* Audio element */}
-      <audio
-        ref={audioRef}
-        onTimeUpdate={() => { if (audioRef.current) setElapsed(audioRef.current.currentTime); }}
-        onLoadedMetadata={() => { if (audioRef.current) setDuration(audioRef.current.duration); }}
-        onEnded={handleEnded}
-        preload="metadata"
-      />
     </div>
   );
 }
