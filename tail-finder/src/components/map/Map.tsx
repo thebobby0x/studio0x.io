@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback, useMemo } from 'react';
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { useSession } from 'next-auth/react';
@@ -83,7 +83,10 @@ export default function MapComponent() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
+    const boundsRef = useRef<MapBounds | null>(null);
+
     const handleBoundsChange = useCallback(async (bounds: MapBounds) => {
+        boundsRef.current = bounds;
         setLoading(true);
         try {
             const data = await fetchFlights(bounds);
@@ -93,6 +96,20 @@ export default function MapComponent() {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    // 10s real-time polling — re-fetches silently without showing spinner
+    useEffect(() => {
+        const id = setInterval(async () => {
+            if (!boundsRef.current) return;
+            try {
+                const data = await fetchFlights(boundsRef.current);
+                setFlights(data);
+            } catch {
+                // silently ignore transient errors
+            }
+        }, 10_000);
+        return () => clearInterval(id);
     }, []);
 
     // Filter flights based on search
