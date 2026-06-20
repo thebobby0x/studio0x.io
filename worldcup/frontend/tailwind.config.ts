@@ -6,11 +6,12 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          green:  "#00b140",
-          gold:   "#f5a623",
-          dark:   "#0a0e1a",
-          card:   "#131928",
-          border: "#1e2a3a",
+          green:  "#10b981",
+          gold:   "#f59e0b",
+          blue:   "#3b82f6",
+          dark:   "#060b18",
+          card:   "#0d1828",
+          border: "#182a42",
         },
       },
       fontFamily: {
