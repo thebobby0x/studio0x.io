@@ -10,9 +10,11 @@ import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
+import TournamentStories from "@/components/news/TournamentStories";
 import type { Match } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
+import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
@@ -81,7 +83,7 @@ function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
       }`}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="text-base shrink-0">{m.homeTeam.flagEmoji}</span>
+        <FlagImg tla={m.homeTeam.code} size={24} className="shrink-0" />
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.homeTeam.name}
         </span>
@@ -95,7 +97,7 @@ function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.awayTeam.name}
         </span>
-        <span className="text-base shrink-0">{m.awayTeam.flagEmoji}</span>
+        <FlagImg tla={m.awayTeam.code} size={24} className="shrink-0" />
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {isLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
@@ -411,6 +413,13 @@ export default async function DashboardPage({
                     highlightTlas={[featuredMatch.homeTeam.code, featuredMatch.awayTeam.code]}
                     limit={12}
                   />
+                </CollapsibleSection>
+
+                {/* AI-generated tournament news */}
+                <CollapsibleSection title="Tournament News">
+                  <Suspense fallback={<div className="h-48 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
+                    <TournamentStories />
+                  </Suspense>
                 </CollapsibleSection>
 
                 {/* All matches compact list */}

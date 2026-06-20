@@ -8,6 +8,7 @@ import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
+import FlagImg from "@/components/ui/FlagImg";
 
 const METRIC_LABELS: Record<string, string> = {
   possession:   "Possession %",
@@ -147,7 +148,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         <div className="px-4 py-6">
           <div className="grid grid-cols-3 items-center gap-2">
             <Link href={`/team/${homeCode}`} className="text-center group">
-              <div className="text-5xl sm:text-6xl mb-3 leading-none">{match.homeTeam.flagEmoji}</div>
+              <div className="flex justify-center mb-3"><FlagImg tla={homeCode} size={72} className="shadow-lg" /></div>
               <div className="font-black text-lg sm:text-xl text-white group-hover:text-brand-gold transition-colors leading-tight">{match.homeTeam.name}</div>
               <div className="text-xs text-slate-600 uppercase tracking-wider mt-0.5">{homeCode}</div>
             </Link>
@@ -165,7 +166,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             </div>
 
             <Link href={`/team/${awayCode}`} className="text-center group">
-              <div className="text-5xl sm:text-6xl mb-3 leading-none">{match.awayTeam.flagEmoji}</div>
+              <div className="flex justify-center mb-3"><FlagImg tla={awayCode} size={72} className="shadow-lg" /></div>
               <div className="font-black text-lg sm:text-xl text-white group-hover:text-brand-gold transition-colors leading-tight">{match.awayTeam.name}</div>
               <div className="text-xs text-slate-600 uppercase tracking-wider mt-0.5">{awayCode}</div>
             </Link>
@@ -264,7 +265,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         <div className="grid grid-cols-3 items-center gap-2">
           {/* Home team */}
           <Link href={`/team/${homeCode}`} className="text-center group block">
-            <div className="text-4xl sm:text-5xl mb-2">{match.homeTeam.flagEmoji}</div>
+            <div className="flex justify-center mb-2"><FlagImg tla={homeCode} size={56} className="shadow-md" /></div>
             <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.homeTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{homeCode}</div>
           </Link>
@@ -282,7 +283,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
 
           {/* Away team */}
           <Link href={`/team/${awayCode}`} className="text-center group block">
-            <div className="text-4xl sm:text-5xl mb-2">{match.awayTeam.flagEmoji}</div>
+            <div className="flex justify-center mb-2"><FlagImg tla={awayCode} size={56} className="shadow-md" /></div>
             <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.awayTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{awayCode}</div>
           </Link>
