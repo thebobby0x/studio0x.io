@@ -1,0 +1,35 @@
+name: Bootstrap studio0x-content repo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push studio0x-content files to new repo
+        env:
+          CONTENT_REPO_TOKEN: ${{ secrets.CONTENT_REPO_TOKEN }}
+        run: |
+          git config --global user.email "bot@studio0x.io"
+          git config --global user.name "Studio0x Bot"
+
+          # Clone the new empty repo
+          git clone https://x-access-token:${CONTENT_REPO_TOKEN}@github.com/thebobby0x/studio0x-content.git /tmp/studio0x-content
+
+          # Copy all files from the scaffold folder
+          cp -r studio0x-content/. /tmp/studio0x-content/
+
+          cd /tmp/studio0x-content
+          git add .
+          git status
+
+          if git diff --staged --quiet; then
+            echo "Nothing to commit — repo already up to date"
+          else
+            git commit -m "Initial setup: workflows, scripts, podcast RSS, README"
+            git push origin main
+            echo "Done! studio0x-content repo is ready."
+          fi
