@@ -5,13 +5,38 @@ import { CalendarDays } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
 import ScheduleView from "./ScheduleView";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import { prisma } from "@/lib/prisma";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
-    // Direct server-side fetch — same process, no HTTP hop needed
     const { GET } = await import("@/app/api/schedule/route");
     const res = await GET();
-    return res.json() as Promise<ScheduleMatch[]>;
+    const data = (await res.json()) as ScheduleMatch[];
+    if (data.length > 0) return data;
+  } catch {
+    // fall through to DB fallback
+  }
+
+  // DB fallback — seeded matches always available even without API key
+  try {
+    const matches = await prisma.match.findMany({
+      include: { homeTeam: true, awayTeam: true },
+      orderBy: { date: "asc" },
+    });
+    return matches.map((m) => ({
+      id: m.fixture,
+      utcDate: m.date.toISOString(),
+      status: (m.status as ScheduleMatch["status"]) ?? "NS",
+      minute: m.elapsed ?? 0,
+      stage: m.stage ?? "GROUP_STAGE",
+      stageLabel: m.stage ?? "Group Stage",
+      group: m.homeTeam.groupStage ?? "",
+      matchday: 1,
+      homeTeam: { name: m.homeTeam.name, tla: m.homeTeam.code },
+      awayTeam: { name: m.awayTeam.name, tla: m.awayTeam.code },
+      homeScore: m.homeScore ?? null,
+      awayScore: m.awayScore ?? null,
+    }));
   } catch {
     return [];
   }
@@ -40,7 +65,7 @@ export default async function SchedulePage() {
             <CalendarDays size={48} className="mx-auto mb-4 text-slate-600" />
             <p className="text-slate-400 font-semibold">Schedule unavailable</p>
             <p className="text-slate-600 text-sm mt-1">
-              Add <code className="text-brand-green">API_FOOTBALL_KEY</code> to Vercel to load the full schedule.
+              No match data found. Run the seed endpoint or check your connection.
             </p>
           </div>
         ) : (
