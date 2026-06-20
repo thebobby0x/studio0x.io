@@ -11,6 +11,7 @@ export interface Story {
   body: string;
   teamsInvolved: string[];
   generatedAt: string;
+  audioUrl?: string;
 }
 
 // In-memory cache — regenerate once per hour

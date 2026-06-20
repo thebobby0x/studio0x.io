@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, ChevronDown, ChevronUp, Newspaper } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { RefreshCw, ChevronDown, ChevronUp, Newspaper, Play, Pause, Loader2 } from "lucide-react";
 import type { Story } from "@/app/api/ai/stories/route";
 import FlagImg from "@/components/ui/FlagImg";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  "MATCH REPORT":    "bg-blue-500/20 text-blue-300",
+  "MATCH REPORT":    "bg-brand-blue/20 text-blue-300",
   "ANALYSIS":        "bg-brand-gold/20 text-amber-300",
   "STANDINGS":       "bg-emerald-500/20 text-emerald-300",
   "METRIC SPOTLIGHT":"bg-purple-500/20 text-purple-300",
@@ -14,9 +14,48 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function StoryCard({ story }: { story: Story }) {
   const [expanded, setExpanded] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
   const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
+
+  const handlePlay = useCallback(async () => {
+    // Already have audio — toggle play/pause
+    if (audioRef.current && audioUrl) {
+      if (playing) {
+        audioRef.current.pause();
+        setPlaying(false);
+      } else {
+        audioRef.current.play();
+        setPlaying(true);
+      }
+      return;
+    }
+
+    // Generate audio
+    setAudioLoading(true);
+    try {
+      const res = await fetch("/api/ai/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: `${story.headline}. ${story.body}`, storyId: story.id }),
+      });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!data.url) return;
+      setAudioUrl(data.url);
+      const audio = new Audio(data.url);
+      audioRef.current = audio;
+      audio.onended = () => setPlaying(false);
+      audio.play();
+      setPlaying(true);
+    } finally {
+      setAudioLoading(false);
+    }
+  }, [audioUrl, playing, story]);
 
   return (
     <div className="rounded-xl bg-brand-card border border-brand-border p-4 flex flex-col gap-2 transition-all">
@@ -38,13 +77,30 @@ function StoryCard({ story }: { story: Story }) {
         {story.body}
       </p>
 
-      <button
-        onClick={() => setExpanded((e) => !e)}
-        className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors self-start mt-0.5"
-      >
-        {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        {expanded ? "Less" : "Read more"}
-      </button>
+      <div className="flex items-center justify-between mt-0.5">
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {expanded ? "Less" : "Read more"}
+        </button>
+
+        <button
+          onClick={handlePlay}
+          disabled={audioLoading}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
+        >
+          {audioLoading ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : playing ? (
+            <Pause size={12} />
+          ) : (
+            <Play size={12} />
+          )}
+          {audioLoading ? "Generating…" : playing ? "Pause" : "Listen"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -97,6 +153,7 @@ export default function TournamentStories() {
         <div className="flex items-center gap-2">
           <Newspaper size={15} className="text-brand-gold" />
           <span className="text-xs font-black uppercase tracking-widest text-slate-400">Studio0x Analysis</span>
+          <span className="text-[10px] text-slate-600">· AI + ElevenLabs voice</span>
         </div>
         <button
           onClick={() => load(true)}

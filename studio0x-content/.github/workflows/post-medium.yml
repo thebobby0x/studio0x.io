@@ -1,0 +1,27 @@
+name: Publish to Medium
+
+on:
+  push:
+    paths: ['stories/*.md']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get changed markdown file
+        id: story
+        run: |
+          FILE=$(git diff --name-only HEAD~1 HEAD | grep 'stories/.*\.md' | head -1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Publish to Medium
+        if: steps.story.outputs.file != ''
+        env:
+          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+          MEDIUM_AUTHOR_ID: ${{ secrets.MEDIUM_AUTHOR_ID }}
+        run: |
+          node scripts/post-medium.js "${{ steps.story.outputs.file }}"

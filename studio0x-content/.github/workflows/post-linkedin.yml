@@ -1,0 +1,27 @@
+name: Post to LinkedIn
+
+on:
+  push:
+    paths: ['stories/*.json']
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get changed story file
+        id: story
+        run: |
+          FILE=$(git diff --name-only HEAD~1 HEAD | grep 'stories/.*\.json' | head -1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Post to LinkedIn
+        if: steps.story.outputs.file != ''
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+        run: |
+          node scripts/post-linkedin.js "${{ steps.story.outputs.file }}"
