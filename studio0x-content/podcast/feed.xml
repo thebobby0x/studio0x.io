@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Studio0x World Cup 2026 Digest</title>
+    <link>https://worldcup-2026-sandy.vercel.app</link>
+    <atom:link href="https://raw.githubusercontent.com/thebobby0x/studio0x-content/main/podcast/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>AI-powered match analysis and tournament stories from Studio0x — the world's first AI sports analytics platform. New episodes after every match day.</description>
+    <language>en-us</language>
+    <copyright>Studio0x 2026</copyright>
+    <itunes:author>Studio0x AI</itunes:author>
+    <itunes:category text="Sports">
+      <itunes:category text="Soccer"/>
+    </itunes:category>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:type>episodic</itunes:type>
+    <!-- Episodes will be appended here by /api/admin/publish-stories -->
+  </channel>
+</rss>

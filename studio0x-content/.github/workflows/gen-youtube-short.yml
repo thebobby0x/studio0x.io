@@ -1,0 +1,35 @@
+name: Generate YouTube Short
+
+on:
+  push:
+    paths: ['stories/*.json']
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install FFmpeg
+        run: sudo apt-get install -y ffmpeg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get changed story file
+        id: story
+        run: |
+          FILE=$(git diff --name-only HEAD~1 HEAD | grep 'stories/.*\.json' | head -1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Generate video
+        if: steps.story.outputs.file != ''
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          bash scripts/gen-video.sh "${{ steps.story.outputs.file }}"
