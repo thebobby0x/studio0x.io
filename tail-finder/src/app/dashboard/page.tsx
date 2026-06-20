@@ -10,6 +10,8 @@ export default function DashboardPage() {
     const router = useRouter();
 
     const [watchlist, setWatchlist] = useState<any[]>([]);
+    const [stats, setStats] = useState({ watchlistCount: 0, zoneCount: 0, alertCount: 0 });
+    const [events, setEvents] = useState<any[]>([]);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -19,6 +21,12 @@ export default function DashboardPage() {
             fetch('/api/watchlist')
                 .then(res => res.json())
                 .then(data => setWatchlist(data));
+            fetch('/api/dashboard/stats')
+                .then(res => res.json())
+                .then(data => setStats(data));
+            fetch('/api/dashboard/events')
+                .then(res => res.json())
+                .then(data => setEvents(Array.isArray(data) ? data : []));
         }
     }, [status, router, session]);
 
@@ -68,9 +76,9 @@ export default function DashboardPage() {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {[
-                        { label: 'Active Targets', value: '0', icon: Crosshair, color: 'text-blue-400' },
-                        { label: 'Surveillance Zones', value: '0', icon: Radar, color: 'text-emerald-400' },
-                        { label: 'Alerts (24h)', value: '0', icon: Bell, color: 'text-amber-400' },
+                        { label: 'Active Targets', value: String(stats.watchlistCount), icon: Crosshair, color: 'text-blue-400' },
+                        { label: 'Surveillance Zones', value: String(stats.zoneCount), icon: Radar, color: 'text-emerald-400' },
+                        { label: 'Alerts (24h)', value: String(stats.alertCount), icon: Bell, color: 'text-amber-400' },
                         { label: 'System Status', value: 'ONLINE', icon: Lock, color: 'text-green-500' },
                     ].map((stat, i) => (
                         <div key={i} className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:bg-slate-800/50 transition-colors group">
@@ -94,13 +102,34 @@ export default function DashboardPage() {
                                 <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded-full animate-pulse font-mono">LIVE</span>
                             </div>
                             <div className="p-0 h-96 overflow-y-auto font-mono text-sm">
-                                {/* Placeholder Empty State */}
-                                <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
-                                    <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center">
-                                        <Bell className="h-8 w-8 opacity-20" />
+                                {events.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
+                                        <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center">
+                                            <Bell className="h-8 w-8 opacity-20" />
+                                        </div>
+                                        <p>No recent intelligence reports.</p>
                                     </div>
-                                    <p>No recent intelligence reports.</p>
-                                </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-800/50">
+                                        {events.map((ev) => (
+                                            <div key={ev.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-800/30 transition-colors">
+                                                <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${ev.event === 'ENTERED' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <span className={`text-xs font-bold ${ev.event === 'ENTERED' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                        {ev.event}
+                                                    </span>
+                                                    <span className="text-slate-400 mx-1">·</span>
+                                                    <span className="text-white font-bold">{ev.icao.toUpperCase()}</span>
+                                                    <span className="text-slate-500 mx-1">in</span>
+                                                    <span className="text-slate-300">{ev.zone?.name ?? 'Unknown Zone'}</span>
+                                                </div>
+                                                <span className="text-[10px] text-slate-600 shrink-0">
+                                                    {new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </section>
 

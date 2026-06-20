@@ -408,7 +408,8 @@ async function seed(req: Request) {
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
     await prisma.match.deleteMany({});
-    await prisma.audioStream.deleteMany({});
+    // AudioStream rows are NOT wiped — real Blob URLs must survive re-seeding.
+    // Placeholders (soundhelix) are overwritten; real URLs are preserved (see step 6).
     await prisma.player.deleteMany({});
     const deletedTeams = await prisma.team.deleteMany({});
     if (deletedTeams.count > 0) log.push(`Cleared ${deletedTeams.count} stale team records`);
@@ -470,21 +471,24 @@ async function seed(req: Request) {
     log.push(`Upserted ${playersData.length} players (${playerCount} new) across ${Object.keys(SQUADS).length} squads`);
 
     // ── 6. Batch create anthems (skipDuplicates = idempotent) ────────────────
-    const anthemsData = Object.entries(ANTHEMS).flatMap(([tla, a]) => {
+    let anthemsSeeded = 0;
+    let anthemsSkipped = 0;
+    for (const [tla, a] of Object.entries(ANTHEMS)) {
       const teamId = teamIdByTla.get(tla);
-      if (!teamId) return [];
-      return [{
-        id: a.id,
-        teamId,
-        title: a.title,
-        artistCredit: "Suno AI × Studio0x",
-        audioUrl: a.url,
-        durationSecs: a.durationSecs,
-        tiktokDeepLink: null as string | null,
-      }];
-    });
-    await prisma.audioStream.createMany({ data: anthemsData, skipDuplicates: true });
-    log.push(`Upserted ${anthemsData.length} anthems`);
+      if (!teamId) continue;
+      const existing = await prisma.audioStream.findFirst({ where: { teamId } });
+      if (existing && !existing.audioUrl.includes("soundhelix.com")) {
+        anthemsSkipped++;
+        continue; // real URL already set — do not overwrite
+      }
+      await prisma.audioStream.upsert({
+        where: { teamId },
+        create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × Studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
+        update: { title: a.title, audioUrl: a.url, durationSecs: a.durationSecs },
+      });
+      anthemsSeeded++;
+    }
+    log.push(`Anthems: ${anthemsSeeded} placeholder(s) written, ${anthemsSkipped} real URL(s) preserved`);
 
     // ── 7. Batch create matches, then parallel update live/finished scores ───
     const validMatches = fdMatches.filter(
