@@ -14,24 +14,33 @@ const STATUS_MAP: Record<string, string> = {
   PST: "NS", CANC: "NS", AWD: "FT", WO: "FT",
 };
 
-async function getAFFixture(fixtureId: number) {
+// Per-fixture cache: 30s for live/HT, 5 min for NS/FT (no point polling finished games)
+type AFResult = { homeScore: number | null; awayScore: number | null; status: string; elapsed: number };
+const _afCache = new Map<number, { ts: number; ttl: number; data: AFResult }>();
+
+async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
   const key = process.env.API_FOOTBALL_KEY;
   if (!key) return null;
+  const cached = _afCache.get(fixtureId);
+  if (cached && Date.now() - cached.ts < cached.ttl) return cached.data;
   try {
     const res = await fetch(`${AF_BASE}/fixtures?id=${fixtureId}`, {
       headers: { "x-apisports-key": key },
-      next: { revalidate: 10 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const json = await res.json();
     const f = json.response?.[0];
     if (!f) return null;
-    return {
+    const data: AFResult = {
       homeScore: f.goals.home as number | null,
       awayScore: f.goals.away as number | null,
       status: (STATUS_MAP[f.fixture.status.short] ?? "NS") as string,
       elapsed: (f.fixture.status.elapsed ?? 0) as number,
     };
+    const isLive = data.status === "LIVE" || data.status === "HT";
+    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 30_000 : 300_000, data });
+    return data;
   } catch {
     return null;
   }
