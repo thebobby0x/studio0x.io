@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Trophy, CalendarDays, Radio, Star, Music2, LogIn, LogOut, User, BarChart2, Shield } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useState, useRef, useEffect } from "react";
 import LiveClock from "./LiveClock";
 import LiveMatchBanner from "./LiveMatchBanner";
 import { useUnits } from "@/lib/units";
@@ -20,6 +21,55 @@ function NavLink({ href, children, exact, className = "" }: { href: string; chil
     >
       {children}
     </Link>
+  );
+}
+
+function UserMenu({ session }: { session: NonNullable<ReturnType<typeof useSession>["data"]> }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const isSuperAdmin = session.user?.role === "SUPER_ADMIN";
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button onClick={() => setOpen((o) => !o)} title={session.user?.email ?? ""}>
+        {session.user?.image
+          ? <img src={session.user.image} alt="" className="w-6 h-6 rounded-full" />
+          : <User size={14} className="text-slate-400" />
+        }
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 w-44 rounded-xl border border-brand-border bg-brand-card shadow-xl z-50 overflow-hidden py-1">
+          <div className="px-3 py-2 border-b border-brand-border">
+            <div className="text-[11px] font-semibold text-white truncate">{session.user?.name}</div>
+            <div className="text-[10px] text-slate-500 truncate">{session.user?.email}</div>
+          </div>
+          {isSuperAdmin && (
+            <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-xs text-brand-gold hover:bg-brand-gold/10 transition-colors"
+            >
+              <Shield size={12} /> Admin Panel
+            </Link>
+          )}
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <LogOut size={12} /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -49,9 +99,6 @@ export default function AppNav() {
             <NavLink href="/predict"><Star size={13} /><span className="hidden sm:inline">Predict</span></NavLink>
             <NavLink href="/standings"><BarChart2 size={14} /><span className="hidden sm:inline">Standings</span></NavLink>
             <NavLink href="/anthems"><Music2 size={14} /><span className="hidden sm:inline">Anthems</span></NavLink>
-            {session?.user?.role === "SUPER_ADMIN" && (
-              <NavLink href="/admin"><Shield size={13} /><span className="hidden sm:inline">Admin</span></NavLink>
-            )}
 
             <button
               onClick={toggleUnits}
@@ -68,18 +115,8 @@ export default function AppNav() {
             </div>
 
             {status !== "loading" && (
-              isLoggedIn ? (
-                <button
-                  onClick={() => signOut()}
-                  className="flex items-center gap-1 shrink-0"
-                  title={`Signed in as ${session.user.email} — click to sign out`}
-                >
-                  {session.user.image
-                    ? <img src={session.user.image} alt="" className="w-5 h-5 rounded-full" />
-                    : <User size={14} className="text-slate-400" />
-                  }
-                  <LogOut size={10} className="text-slate-600 hidden sm:block" />
-                </button>
+              isLoggedIn && session ? (
+                <UserMenu session={session} />
               ) : (
                 <button
                   onClick={() => signIn("google")}
