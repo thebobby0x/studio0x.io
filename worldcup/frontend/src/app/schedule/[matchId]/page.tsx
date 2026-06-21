@@ -11,6 +11,9 @@ import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import MatchDNA from "@/components/stats/MatchDNA";
 import UpsetMeter from "@/components/stats/UpsetMeter";
 import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
+import PressingIntensityIndex from "@/components/stats/PressingIntensityIndex";
+import TransitionDangerRating from "@/components/stats/TransitionDangerRating";
+import FormMeter from "@/components/stats/FormMeter";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
@@ -331,6 +334,12 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           )}
         </div>
 
+        {/* Team form guides */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormMeter teamTla={m.homeTeam.tla} teamName={m.homeTeam.name} />
+          <FormMeter teamTla={m.awayTeam.tla} teamName={m.awayTeam.name} />
+        </div>
+
         {/* Live win probability meter — DB match needed for matchId */}
         <MatchWinMeter fixtureId={m.id} />
 
@@ -462,6 +471,16 @@ async function MatchDNAPanel({
         />
         <GoalGravity
           goals={gravityGoals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+        />
+        <TransitionDangerRating
+          goals={goals}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+        />
+        <PressingIntensityIndex
+          matchId={dbMatch.id}
           homeTeamName={homeTeamName}
           awayTeamName={awayTeamName}
         />

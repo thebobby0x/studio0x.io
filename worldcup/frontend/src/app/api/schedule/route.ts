@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // FIFA World Cup
 const SEASON = 2026;
-const CACHE_TTL = 60_000; // 60s — keeps NS→LIVE transitions responsive
+const CACHE_TTL = 60_000; // 60s bulk schedule
+const LIVE_TTL  = 15_000; // 15s live overlay
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -74,7 +75,15 @@ export interface ScheduleMatch {
   awayScore: number | null;
 }
 
+interface LiveEntry {
+  status: ScheduleMatch["status"];
+  minute: number;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
 let _cache: { ts: number; data: ScheduleMatch[] } | null = null;
+let _liveCache: { ts: number; data: Map<number, LiveEntry> } | null = null;
 // name→code lookup loaded once from DB (teams rarely change)
 let _nameToCode: Map<string, string> | null = null;
 
@@ -89,64 +98,124 @@ async function getNameToCode(): Promise<Map<string, string>> {
   return _nameToCode;
 }
 
-export async function GET() {
-  if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
-    return NextResponse.json(_cache.data);
+async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
+  if (_liveCache && Date.now() - _liveCache.ts < LIVE_TTL) {
+    return _liveCache.data;
   }
-
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return NextResponse.json([], { status: 503 });
-
-  const nameToCode = await getNameToCode();
 
   try {
     const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 10_000);
+    setTimeout(() => ctrl.abort(), 5_000);
     const res = await fetch(
-      `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}`,
+      `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}&live=all`,
       { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
     );
 
     if (!res.ok) {
-      console.warn(`[schedule] api-football ${res.status}`);
-      return NextResponse.json(_cache?.data ?? [], { status: 502 });
+      console.warn(`[schedule/live] api-football ${res.status}`);
+      return _liveCache?.data ?? new Map();
     }
 
-    const json  = await res.json();
-    const raw: AFFixture[] = json.response ?? [];
+    const json = await res.json();
+    const liveFixtures: AFFixture[] = json.response ?? [];
 
-    const data: ScheduleMatch[] = raw.map((f) => {
-      const round    = f.league.round;
-      const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
-      const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
-      const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
-      // api-football fixtures endpoint returns code:null; fall back to DB name→code lookup
-      const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
-      const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
-      const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
-      const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
+    const data = new Map<number, LiveEntry>();
+    for (const f of liveFixtures) {
+      data.set(f.fixture.id, {
+        status: (STATUS_MAP[f.fixture.status.short] ?? "LIVE") as ScheduleMatch["status"],
+        minute: f.fixture.status.elapsed ?? 0,
+        homeScore: f.goals.home,
+        awayScore: f.goals.away,
+      });
+    }
 
-      return {
-        id:         f.fixture.id,
-        utcDate:    f.fixture.date,
-        status,
-        minute:     f.fixture.status.elapsed ?? 0,
-        stage,
-        stageLabel: STAGE_LABELS[stage] ?? stage,
-        group,
-        matchday,
-        homeTeam:   { name: f.teams.home.name, tla: homeTla },
-        awayTeam:   { name: f.teams.away.name, tla: awayTla },
-        homeScore:  f.goals.home,
-        awayScore:  f.goals.away,
-      };
-    });
-
-    _cache = { ts: Date.now(), data };
-    console.log(`[schedule] fetched ${data.length} fixtures from api-football.com`);
-    return NextResponse.json(data);
-  } catch (e) {
-    console.error("[schedule] error:", e);
-    return NextResponse.json(_cache?.data ?? [], { status: 503 });
+    _liveCache = { ts: Date.now(), data };
+    if (liveFixtures.length > 0) {
+      console.log(`[schedule/live] ${liveFixtures.length} live fixture(s) overlaid`);
+    }
+    return data;
+  } catch {
+    return _liveCache?.data ?? new Map();
   }
+}
+
+function applyLiveOverlay(data: ScheduleMatch[], overlay: Map<number, LiveEntry>): ScheduleMatch[] {
+  if (overlay.size === 0) return data;
+  return data.map(m => {
+    const live = overlay.get(m.id);
+    if (!live) return m;
+    return { ...m, ...live };
+  });
+}
+
+export async function GET() {
+  const apiKey = process.env.API_FOOTBALL_KEY;
+  if (!apiKey) return NextResponse.json([], { status: 503 });
+
+  // ── Bulk schedule (60s TTL) ──────────────────────────────────────────────
+  let baseData: ScheduleMatch[];
+
+  if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
+    baseData = _cache.data;
+  } else {
+    const nameToCode = await getNameToCode();
+
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 10_000);
+      const res = await fetch(
+        `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}`,
+        { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
+      );
+
+      if (!res.ok) {
+        console.warn(`[schedule] api-football ${res.status}`);
+        baseData = _cache?.data ?? [];
+      } else {
+        const json  = await res.json();
+        const raw: AFFixture[] = json.response ?? [];
+
+        baseData = raw.map((f) => {
+          const round    = f.league.round;
+          const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
+          const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
+          const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
+          const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
+          const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
+          const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
+          const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
+
+          return {
+            id:         f.fixture.id,
+            utcDate:    f.fixture.date,
+            status,
+            minute:     f.fixture.status.elapsed ?? 0,
+            stage,
+            stageLabel: STAGE_LABELS[stage] ?? stage,
+            group,
+            matchday,
+            homeTeam:   { name: f.teams.home.name, tla: homeTla },
+            awayTeam:   { name: f.teams.away.name, tla: awayTla },
+            homeScore:  f.goals.home,
+            awayScore:  f.goals.away,
+          };
+        });
+
+        _cache = { ts: Date.now(), data: baseData };
+        console.log(`[schedule] fetched ${baseData.length} fixtures from api-football.com`);
+      }
+    } catch (e) {
+      console.error("[schedule] error:", e);
+      baseData = _cache?.data ?? [];
+      if (!baseData.length) return NextResponse.json([], { status: 503 });
+    }
+  }
+
+  // ── Live overlay (15s TTL) ───────────────────────────────────────────────
+  // Checks /fixtures?live=all for any currently-playing WC matches and
+  // overlays real-time status/scores on top of the bulk schedule data.
+  const liveOverlay = await getLiveOverlay(apiKey);
+  const data = applyLiveOverlay(baseData, liveOverlay);
+
+  return NextResponse.json(data);
 }
