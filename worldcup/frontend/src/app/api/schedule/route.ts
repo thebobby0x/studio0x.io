@@ -82,6 +82,13 @@ interface LiveEntry {
   awayScore: number | null;
 }
 
+interface DbEntry {
+  status: ScheduleMatch["status"];
+  homeScore: number;
+  awayScore: number;
+  elapsed: number;
+}
+
 let _cache: { ts: number; data: ScheduleMatch[] } | null = null;
 let _liveCache: { ts: number; data: Map<number, LiveEntry> } | null = null;
 // name→code lookup loaded once from DB (teams rarely change)
@@ -96,6 +103,79 @@ async function getNameToCode(): Promise<Map<string, string>> {
     _nameToCode = new Map();
   }
   return _nameToCode;
+}
+
+// DB overlay: corrects stale "NS" statuses for completed/live matches.
+// api-football sometimes lags on status updates; DB (seeded and updated via seed route)
+// is the authoritative source for FT matches.
+async function getDbOverlay(): Promise<Map<number, DbEntry>> {
+  try {
+    const dbMatches = await prisma.match.findMany({
+      where: { status: { in: ["FT", "LIVE", "HT"] } },
+      select: { fixture: true, status: true, homeScore: true, awayScore: true, elapsed: true },
+    });
+    return new Map(dbMatches.map(m => [
+      m.fixture,
+      { status: m.status as ScheduleMatch["status"], homeScore: m.homeScore, awayScore: m.awayScore, elapsed: m.elapsed },
+    ]));
+  } catch {
+    return new Map();
+  }
+}
+
+// Synthesize schedule from DB when api-football returns empty results.
+// Uses DB match records + Team relations to build ScheduleMatch objects.
+async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
+  try {
+    const dbMatches = await prisma.match.findMany({
+      include: {
+        homeTeam: { select: { name: true, code: true, groupStage: true } },
+        awayTeam: { select: { name: true, code: true, groupStage: true } },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    if (dbMatches.length === 0) return [];
+
+    // Attempt to figure out matchday from position within group
+    const groupMatchdayCounter = new Map<string, Map<string, number>>();
+
+    return dbMatches.map(m => {
+      const homeTla = m.homeTeam.code;
+      const awayTla = m.awayTeam.code;
+      const group = m.homeTeam.groupStage || m.awayTeam.groupStage || "";
+      const isGroupStage = !!group && group !== "KO";
+      const stage = isGroupStage ? "GROUP_STAGE" : "KNOCKOUT";
+
+      // Compute matchday per group by counting matches per team
+      let matchday = 0;
+      if (isGroupStage) {
+        if (!groupMatchdayCounter.has(group)) groupMatchdayCounter.set(group, new Map());
+        const counter = groupMatchdayCounter.get(group)!;
+        const homeCount = (counter.get(homeTla) ?? 0) + 1;
+        counter.set(homeTla, homeCount);
+        counter.set(awayTla, (counter.get(awayTla) ?? 0) + 1);
+        matchday = homeCount; // 1, 2, or 3
+      }
+
+      return {
+        id: m.fixture,
+        utcDate: m.date.toISOString(),
+        status: m.status as ScheduleMatch["status"],
+        minute: m.elapsed,
+        stage,
+        stageLabel: STAGE_LABELS[stage] ?? stage,
+        group,
+        matchday,
+        homeTeam: { name: m.homeTeam.name, tla: homeTla },
+        awayTeam: { name: m.awayTeam.name, tla: awayTla },
+        homeScore: m.status === "FT" ? m.homeScore : null,
+        awayScore: m.status === "FT" ? m.awayScore : null,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
@@ -139,6 +219,17 @@ async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
   }
 }
 
+function applyDbOverlay(data: ScheduleMatch[], overlay: Map<number, DbEntry>): ScheduleMatch[] {
+  if (overlay.size === 0) return data;
+  return data.map(m => {
+    const db = overlay.get(m.id);
+    // Only override if DB has a more authoritative status (FT, LIVE, HT) and api-football still shows NS
+    if (!db) return m;
+    if (m.status !== "NS" && m.status === db.status) return m; // already in sync
+    return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed };
+  });
+}
+
 function applyLiveOverlay(data: ScheduleMatch[], overlay: Map<number, LiveEntry>): ScheduleMatch[] {
   if (overlay.size === 0) return data;
   return data.map(m => {
@@ -175,45 +266,60 @@ export async function GET() {
         const json  = await res.json();
         const raw: AFFixture[] = json.response ?? [];
 
-        baseData = raw.map((f) => {
-          const round    = f.league.round;
-          const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
-          const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
-          const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
-          const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
-          const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
-          const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
-          const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
+        if (raw.length > 0) {
+          baseData = raw.map((f) => {
+            const round    = f.league.round;
+            const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
+            const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
+            const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
+            const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
+            const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
+            const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
+            const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
 
-          return {
-            id:         f.fixture.id,
-            utcDate:    f.fixture.date,
-            status,
-            minute:     f.fixture.status.elapsed ?? 0,
-            stage,
-            stageLabel: STAGE_LABELS[stage] ?? stage,
-            group,
-            matchday,
-            homeTeam:   { name: f.teams.home.name, tla: homeTla },
-            awayTeam:   { name: f.teams.away.name, tla: awayTla },
-            homeScore:  f.goals.home,
-            awayScore:  f.goals.away,
-          };
-        });
+            return {
+              id:         f.fixture.id,
+              utcDate:    f.fixture.date,
+              status,
+              minute:     f.fixture.status.elapsed ?? 0,
+              stage,
+              stageLabel: STAGE_LABELS[stage] ?? stage,
+              group,
+              matchday,
+              homeTeam:   { name: f.teams.home.name, tla: homeTla },
+              awayTeam:   { name: f.teams.away.name, tla: awayTla },
+              homeScore:  f.goals.home,
+              awayScore:  f.goals.away,
+            };
+          });
 
-        _cache = { ts: Date.now(), data: baseData };
-        console.log(`[schedule] fetched ${baseData.length} fixtures from api-football.com`);
+          _cache = { ts: Date.now(), data: baseData };
+          console.log(`[schedule] fetched ${baseData.length} fixtures from api-football.com`);
+        } else {
+          // api-football returned 0 results — fall back to DB-synthesised schedule
+          console.warn("[schedule] api-football returned 0 fixtures, synthesising from DB");
+          baseData = await synthesizeFromDb();
+          if (baseData.length > 0) {
+            _cache = { ts: Date.now(), data: baseData };
+          }
+        }
       }
     } catch (e) {
       console.error("[schedule] error:", e);
       baseData = _cache?.data ?? [];
+      if (!baseData.length) {
+        baseData = await synthesizeFromDb();
+      }
       if (!baseData.length) return NextResponse.json([], { status: 503 });
     }
   }
 
-  // ── Live overlay (15s TTL) ───────────────────────────────────────────────
-  // Checks /fixtures?live=all for any currently-playing WC matches and
-  // overlays real-time status/scores on top of the bulk schedule data.
+  // ── DB overlay (always fresh): fix stale NS statuses for FT/LIVE/HT matches
+  // api-football sometimes lags; the DB is authoritative for completed games.
+  const dbOverlay = await getDbOverlay();
+  baseData = applyDbOverlay(baseData, dbOverlay);
+
+  // ── Live overlay (15s TTL): real-time status for currently-playing matches ──
   const liveOverlay = await getLiveOverlay(apiKey);
   const data = applyLiveOverlay(baseData, liveOverlay);
 
