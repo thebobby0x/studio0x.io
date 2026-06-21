@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { RefreshCw, ChevronDown, ChevronUp, Newspaper, Play, Pause, Loader2 } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronUp, Newspaper, Play, Pause, Loader2, Telescope } from "lucide-react";
 import type { Story } from "@/app/api/ai/stories/route";
 import FlagImg from "@/components/ui/FlagImg";
 
@@ -12,6 +12,27 @@ const CATEGORY_COLORS: Record<string, string> = {
   "METRIC SPOTLIGHT":"bg-purple-500/20 text-purple-300",
 };
 
+function DeepDivePanel({ text }: { text: string }) {
+  // Render bold **headings** and paragraphs
+  const sections = text.split(/\n\n+/).filter(Boolean);
+  return (
+    <div className="mt-3 pt-3 border-t border-brand-border space-y-3">
+      {sections.map((block, i) => {
+        const headingMatch = block.match(/^\*\*(.+?)\*\*\n?([\s\S]*)/);
+        if (headingMatch) {
+          return (
+            <div key={i}>
+              <p className="text-[11px] font-black uppercase tracking-widest text-brand-gold mb-1">{headingMatch[1]}</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{headingMatch[2].trim()}</p>
+            </div>
+          );
+        }
+        return <p key={i} className="text-sm text-slate-300 leading-relaxed">{block}</p>;
+      })}
+    </div>
+  );
+}
+
 function StoryCard({ story }: { story: Story }) {
   const [expanded, setExpanded] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -19,24 +40,20 @@ function StoryCard({ story }: { story: Story }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const [deepDive, setDeepDive] = useState<string | null>(null);
+  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
+  const [deepDiveOpen, setDeepDiveOpen] = useState(false);
+
   const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
   const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
 
   const handlePlay = useCallback(async () => {
-    // Already have audio — toggle play/pause
     if (audioRef.current && audioUrl) {
-      if (playing) {
-        audioRef.current.pause();
-        setPlaying(false);
-      } else {
-        audioRef.current.play();
-        setPlaying(true);
-      }
+      if (playing) { audioRef.current.pause(); setPlaying(false); }
+      else { audioRef.current.play(); setPlaying(true); }
       return;
     }
-
-    // Generate audio
     setAudioLoading(true);
     try {
       const res = await fetch("/api/ai/tts", {
@@ -56,6 +73,29 @@ function StoryCard({ story }: { story: Story }) {
       setAudioLoading(false);
     }
   }, [audioUrl, playing, story]);
+
+  const handleDeepDive = useCallback(async () => {
+    if (deepDive) { setDeepDiveOpen((o) => !o); return; }
+    setDeepDiveLoading(true);
+    setDeepDiveOpen(true);
+    try {
+      const res = await fetch("/api/ai/story-expand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storyId: story.id,
+          headline: story.headline,
+          body: story.body,
+          category: story.category,
+          teamsInvolved: story.teamsInvolved,
+        }),
+      });
+      const data = await res.json() as { deepDive?: string; error?: string };
+      if (data.deepDive) setDeepDive(data.deepDive);
+    } finally {
+      setDeepDiveLoading(false);
+    }
+  }, [deepDive, story]);
 
   return (
     <div className="rounded-xl bg-brand-card border border-brand-border p-4 flex flex-col gap-2 transition-all">
@@ -86,21 +126,39 @@ function StoryCard({ story }: { story: Story }) {
           {expanded ? "Less" : "Read more"}
         </button>
 
-        <button
-          onClick={handlePlay}
-          disabled={audioLoading}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
-        >
-          {audioLoading ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : playing ? (
-            <Pause size={12} />
-          ) : (
-            <Play size={12} />
-          )}
-          {audioLoading ? "Generating…" : playing ? "Pause" : "Listen"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDeepDive}
+            disabled={deepDiveLoading}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 disabled:opacity-40"
+          >
+            {deepDiveLoading ? <Loader2 size={12} className="animate-spin" /> : <Telescope size={12} />}
+            {deepDiveLoading ? "Analysing…" : deepDiveOpen ? "Close" : "Go Deeper"}
+          </button>
+
+          <button
+            onClick={handlePlay}
+            disabled={audioLoading}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
+          >
+            {audioLoading ? <Loader2 size={12} className="animate-spin" /> : playing ? <Pause size={12} /> : <Play size={12} />}
+            {audioLoading ? "Generating…" : playing ? "Pause" : "Listen"}
+          </button>
+        </div>
       </div>
+
+      {/* Deep dive panel */}
+      {deepDiveOpen && (
+        deepDiveLoading ? (
+          <div className="mt-3 pt-3 border-t border-brand-border space-y-2">
+            {[90, 75, 85, 60, 80].map((w, i) => (
+              <div key={i} className="h-3 bg-slate-800 rounded animate-pulse" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        ) : deepDive ? (
+          <DeepDivePanel text={deepDive} />
+        ) : null
+      )}
     </div>
   );
 }
