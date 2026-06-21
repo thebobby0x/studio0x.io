@@ -58,6 +58,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const { id } = await params;
   const { searchParams } = new URL(req.url);
   const persona: Persona = (searchParams.get("persona") ?? "analyst") as Persona;
@@ -96,19 +97,26 @@ ${eventSummary}
 
 Generate exactly ${limit} short commentary lines about this match, covering the key moments and current state. Number each line (1., 2., ...). If no goals yet, comment on the tactical battle, atmosphere, and what's at stake.`;
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
-  const lines = text
-    .split("\n")
-    .map(l => l.replace(/^\d+\.\s*/, "").trim())
-    .filter(l => l.length > 0)
-    .slice(0, limit);
+  let lines: string[] = [];
+  try {
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    lines = text
+      .split("\n")
+      .map(l => l.replace(/^\d+\.\s*/, "").trim())
+      .filter(l => l.length > 0)
+      .slice(0, limit);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "AI generation failed" },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json({
     persona,
@@ -119,4 +127,10 @@ Generate exactly ${limit} short commentary lines about this match, covering the 
     eventCount: events.length,
     generatedAt: new Date().toISOString(),
   });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Internal error" },
+      { status: 500 }
+    );
+  }
 }
