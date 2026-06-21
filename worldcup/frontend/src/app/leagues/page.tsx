@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import AppNav from "@/components/ui/AppNav";
 import { prisma } from "@/lib/prisma";
 import { Building2 } from "lucide-react";
+import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
+import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
 
 function LeagueIcon({ league }: { league: string }): string {
   const map: Record<string, string> = {
@@ -109,6 +111,12 @@ export default async function LeaguesPage() {
             </p>
           </div>
         )}
+
+        {/* Studio0x Proprietary Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <ClubContributionIndex limit={8} />
+          <PlayerPerformanceIndex limit={10} />
+        </div>
 
         {/* League sections */}
         {sortedLeagues.map(([league, clubMap]) => {

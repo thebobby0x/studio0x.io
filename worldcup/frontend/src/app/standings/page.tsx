@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
 import TournamentRecords from "@/components/stats/TournamentRecords";
+import EliminationProximity from "@/components/stats/EliminationProximity";
 import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
 import { getTournamentWinnerMarkets } from "@/lib/polymarket";
@@ -386,6 +387,9 @@ export default async function StandingsPage() {
 
         {/* Tournament Records™ */}
         <TournamentRecords />
+        <div className="mt-8">
+          <EliminationProximity limit={16} />
+        </div>
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
