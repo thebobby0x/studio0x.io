@@ -19,8 +19,10 @@ jobs:
           # Clone the new empty repo
           git clone https://x-access-token:${CONTENT_REPO_TOKEN}@github.com/thebobby0x/studio0x-content.git /tmp/studio0x-content
 
-          # Copy all files from the scaffold folder
+          # Copy all files except .github/workflows (requires `workflow` PAT scope)
+          # Workflows can be added later via the GitHub web UI
           cp -r studio0x-content/. /tmp/studio0x-content/
+          rm -rf /tmp/studio0x-content/.github/workflows
 
           cd /tmp/studio0x-content
           git add .
@@ -29,7 +31,14 @@ jobs:
           if git diff --staged --quiet; then
             echo "Nothing to commit — repo already up to date"
           else
-            git commit -m "Initial setup: workflows, scripts, podcast RSS, README"
+            git commit -m "Initial setup: scripts, podcast RSS, README"
             git push origin main
             echo "Done! studio0x-content repo is ready."
+            echo ""
+            echo "NOTE: The .github/workflows/ files were skipped because the PAT needs"
+            echo "'workflow' scope to push them. Add them via the GitHub web UI:"
+            echo "  - post-linkedin.yml"
+            echo "  - post-x.yml"
+            echo "  - post-medium.yml"
+            echo "  - gen-youtube-short.yml"
           fi
