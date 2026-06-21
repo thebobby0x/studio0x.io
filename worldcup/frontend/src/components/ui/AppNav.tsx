@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy, CalendarDays, Radio, Star, Music2, LogIn, LogOut, User, BarChart2 } from "lucide-react";
+import { Trophy, CalendarDays, Radio, Star, Music2, LogIn, LogOut, User, BarChart2, Shield } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import LiveClock from "./LiveClock";
 import LiveMatchBanner from "./LiveMatchBanner";
@@ -49,6 +49,9 @@ export default function AppNav() {
             <NavLink href="/predict"><Star size={13} /><span className="hidden sm:inline">Predict</span></NavLink>
             <NavLink href="/standings"><BarChart2 size={14} /><span className="hidden sm:inline">Standings</span></NavLink>
             <NavLink href="/anthems"><Music2 size={14} /><span className="hidden sm:inline">Anthems</span></NavLink>
+            {session?.user?.role === "SUPER_ADMIN" && (
+              <NavLink href="/admin"><Shield size={13} /><span className="hidden sm:inline">Admin</span></NavLink>
+            )}
 
             <button
               onClick={toggleUnits}
