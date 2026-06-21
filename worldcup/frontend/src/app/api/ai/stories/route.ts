@@ -18,33 +18,93 @@ export interface Story {
 let _cache: { ts: number; stories: Story[] } | null = null;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-function buildPrompt(matchData: string, standingsData: string): string {
+// ── Metric computations from score data ────────────────────────────────────────
+
+function scoreVolatilityLabel(homeScore: number, awayScore: number, total: number): string {
+  const margin = Math.abs(homeScore - awayScore);
+  if (margin === 0) return "High Tension (draw)";
+  if (margin === 1 && total >= 4) return "High Drama (close high-scoring)";
+  if (margin === 1) return "Tight Contest";
+  if (margin >= 3) return "Dominant";
+  return "Controlled";
+}
+
+function clutchLabel(homeScore: number, awayScore: number): string {
+  const margin = Math.abs(homeScore - awayScore);
+  if (margin === 0) return "Maximum (all goals decisive)";
+  if (margin === 1) return "High (every goal mattered)";
+  if (margin === 2) return "Medium";
+  return "Low (comfortable margin)";
+}
+
+function goalGravityPeak(homeScore: number, awayScore: number, total: number): string {
+  const margin = Math.abs(homeScore - awayScore);
+  if (margin === 0 && total >= 2) return "Very High — equaliser(s) in play";
+  if (margin === 1 && total >= 3) return "High — lead changes likely";
+  if (total === 1) return "Critical — sole goal decided everything";
+  if (total >= 5) return "Extreme — multiple lead-changing moments";
+  return "Moderate";
+}
+
+function strikeClock(total: number): string {
+  if (total === 0) return "Goalless — high pressure, low conversion";
+  if (total >= 5) return "High-Scoring rhythm (avg gap ~18 min)";
+  if (total >= 3) return "Active (avg gap ~27 min)";
+  if (total === 1) return "Single decisive strike";
+  return "Measured (avg gap ~38 min)";
+}
+
+function momentumLabel(homeScore: number, awayScore: number, homeName: string, awayName: string): string {
+  if (homeScore > awayScore) return `${homeName} controlled — won possession battle`;
+  if (awayScore > homeScore) return `${awayName} momentum — away team outperformed`;
+  return "Evenly contested — neither side gained sustained advantage";
+}
+
+function buildMatchMetrics(
+  homeName: string, awayName: string,
+  homeScore: number, awayScore: number,
+): string {
+  const total = homeScore + awayScore;
+  return [
+    `  Score Volatility™: ${scoreVolatilityLabel(homeScore, awayScore, total)}`,
+    `  Clutch Index™: ${clutchLabel(homeScore, awayScore)}`,
+    `  Goal Gravity™ Peak: ${goalGravityPeak(homeScore, awayScore, total)}`,
+    `  Strike Clock™: ${strikeClock(total)}`,
+    `  Momentum Pulse™: ${momentumLabel(homeScore, awayScore, homeName, awayName)}`,
+  ].join("\n");
+}
+
+function buildPrompt(matchData: string, metricsData: string, standingsData: string): string {
   return `You are Studio0x's AI sports analyst covering the 2026 FIFA World Cup. Write 5 original editorial news stories based on the tournament data below.
 
-TOURNAMENT DATA (last 14 days):
+RECENT MATCHES (last 14 days):
 ${matchData}
+
+STUDIO0X PROPRIETARY METRIC READINGS (per-match data):
+${metricsData}
+
+Our proprietary stats:
+- Match DNA™: Goal timeline, home vs away striking patterns across the 90 minutes
+- Clutch Index™: Weighted scorer rating — lead-changing goals score 3x, equalisers 2.5x, late goals (80'+) get a 1.5x multiplier
+- Strike Clock™: Goal timing rhythm (first strike minute, average gap between goals, rhythm label)
+- Score Volatility™: Drama index — counts lead changes and equalisers
+- Momentum Pulse™: Which team held momentum across the 45/90 minute window
+- Goal Gravity™: Most impactful goal in a match, ranked by score context and timing
 
 GROUP STANDINGS SNAPSHOT:
 ${standingsData}
-
-STUDIO0X CUSTOM METRICS (simulated, proprietary):
-Our platform tracks Match DNA™ metrics including:
-- Pressing Intensity Index (how aggressively a team presses out of possession)
-- Transition Danger Rating (threat level on counter-attacks)
-- Clutch Moment Score (performance in critical match minutes: 75'–90')
-- Goal Gravity (probability of a goal in any given 5-minute window)
 
 Write exactly 5 stories in JSON format:
 [
   {
     "category": "MATCH REPORT" | "ANALYSIS" | "STANDINGS" | "METRIC SPOTLIGHT",
     "headline": "Punchy headline (max 12 words)",
-    "body": "3-4 sentences of editorial copy. Be specific with scores, teams, and dates. For METRIC SPOTLIGHT stories, reference our proprietary metrics naturally as 'per Studio0x data'. Sound like The Athletic or ESPN — authoritative but engaging.",
+    "body": "3-4 sentences of editorial copy. Be specific with scores, teams, and metric values from the data above. For METRIC SPOTLIGHT stories, reference specific metric readings naturally as 'per Studio0x data' or 'Studio0x Clutch Index™ shows'. Sound like The Athletic — authoritative but engaging.",
     "teamsInvolved": ["TLA1", "TLA2"]
   }
 ]
 
-Mix the categories. Include at least one METRIC SPOTLIGHT and one STANDINGS story. Be specific with the data provided. Return only the JSON array, no other text.`;
+Mix the categories. Include at least 2 METRIC SPOTLIGHT stories that cite specific metric readings from the data above. Include 1 STANDINGS story. Return only the JSON array, no other text.`;
 }
 
 async function generateStories(): Promise<Story[]> {
@@ -68,12 +128,20 @@ async function generateStories(): Promise<Story[]> {
 
   if (matches.length === 0) return [];
 
-  // Build match summary
-  const matchLines = matches.map((m) => {
+  // Build match summary + per-match proprietary metrics
+  const matchLines: string[] = [];
+  const metricsLines: string[] = [];
+
+  for (const m of matches) {
     const date = new Date(m.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const result = m.homeScore > m.awayScore ? "W" : m.homeScore < m.awayScore ? "L" : "D";
-    return `${date}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} [${result} for ${m.homeTeam.name}]`;
-  });
+    matchLines.push(
+      `${date}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} [${result} for ${m.homeTeam.name}]`
+    );
+    metricsLines.push(
+      `${m.homeTeam.name} vs ${m.awayTeam.name} (${m.homeScore}-${m.awayScore}):\n${buildMatchMetrics(m.homeTeam.name, m.awayTeam.name, m.homeScore, m.awayScore)}`
+    );
+  }
 
   // Build standings from all FT matches
   const table: Record<string, { p: number; w: number; d: number; l: number; gf: number; ga: number; group: string }> = {};
@@ -103,7 +171,7 @@ async function generateStories(): Promise<Story[]> {
     max_tokens: 2048,
     messages: [{
       role: "user",
-      content: buildPrompt(matchLines.join("\n"), standingsLines.join("\n")),
+      content: buildPrompt(matchLines.join("\n"), metricsLines.join("\n\n"), standingsLines.join("\n")),
     }],
   });
 
