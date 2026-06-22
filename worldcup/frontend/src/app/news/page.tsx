@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import StoryCard, { type StoryCardData } from "@/components/news/StoryCard";
+import AppNav from "@/components/ui/AppNav";
 import { Newspaper } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,8 @@ export default async function NewsPage() {
   const days = [...groups.keys()].sort().reverse();
 
   return (
+    <div className="min-h-screen bg-brand-dark text-slate-200">
+      <AppNav />
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-black text-white">
@@ -77,6 +80,7 @@ export default async function NewsPage() {
           </section>
         ))
       )}
+    </div>
     </div>
   );
 }
