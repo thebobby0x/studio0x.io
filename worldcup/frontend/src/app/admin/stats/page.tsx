@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import AppNav from "@/components/ui/AppNav";
 import { CopyUrlButton } from "./CopyUrlButton";
 
 function formatListenTime(seconds: number): string {
@@ -19,7 +20,9 @@ export default async function AdminStatsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-brand-dark text-slate-200 p-6">
+    <div className="min-h-screen bg-brand-dark text-slate-200">
+      <AppNav />
+      <div className="p-6">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-white">Anthem Stats</h1>
@@ -75,6 +78,7 @@ export default async function AdminStatsPage() {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   );

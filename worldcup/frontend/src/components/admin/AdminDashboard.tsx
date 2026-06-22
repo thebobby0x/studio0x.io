@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2 } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -203,8 +203,9 @@ export default function AdminDashboard({ users }: { users: User[] }) {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
-              { href: "/admin/anthems", icon: Music2, label: "Anthem Manager", desc: "Upload & manage team anthems" },
-              { href: "/admin/stats",   icon: BarChart2, label: "Play Stats",   desc: "Audio stream analytics" },
+              { href: "/admin/anthems",  icon: Music2,            label: "Anthem Manager",  desc: "Upload & manage team anthems" },
+              { href: "/admin/stats",    icon: BarChart2,          label: "Play Stats",      desc: "Audio stream analytics" },
+              { href: "/admin/sponsors", icon: BadgeDollarSign,    label: "Sponsors",        desc: "View sponsors, ad slots & impression stats" },
               { href: `https://worldcup-2026-sandy.vercel.app/api/admin/publish-stories?secret=wc2026studio0x`, icon: Newspaper, label: "Publish Stories", desc: "Push AI stories to content repo", external: true },
             ].map(({ href, icon: Icon, label, desc, external }) => (
               <a
