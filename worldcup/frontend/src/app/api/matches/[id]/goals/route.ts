@@ -108,6 +108,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!match) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Admin override takes priority over any external source
+  if (match.goalEvents) {
+    const overrideGoals = match.goalEvents as unknown as GoalEvent[];
+    return NextResponse.json({ goals: overrideGoals, source: "override" });
+  }
+
   const apiKey = process.env.API_FOOTBALL_KEY;
 
   // Try the real live events feed first

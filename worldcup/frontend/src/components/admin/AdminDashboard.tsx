@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2 } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -144,6 +144,31 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 label: "Generate News Recaps",
                 desc: "AI recap for every finished match + end-of-day round-ups. Idempotent — re-run to catch up.",
                 action: () => runSeed("news", "/api/news/generate?secret=wc2026studio0x", "POST"),
+              },
+              {
+                key: "ingest",
+                icon: Activity,
+                label: "Ingest Player Stats",
+                desc: "Pull per-match stats from api-football for all finished games. Powers PPI™ and cross-metrics.",
+                action: () => runSeed("ingest", "/api/admin/ingest-match-stats?secret=wc2026studio0x", "POST"),
+              },
+              {
+                key: "purge",
+                icon: Trash2,
+                label: "Purge & Regenerate Stories",
+                desc: "Delete all existing news stories then regenerate from scratch with corrected prompts.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, purge: "loading" }));
+                  try {
+                    const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                    if (!del.ok) throw new Error("purge failed");
+                    const gen = await fetch("/api/news/generate?secret=wc2026studio0x", { method: "POST" });
+                    setSeedStatus(s => ({ ...s, purge: gen.ok ? "done" : "error" }));
+                  } catch {
+                    setSeedStatus(s => ({ ...s, purge: "error" }));
+                  }
+                  setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
+                },
               },
             ].map(({ key, icon: Icon, label, desc, action }) => {
               const status = seedStatus[key] ?? "idle";

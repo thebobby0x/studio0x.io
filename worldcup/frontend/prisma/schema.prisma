@@ -119,40 +119,102 @@ model Player {
   dateOfBirth    String                @default("")
   photoUrl       String?
   tournamentStat PlayerTournamentStat?
+  matchStats     PlayerMatchStat[]
 }
 
 model PlayerTournamentStat {
-  id            String   @id @default(cuid())
-  playerId      String   @unique
-  player        Player   @relation(fields: [playerId], references: [id])
-  goals         Int      @default(0)
-  assists       Int      @default(0)
-  matches       Int      @default(0)
-  minutesPlayed Int      @default(0)
-  yellowCards   Int      @default(0)
-  redCards      Int      @default(0)
-  rating        Float    @default(0)
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  playerId         String   @unique
+  player           Player   @relation(fields: [playerId], references: [id])
+  // Totals (accumulated across all matches)
+  goals            Int      @default(0)
+  assists          Int      @default(0)
+  matches          Int      @default(0)
+  minutesPlayed    Int      @default(0)
+  yellowCards      Int      @default(0)
+  redCards         Int      @default(0)
+  rating           Float    @default(0)   // average across matches
+  // Shooting
+  shotsTotal       Int      @default(0)
+  shotsOnTarget    Int      @default(0)
+  // Passing
+  passesTotal      Int      @default(0)
+  passesKey        Int      @default(0)
+  // Defensive
+  tacklesTotal     Int      @default(0)
+  tackleBlocks     Int      @default(0)
+  interceptions    Int      @default(0)
+  // Duels
+  duelsTotal       Int      @default(0)
+  duelsWon         Int      @default(0)
+  // Dribbles
+  dribblesAttempts Int      @default(0)
+  dribblesSuccess  Int      @default(0)
+  // Discipline
+  foulsDrawn       Int      @default(0)
+  foulsCommitted   Int      @default(0)
+  // Penalties
+  penaltiesScored  Int      @default(0)
+  penaltiesMissed  Int      @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+model PlayerMatchStat {
+  id               String   @id @default(cuid())
+  playerId         String
+  player           Player   @relation(fields: [playerId], references: [id])
+  matchId          String
+  match            Match    @relation(fields: [matchId], references: [id])
+  minutesPlayed    Int      @default(0)
+  rating           Float    @default(0)
+  goals            Int      @default(0)
+  assists          Int      @default(0)
+  captain          Boolean  @default(false)
+  substitute       Boolean  @default(false)
+  shotsTotal       Int      @default(0)
+  shotsOnTarget    Int      @default(0)
+  passesTotal      Int      @default(0)
+  passesKey        Int      @default(0)
+  passAccuracy     Int      @default(0)
+  tacklesTotal     Int      @default(0)
+  tackleBlocks     Int      @default(0)
+  interceptions    Int      @default(0)
+  duelsTotal       Int      @default(0)
+  duelsWon         Int      @default(0)
+  dribblesAttempts Int      @default(0)
+  dribblesSuccess  Int      @default(0)
+  foulsDrawn       Int      @default(0)
+  foulsCommitted   Int      @default(0)
+  yellowCards      Int      @default(0)
+  redCards         Int      @default(0)
+  penaltiesScored  Int      @default(0)
+  penaltiesMissed  Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@unique([playerId, matchId])
 }
 
 model Match {
-  id          String         @id @default(cuid())
-  fixture     Int            @unique
-  homeTeamId  String
-  awayTeamId  String
-  homeTeam    Team           @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam    Team           @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  venue       String
-  city        String
-  date        DateTime
-  status      String         @default("NS")
-  homeScore   Int            @default(0)
-  awayScore   Int            @default(0)
-  elapsed     Int            @default(0)
-  metrics     LiveMetric[]
-  markets     KalshiMarket[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id           String            @id @default(cuid())
+  fixture      Int               @unique
+  homeTeamId   String
+  awayTeamId   String
+  homeTeam     Team              @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team              @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  venue        String
+  city         String
+  date         DateTime
+  status       String            @default("NS")
+  homeScore    Int               @default(0)
+  awayScore    Int               @default(0)
+  elapsed      Int               @default(0)
+  round        String            @default("Group Stage")
+  goalEvents   Json?             // admin override: [{minute,team,scorer,assist,isOwnGoal,isPenalty}]
+  metrics      LiveMetric[]
+  markets      KalshiMarket[]
+  playerStats  PlayerMatchStat[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 }
 
 model NewsStory {
