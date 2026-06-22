@@ -155,6 +155,22 @@ model Match {
   updatedAt   DateTime       @updatedAt
 }
 
+model NewsStory {
+  id            String   @id @default(cuid())
+  date          DateTime           // the day the story pertains to (UTC)
+  matchday      Int?               // optional matchday number
+  fixture       Int?               // api-football fixture id (set for GAME RECAP, for dedup)
+  category      String             // GAME RECAP | DAILY RECAP | MATCH REPORT | ANALYSIS | STANDINGS | METRIC SPOTLIGHT
+  headline      String
+  body          String
+  teamsInvolved String[]           // team codes (TLAs) for flag display
+  audioUrl      String?
+  generatedAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([fixture])
+}
+
 model LiveMetric {
   id         String   @id @default(cuid())
   matchId    String

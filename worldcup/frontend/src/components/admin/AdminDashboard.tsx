@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -122,7 +122,7 @@ export default function AdminDashboard({ users }: { users: User[] }) {
             <Database size={14} className="text-slate-400" />
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Data Seeds</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               {
                 key: "matches",
@@ -137,6 +137,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 label: "Seed Player Clubs",
                 desc: "Add club/league data to players — activates CCI™ and PPI™ on Leagues page",
                 action: () => runSeed("players", "/api/admin/seed-players?mock=true", "GET"),
+              },
+              {
+                key: "news",
+                icon: Sparkles,
+                label: "Generate News Recaps",
+                desc: "AI recap for every finished match + end-of-day round-ups. Idempotent — re-run to catch up.",
+                action: () => runSeed("news", "/api/news/generate?secret=wc2026studio0x", "POST"),
               },
             ].map(({ key, icon: Icon, label, desc, action }) => {
               const status = seedStatus[key] ?? "idle";
