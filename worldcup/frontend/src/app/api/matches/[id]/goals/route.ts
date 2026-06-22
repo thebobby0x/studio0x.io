@@ -135,6 +135,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             isPenalty: e.detail === "Penalty",
           }));
 
+        // Sanity-check: own-goal attribution is reversed (credit goes to other team),
+        // so compute effective home/away goal counts and compare against the known score.
+        // If they don't match, the events feed has bad data — discard it rather than
+        // displaying wrong scorers to users.
+        if (goals.length > 0 && match.status === "FT") {
+          const homeEffective = goals.filter(
+            (g) => g.isOwnGoal ? g.team !== match.homeTeam.name : g.team === match.homeTeam.name
+          ).length;
+          const awayEffective = goals.filter(
+            (g) => g.isOwnGoal ? g.team !== match.awayTeam.name : g.team === match.awayTeam.name
+          ).length;
+          if (homeEffective !== match.homeScore || awayEffective !== match.awayScore) {
+            // Event totals don't match the confirmed scoreline — data is corrupt.
+            return NextResponse.json({ goals: [], dataWarning: "event_score_mismatch" });
+          }
+        }
+
         if (goals.length > 0) return NextResponse.json({ goals });
         // No real events yet — fall through to simulation below (LIVE/HT only)
       }
