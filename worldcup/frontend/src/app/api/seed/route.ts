@@ -354,7 +354,7 @@ async function seed(req: Request) {
       h1{color:#f56565;font-size:1.5rem}code{color:#f5a623}</style></head>
       <body><h1>⚠️ API_FOOTBALL_KEY not set</h1>
       <p>Add it to Vercel environment variables and redeploy.</p></body></html>`,
-      { headers: { "Content-Type": "text/html" } }
+      { status: 500, headers: { "Content-Type": "text/html" } }
     );
   }
 
@@ -373,7 +373,7 @@ async function seed(req: Request) {
 
     if (!afRes.ok) {
       log.push(`api-football error: ${afRes.status} ${afRes.statusText}`);
-      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
+      return new Response(errorPage(log.join("\n")), { status: 502, headers: { "Content-Type": "text/html" } });
     }
 
     const afJson = await afRes.json();
@@ -382,12 +382,12 @@ async function seed(req: Request) {
     // Surface API-level errors (auth failures return HTTP 200 with errors field)
     if (afJson.errors && Object.keys(afJson.errors).length > 0) {
       log.push(`api-football API errors: ${JSON.stringify(afJson.errors)}`);
-      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
+      return new Response(errorPage(log.join("\n")), { status: 502, headers: { "Content-Type": "text/html" } });
     }
     log.push(`Fetched ${afFixtures.length} fixtures from api-football.com (results: ${afJson.results ?? "?"})`);
     if (afFixtures.length === 0) {
       log.push(`Raw response preview: ${JSON.stringify(afJson).slice(0, 400)}`);
-      return new Response(errorPage(log.join("\n")), { headers: { "Content-Type": "text/html" } });
+      return new Response(errorPage(log.join("\n")), { status: 502, headers: { "Content-Type": "text/html" } });
     }
 
     // ── 1b. Fetch team codes (fixtures endpoint omits the 3-letter code field) ──
@@ -470,27 +470,11 @@ async function seed(req: Request) {
     const { count: playerCount } = await prisma.player.createMany({ data: playersData, skipDuplicates: true });
     log.push(`Upserted ${playersData.length} players (${playerCount} new) across ${Object.keys(SQUADS).length} squads`);
 
-    // ── 6. Batch create anthems (skipDuplicates = idempotent) ────────────────
-    let anthemsSeeded = 0;
-    let anthemsSkipped = 0;
-    for (const [tla, a] of Object.entries(ANTHEMS)) {
-      const teamId = teamIdByTla.get(tla);
-      if (!teamId) continue;
-      const existing = await prisma.audioStream.findFirst({ where: { teamId } });
-      if (existing && !existing.audioUrl.includes("soundhelix.com")) {
-        anthemsSkipped++;
-        continue; // real URL already set — do not overwrite
-      }
-      await prisma.audioStream.upsert({
-        where: { teamId },
-        create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × Studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
-        update: { title: a.title, audioUrl: a.url, durationSecs: a.durationSecs },
-      });
-      anthemsSeeded++;
-    }
-    log.push(`Anthems: ${anthemsSeeded} placeholder(s) written, ${anthemsSkipped} real URL(s) preserved`);
-
-    // ── 7. Batch create matches, then parallel update live/finished scores ───
+    // ── 6. Batch create matches, then parallel update live/finished scores ───
+    // NOTE: matches are created BEFORE anthems on purpose. The anthem pass does
+    // sequential per-team round-trips and is the slowest step; if the function
+    // is killed by a serverless timeout, the critical match data must already be
+    // committed. Anthems are written last (step 8) and are non-essential.
     const validMatches = fdMatches.filter(
       m => m.homeTeam?.tla && m.awayTeam?.tla &&
            teamIdByTla.has(m.homeTeam.tla) && teamIdByTla.has(m.awayTeam.tla)
@@ -556,10 +540,30 @@ async function seed(req: Request) {
     await prisma.kalshiMarket.createMany({ data: marketsData, skipDuplicates: true });
     log.push(`Upserted ${marketsData.length} Kalshi market records`);
 
+    // ── 9. Anthems LAST (non-critical, slowest) — parallelised ───────────────
+    // Real Blob URLs are preserved; only soundhelix placeholders are (re)written.
+    const anthemResults = await Promise.all(
+      Object.entries(ANTHEMS).map(async ([tla, a]) => {
+        const teamId = teamIdByTla.get(tla);
+        if (!teamId) return "skip";
+        const existing = await prisma.audioStream.findFirst({ where: { teamId } });
+        if (existing && !existing.audioUrl.includes("soundhelix.com")) return "preserved";
+        await prisma.audioStream.upsert({
+          where: { teamId },
+          create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × Studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
+          update: { title: a.title, audioUrl: a.url, durationSecs: a.durationSecs },
+        });
+        return "written";
+      })
+    );
+    const anthemsSeeded = anthemResults.filter(r => r === "written").length;
+    const anthemsSkipped = anthemResults.filter(r => r === "preserved").length;
+    log.push(`Anthems: ${anthemsSeeded} placeholder(s) written, ${anthemsSkipped} real URL(s) preserved`);
+
   } catch (err) {
     const msg = err instanceof Error ? `${err.name}: ${err.message}\n\n${err.stack ?? ""}` : String(err);
     log.push(`ERROR: ${msg}`);
-    return new Response(errorPage(log.join("\n") + "\n\n" + msg), { headers: { "Content-Type": "text/html" } });
+    return new Response(errorPage(log.join("\n") + "\n\n" + msg), { status: 500, headers: { "Content-Type": "text/html" } });
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
