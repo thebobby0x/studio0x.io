@@ -180,7 +180,7 @@ async function seedFromApi() {
   return NextResponse.json({ updated, notFound, teamsScanned: apiTeamIds.size });
 }
 
-export async function POST(req: Request) {
+async function handler(req: Request) {
   const session = await auth();
   if (session?.user?.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -196,3 +196,6 @@ export async function POST(req: Request) {
 
   return seedFromApi();
 }
+
+export async function GET(req: Request) { return handler(req); }
+export async function POST(req: Request) { return handler(req); }
