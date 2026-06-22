@@ -117,7 +117,7 @@ RESULT TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
 Return ONLY a JSON object, no other text:
 {
   "headline": "Punchy headline, max 11 words, references the teams or scoreline",
-  "body": "2-3 sentences of authoritative match-report copy in the style of The Athletic. Reference the score and what it means for the group. No fluff."
+  "body": "2-3 sentences of authoritative match-report copy in the style of The Athletic. Reference the score and what it means for the group. IMPORTANT: You only have the final score — do NOT invent player names, goal scorers, minutes, or any match events. Stick strictly to the result and its implications. No fluff."
 }`;
     try {
       const msg = await client.messages.create({

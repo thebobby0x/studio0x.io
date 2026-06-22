@@ -81,6 +81,13 @@ export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
     setFactIdx(i => (i + 1) % venueInfo.didYouKnow.length);
   }, [venueInfo.didYouKnow.length]);
 
+  // Auto-rotate facts every 6 seconds
+  useEffect(() => {
+    if (venueInfo.didYouKnow.length <= 1) return;
+    const id = setInterval(nextFact, 6000);
+    return () => clearInterval(id);
+  }, [nextFact, venueInfo.didYouKnow.length]);
+
   const altLabel = venueInfo.altitudeM >= 1000
     ? `${venueInfo.altitudeM.toLocaleString()}m — thin air!`
     : venueInfo.altitudeM >= 300

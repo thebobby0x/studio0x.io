@@ -15,10 +15,15 @@ function prettyDay(key: string): string {
 }
 
 export default async function NewsPage() {
-  const stories = await prisma.newsStory.findMany({
-    orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
-    take: 400,
-  });
+  let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
+  try {
+    stories = await prisma.newsStory.findMany({
+      orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
+      take: 400,
+    });
+  } catch {
+    // Table may not exist yet on first deploy — render empty state gracefully
+  }
 
   // Group by day, daily recap first within each day
   const groups = new Map<string, StoryCardData[]>();

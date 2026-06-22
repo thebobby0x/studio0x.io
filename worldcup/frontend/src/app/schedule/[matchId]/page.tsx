@@ -8,6 +8,7 @@ import type { ScheduleMatch } from "@/app/api/schedule/route";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
+import HeroWeather from "@/components/venue/HeroWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
 import UpsetMeter from "@/components/stats/UpsetMeter";
 import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
@@ -233,7 +234,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             <span suppressHydrationWarning className="flex items-center gap-1.5">
               <Clock size={12} />
               {localDt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · {localDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              <span className="text-slate-700 text-[10px]">local</span>
             </span>
+            {venueInfo && venueFromDB?.venue && (
+              <HeroWeather venueName={venueFromDB.venue} />
+            )}
             {m.group && (
               <Link href={`/schedule?group=${m.group}`} className="flex items-center gap-1.5 text-brand-gold hover:text-amber-300 transition-colors">
                 <CalendarDays size={12} />
@@ -259,85 +264,13 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {/* Upset Factor™ — only for FT matches with Polymarket odds available */}
         {isDone && <UpsetMeterForMatch fixtureId={m.id} />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Group standings */}
-          {table.length > 0 && (
-            <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Group {m.group} Standings
-              </div>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[10px] text-slate-600 uppercase tracking-wider">
-                    <th className="text-left px-4 py-2">Team</th>
-                    <th className="px-2 py-2 text-center">P</th>
-                    <th className="px-2 py-2 text-center">W</th>
-                    <th className="px-2 py-2 text-center">D</th>
-                    <th className="px-2 py-2 text-center">L</th>
-                    <th className="px-2 py-2 text-center">GD</th>
-                    <th className="px-4 py-2 text-center font-bold text-slate-400">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.map((row, i) => {
-                    const isHighlighted = row.tla === m.homeTeam.tla || row.tla === m.awayTeam.tla;
-                    return (
-                      <tr key={row.tla} className={`border-t border-brand-border/50 ${isHighlighted ? "bg-brand-green/5" : ""}`}>
-                        <td className="px-4 py-2.5">
-                          <Link href={`/team/${row.tla}`} className="flex items-center gap-2 hover:text-brand-gold transition-colors">
-                            <span className="text-slate-600 w-3">{i + 1}</span>
-                            <span className="text-base">{getFlag(row.tla)}</span>
-                            <span className={`font-semibold ${isHighlighted ? "text-white" : "text-slate-300"}`}>{row.name}</span>
-                          </Link>
-                        </td>
-                        <td className="px-2 py-2.5 text-center text-slate-500">{row.p}</td>
-                        <td className="px-2 py-2.5 text-center text-slate-400">{row.w}</td>
-                        <td className="px-2 py-2.5 text-center text-slate-500">{row.d}</td>
-                        <td className="px-2 py-2.5 text-center text-slate-500">{row.l}</td>
-                        <td className="px-2 py-2.5 text-center text-slate-500">{row.gf - row.ga > 0 ? "+" : ""}{row.gf - row.ga}</td>
-                        <td className="px-4 py-2.5 text-center font-black text-white">{row.pts}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Group fixtures */}
-          {groupMatches.length > 0 && (
-            <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Other Group {m.group} Fixtures
-              </div>
-              <div className="divide-y divide-brand-border/50">
-                {groupMatches.map(gm => (
-                  <Link key={gm.id} href={`/schedule/${gm.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-                      <span>{getFlag(gm.homeTeam.tla)}</span>
-                      <span>{gm.homeTeam.tla}</span>
-                    </div>
-                    <div className="text-xs font-bold tabular-nums text-center min-w-[60px]">
-                      {gm.status === "FT" || gm.status === "LIVE" || gm.status === "HT"
-                        ? <span className={gm.status === "LIVE" || gm.status === "HT" ? "text-brand-green" : "text-slate-400"}>{gm.homeScore ?? 0} – {gm.awayScore ?? 0}</span>
-                        : <span suppressHydrationWarning className="text-slate-600">{new Date(gm.utcDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-                      }
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 flex-row-reverse">
-                      <span>{getFlag(gm.awayTeam.tla)}</span>
-                      <span>{gm.awayTeam.tla}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Team form guides */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormMeter teamTla={m.homeTeam.tla} teamName={m.homeTeam.name} />
-          <FormMeter teamTla={m.awayTeam.tla} teamName={m.awayTeam.name} />
+        {/* Team form guides — side-by-side under a shared label */}
+        <div className="space-y-1.5">
+          <div className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-600">Form Guide</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormMeter teamTla={m.homeTeam.tla} teamName={m.homeTeam.name} />
+            <FormMeter teamTla={m.awayTeam.tla} teamName={m.awayTeam.name} />
+          </div>
         </div>
 
         {/* Live win probability meter — DB match needed for matchId */}
@@ -349,6 +282,81 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             group={m.group}
             highlightTeams={[m.homeTeam.name, m.awayTeam.name]}
           />
+        )}
+
+        {/* Group standings + other fixtures — context, not headline, so at bottom */}
+        {(table.length > 0 || groupMatches.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {table.length > 0 && (
+              <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
+                <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Group {m.group} Standings
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider">
+                      <th className="text-left px-4 py-2">Team</th>
+                      <th className="px-2 py-2 text-center">P</th>
+                      <th className="px-2 py-2 text-center">W</th>
+                      <th className="px-2 py-2 text-center">D</th>
+                      <th className="px-2 py-2 text-center">L</th>
+                      <th className="px-2 py-2 text-center">GD</th>
+                      <th className="px-4 py-2 text-center font-bold text-slate-400">Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.map((row, i) => {
+                      const isHighlighted = row.tla === m.homeTeam.tla || row.tla === m.awayTeam.tla;
+                      return (
+                        <tr key={row.tla} className={`border-t border-brand-border/50 ${isHighlighted ? "bg-brand-green/5" : ""}`}>
+                          <td className="px-4 py-2.5">
+                            <Link href={`/team/${row.tla}`} className="flex items-center gap-2 hover:text-brand-gold transition-colors">
+                              <span className="text-slate-600 w-3">{i + 1}</span>
+                              <span className="text-base">{getFlag(row.tla)}</span>
+                              <span className={`font-semibold ${isHighlighted ? "text-white" : "text-slate-300"}`}>{row.name}</span>
+                            </Link>
+                          </td>
+                          <td className="px-2 py-2.5 text-center text-slate-500">{row.p}</td>
+                          <td className="px-2 py-2.5 text-center text-slate-400">{row.w}</td>
+                          <td className="px-2 py-2.5 text-center text-slate-500">{row.d}</td>
+                          <td className="px-2 py-2.5 text-center text-slate-500">{row.l}</td>
+                          <td className="px-2 py-2.5 text-center text-slate-500">{row.gf - row.ga > 0 ? "+" : ""}{row.gf - row.ga}</td>
+                          <td className="px-4 py-2.5 text-center font-black text-white">{row.pts}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {groupMatches.length > 0 && (
+              <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
+                <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Other Group {m.group} Fixtures
+                </div>
+                <div className="divide-y divide-brand-border/50">
+                  {groupMatches.map(gm => (
+                    <Link key={gm.id} href={`/schedule/${gm.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                        <span>{getFlag(gm.homeTeam.tla)}</span>
+                        <span>{gm.homeTeam.tla}</span>
+                      </div>
+                      <div className="text-xs font-bold tabular-nums text-center min-w-[60px]">
+                        {gm.status === "FT" || gm.status === "LIVE" || gm.status === "HT"
+                          ? <span className={gm.status === "LIVE" || gm.status === "HT" ? "text-brand-green" : "text-slate-400"}>{gm.homeScore ?? 0} – {gm.awayScore ?? 0}</span>
+                          : <span suppressHydrationWarning className="text-slate-600">{new Date(gm.utcDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                        }
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 flex-row-reverse">
+                        <span>{getFlag(gm.awayTeam.tla)}</span>
+                        <span>{gm.awayTeam.tla}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Starting lineups + subs via api-football */}
