@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -40,6 +40,19 @@ export default function AdminDashboard({ users }: { users: User[] }) {
   );
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [savedRole, setSavedRole] = useState<string | null>(null);
+  const [seedStatus, setSeedStatus] = useState<Record<string, "idle" | "loading" | "done" | "error">>({});
+
+  async function runSeed(key: string, url: string, method: "GET" | "POST" = "POST") {
+    setSeedStatus(s => ({ ...s, [key]: "loading" }));
+    try {
+      const res = await fetch(url, { method });
+      setSeedStatus(s => ({ ...s, [key]: res.ok ? "done" : "error" }));
+      setTimeout(() => setSeedStatus(s => ({ ...s, [key]: "idle" })), 4000);
+    } catch {
+      setSeedStatus(s => ({ ...s, [key]: "error" }));
+      setTimeout(() => setSeedStatus(s => ({ ...s, [key]: "idle" })), 4000);
+    }
+  }
 
   async function switchView(role: Role) {
     setViewLoading(role);
@@ -100,6 +113,53 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 )}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Seed Tools */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Database size={14} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Data Seeds</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              {
+                key: "matches",
+                icon: Database,
+                label: "Re-seed Matches",
+                desc: "Fetch all 48 WC fixtures from api-football & update DB statuses/scores",
+                action: () => runSeed("matches", "/api/seed?secret=wc2026studio0x", "GET"),
+              },
+              {
+                key: "players",
+                icon: UserCheck,
+                label: "Seed Player Clubs",
+                desc: "Add club/league data to players — activates CCI™ and PPI™ on Leagues page",
+                action: () => runSeed("players", "/api/admin/seed-players?mock=true", "GET"),
+              },
+            ].map(({ key, icon: Icon, label, desc, action }) => {
+              const status = seedStatus[key] ?? "idle";
+              return (
+                <button
+                  key={key}
+                  onClick={action}
+                  disabled={status === "loading"}
+                  className="text-left rounded-xl border border-brand-border bg-brand-card p-4 hover:border-brand-gold/50 transition-colors disabled:opacity-60"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon size={14} className={status === "done" ? "text-brand-green" : status === "error" ? "text-red-400" : "text-brand-gold"} />
+                    <div className="font-bold text-white text-sm">{label}</div>
+                  </div>
+                  <div className="text-[11px] text-slate-500">{desc}</div>
+                  {status !== "idle" && (
+                    <div className={`text-[10px] mt-2 font-semibold ${status === "loading" ? "text-slate-400 animate-pulse" : status === "done" ? "text-brand-green" : "text-red-400"}`}>
+                      {status === "loading" ? "Running…" : status === "done" ? "✓ Done" : "✗ Failed — check Vercel logs"}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </section>
 
