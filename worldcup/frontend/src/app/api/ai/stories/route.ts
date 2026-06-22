@@ -99,7 +99,7 @@ Write exactly 5 stories in JSON format:
   {
     "category": "MATCH REPORT" | "ANALYSIS" | "STANDINGS" | "METRIC SPOTLIGHT",
     "headline": "Punchy headline (max 12 words)",
-    "body": "3-4 sentences of editorial copy. Be specific with scores, teams, and metric values from the data above. For METRIC SPOTLIGHT stories, reference specific metric readings naturally as 'per Studio0x data' or 'Studio0x Clutch Index™ shows'. Sound like The Athletic — authoritative but engaging.",
+    "body": "3-4 sentences of editorial copy. ONLY reference facts you can see in the data above — NEVER invent player names, goal minutes, scorers, assists, or any match events not in the data. Stick to scores, standings, and metric readings. For METRIC SPOTLIGHT stories, reference specific metric readings naturally as 'per Studio0x data' or 'Studio0x Clutch Index™ shows'. Sound like The Athletic — authoritative but engaging.",
     "teamsInvolved": ["TLA1", "TLA2"]
   }
 ]
