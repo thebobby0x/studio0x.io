@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Building2 } from "lucide-react";
 import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
 import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
+import TournamentXMetrics from "@/components/stats/TournamentXMetrics";
 
 function LeagueIcon({ league }: { league: string }): string {
   const map: Record<string, string> = {
@@ -116,6 +117,20 @@ export default async function LeaguesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <ClubContributionIndex limit={8} />
           <PlayerPerformanceIndex limit={10} />
+        </div>
+
+        {/* Novel Cross-Metrics — connecting traditionally separate stat categories */}
+        <div className="mb-2">
+          <h2 className="text-xs font-black uppercase tracking-widest text-slate-600 mb-4">Novel Cross-Metrics™</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
+            <TournamentXMetrics metric="cps" limit={10} />
+            <TournamentXMetrics metric="ipm" limit={10} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <TournamentXMetrics metric="sei" limit={8} />
+            <TournamentXMetrics metric="dd"  limit={8} />
+            <TournamentXMetrics metric="pr"  limit={8} />
+          </div>
         </div>
 
         {/* League sections */}
