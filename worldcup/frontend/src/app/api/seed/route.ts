@@ -541,19 +541,22 @@ async function seed(req: Request) {
     log.push(`Upserted ${marketsData.length} Kalshi market records`);
 
     // ── 9. Anthems LAST (non-critical, slowest) — parallelised ───────────────
+    // Upsert by the stable anthem `id`, NOT teamId: the wipe nulls AudioStream.teamId
+    // (nullable relation) but leaves the rows, so a teamId-keyed create would collide
+    // on the existing `id`. Keying on `id` reattaches the orphan to the new team.
     // Real Blob URLs are preserved; only soundhelix placeholders are (re)written.
     const anthemResults = await Promise.all(
       Object.entries(ANTHEMS).map(async ([tla, a]) => {
         const teamId = teamIdByTla.get(tla);
         if (!teamId) return "skip";
-        const existing = await prisma.audioStream.findFirst({ where: { teamId } });
-        if (existing && !existing.audioUrl.includes("soundhelix.com")) return "preserved";
+        const existing = await prisma.audioStream.findUnique({ where: { id: a.id } });
+        const preserveUrl = !!existing && !existing.audioUrl.includes("soundhelix.com");
         await prisma.audioStream.upsert({
-          where: { teamId },
+          where: { id: a.id },
           create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × Studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
-          update: { title: a.title, audioUrl: a.url, durationSecs: a.durationSecs },
+          update: { teamId, title: a.title, durationSecs: a.durationSecs, ...(preserveUrl ? {} : { audioUrl: a.url }) },
         });
-        return "written";
+        return preserveUrl ? "preserved" : "written";
       })
     );
     const anthemsSeeded = anthemResults.filter(r => r === "written").length;
