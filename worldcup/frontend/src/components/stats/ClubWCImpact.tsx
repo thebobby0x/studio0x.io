@@ -18,60 +18,80 @@ const LEAGUE_FLAG: Record<string, string> = {
   "Danish Superliga": "🇩🇰",
 };
 
-type ClubStats = {
+type ClubEntry = {
   club: string;
   league: string;
   playerNames: string[];
-  goals: number;
-  assists: number;
-  minutesPlayed: number;
-  matches: number;
-  ratingSum: number;
-  ratingCount: number;
+  // WC tournament stats (live mode)
+  wcGoals: number;
+  wcAssists: number;
+  wcMinutes: number;
+  wcMatches: number;
+  wcRatingSum: number;
+  wcRatingCount: number;
   hatTricks: number;
   shotsTotal: number;
   tacklesTotal: number;
   interceptions: number;
+  // career / squad stats (preview mode fallback)
+  careerGoals: number;
   score: number;
 };
 
-type LeagueStats = {
+type LeagueEntry = {
   league: string;
   clubs: number;
   players: number;
   goals: number;
   assists: number;
-  minutesPlayed: number;
   hatTricks: number;
+  careerGoals: number;
 };
 
-function talkingPoint(club: ClubStats, rank: number, grandTotalGoals: number): string {
-  const pct = grandTotalGoals > 0 ? Math.round((club.goals / grandTotalGoals) * 100) : 0;
-  const top2 = club.playerNames.slice(0, 2).join(" & ");
-
-  if (club.hatTricks >= 2)
-    return `${club.club} players have recorded ${club.hatTricks} hat-tricks — the most devastating club presence at this World Cup.`;
-  if (club.hatTricks === 1)
-    return `${club.club} has a World Cup hat-trick in the books — ${top2} leading the charge for ${club.league}.`;
-  if (rank === 1 && club.goals > 0)
-    return `${club.club} leads all clubs with ${club.goals} WC goals${pct > 0 ? ` (${pct}% of all goals)` : ""} — ${top2} are the tournament's dominant club force.`;
-  if (club.goals === 0 && club.minutesPlayed > 0)
-    return `${club.club}'s ${club.playerNames.length} players have clocked ${club.minutesPlayed} World Cup minutes — contributing defensively and in transition.`;
-  return `${club.club}'s ${club.playerNames.length} World Cup players: ${club.goals}G ${club.assists}A across ${club.matches} appearances.`;
+function wcTalkingPoint(c: ClubEntry, rank: number, grandTotal: number): string {
+  const pct = grandTotal > 0 ? Math.round((c.wcGoals / grandTotal) * 100) : 0;
+  const top2 = c.playerNames.slice(0, 2).join(" & ");
+  if (c.hatTricks >= 2)
+    return `${c.club} players have delivered ${c.hatTricks} hat-tricks — the most explosive club presence at this World Cup.`;
+  if (c.hatTricks === 1)
+    return `${c.club} already has a World Cup hat-trick — ${top2} carrying the banner for ${c.league}.`;
+  if (rank === 0 && c.wcGoals > 0)
+    return `${c.club} leads all clubs with ${c.wcGoals} WC goals${pct > 0 ? ` (${pct}% of all goals scored)` : ""} — ${top2} are the tournament's dominant club force.`;
+  if (c.wcGoals === 0 && c.wcMinutes > 0)
+    return `${c.club}'s ${c.playerNames.length} players have clocked ${c.wcMinutes} World Cup minutes — contributing without getting on the scoresheet.`;
+  return `${c.club}: ${c.playerNames.length} players · ${c.wcGoals}G ${c.wcAssists}A across ${c.wcMatches} appearances.`;
 }
 
-function leagueTalkingPoint(league: LeagueStats, rank: number, grandTotalGoals: number): string {
-  const pct = grandTotalGoals > 0 ? Math.round((league.goals / grandTotalGoals) * 100) : 0;
-  if (rank === 1 && league.goals > 0)
-    return `${league.league} clubs account for ${pct}% of all World Cup goals — the strongest argument for its global dominance.`;
-  if (league.hatTricks > 0)
-    return `${league.league} players have ${league.hatTricks} hat-trick${league.hatTricks > 1 ? "s" : ""} at this tournament — proving the league produces elite finishers.`;
-  return `${league.clubs} ${league.league} clubs combined for ${league.goals} WC goals and ${league.assists} assists.`;
+function previewTalkingPoint(c: ClubEntry, rank: number): string {
+  const top2 = c.playerNames.slice(0, 2).join(" & ");
+  if (rank === 0)
+    return `${c.club} sends the most players to this tournament — ${top2} among a star-studded WC squad with ${c.careerGoals} combined international goals.`;
+  if (c.careerGoals > 30)
+    return `${c.playerNames.length} ${c.club} players bring a combined ${c.careerGoals} international goals to the World Cup — elite firepower on the stage.`;
+  return `${c.club} is represented by ${c.playerNames.length} player${c.playerNames.length !== 1 ? "s" : ""} — ${top2} carrying the club flag.`;
+}
+
+function leagueTalkingPoint(l: LeagueEntry, rank: number, grandTotal: number, isLive: boolean): string {
+  const pct = grandTotal > 0 ? Math.round((l.goals / grandTotal) * 100) : 0;
+  if (isLive) {
+    if (rank === 0 && l.goals > 0)
+      return `${l.league} clubs account for ${pct}% of all World Cup goals — the clearest argument for its global supremacy.`;
+    if (l.hatTricks > 0)
+      return `${l.league} players have recorded ${l.hatTricks} hat-trick${l.hatTricks > 1 ? "s" : ""} — elite finishing runs in this league.`;
+    return `${l.clubs} ${l.league} clubs: ${l.goals}G ${l.assists}A combined at this World Cup.`;
+  } else {
+    if (rank === 0)
+      return `${l.league} sends the most players to this World Cup — ${l.players} players from ${l.clubs} clubs bringing ${l.careerGoals} combined international goals.`;
+    if (l.careerGoals > 50)
+      return `${l.players} ${l.league} players carry ${l.careerGoals} international goals into this tournament — a league built on global talent.`;
+    return `${l.clubs} ${l.league} clubs represented across ${l.players} World Cup players.`;
+  }
 }
 
 export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
-  const players = await prisma.player.findMany({
-    where: { club: { not: "" }, tournamentStat: { isNot: null } },
+  // Fetch all players with clubs — include tournament stats + hat-trick matches when available
+  const allPlayers = await prisma.player.findMany({
+    where: { club: { not: "" } },
     include: {
       tournamentStat: true,
       matchStats: {
@@ -81,11 +101,7 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
     },
   }).catch(() => []);
 
-  const withStats = players.filter(
-    (p) => p.tournamentStat && p.tournamentStat.matches > 0
-  );
-
-  if (withStats.length === 0) {
+  if (allPlayers.length === 0) {
     return (
       <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
         <div className="px-4 py-3 border-b border-brand-border flex items-center gap-2">
@@ -93,82 +109,115 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
         <div className="px-4 py-8 text-center">
-          <p className="text-slate-500 text-sm font-semibold">No tournament data yet</p>
+          <p className="text-slate-500 text-sm font-semibold">No club data yet</p>
           <p className="text-slate-700 text-xs mt-1">
-            Admin: run <span className="text-brand-gold font-mono text-[10px]">Ingest Player Stats</span> after matches complete
+            Admin: run <span className="text-brand-gold font-mono text-[10px]">Seed Clubs (Mock)</span> to populate
           </p>
         </div>
       </div>
     );
   }
 
-  // Aggregate by club
-  const clubMap = new Map<string, ClubStats>();
-  for (const p of withStats) {
-    const s = p.tournamentStat!;
+  // Determine if we have live WC tournament stats
+  const playersWithWCStats = allPlayers.filter(p => p.tournamentStat && p.tournamentStat.matches > 0);
+  const isLive = playersWithWCStats.length > 0;
+
+  // Aggregate by club using whichever data source is available
+  const clubMap = new Map<string, ClubEntry>();
+  for (const p of allPlayers) {
+    if (!p.club) continue;
     if (!clubMap.has(p.club)) {
       clubMap.set(p.club, {
         club: p.club, league: p.league,
-        playerNames: [], goals: 0, assists: 0, minutesPlayed: 0,
-        matches: 0, ratingSum: 0, ratingCount: 0,
-        hatTricks: 0, shotsTotal: 0, tacklesTotal: 0, interceptions: 0, score: 0,
+        playerNames: [],
+        wcGoals: 0, wcAssists: 0, wcMinutes: 0, wcMatches: 0,
+        wcRatingSum: 0, wcRatingCount: 0,
+        hatTricks: 0, shotsTotal: 0, tacklesTotal: 0, interceptions: 0,
+        careerGoals: 0, score: 0,
       });
     }
     const c = clubMap.get(p.club)!;
     c.playerNames.push(p.name);
-    c.goals += s.goals;
-    c.assists += s.assists;
-    c.minutesPlayed += s.minutesPlayed;
-    c.matches += s.matches;
-    if (s.rating > 0) { c.ratingSum += s.rating; c.ratingCount++; }
+    c.careerGoals += p.goals;
+    if (p.tournamentStat) {
+      const s = p.tournamentStat;
+      c.wcGoals += s.goals;
+      c.wcAssists += s.assists;
+      c.wcMinutes += s.minutesPlayed;
+      c.wcMatches += s.matches;
+      if (s.rating > 0) { c.wcRatingSum += s.rating; c.wcRatingCount++; }
+      c.shotsTotal += s.shotsTotal;
+      c.tacklesTotal += s.tacklesTotal;
+      c.interceptions += s.interceptions;
+    }
     c.hatTricks += p.matchStats.length;
-    c.shotsTotal += s.shotsTotal;
-    c.tacklesTotal += s.tacklesTotal;
-    c.interceptions += s.interceptions;
   }
 
-  const grandTotalGoals = [...clubMap.values()].reduce((n, c) => n + c.goals, 0);
+  const grandTotalGoals = [...clubMap.values()].reduce((n, c) => n + c.wcGoals, 0);
 
   const clubs = [...clubMap.values()]
     .map(c => ({
       ...c,
-      score: c.goals * 4 + c.assists * 2.5 + c.hatTricks * 8 +
-        (c.tacklesTotal + c.interceptions) * 0.3 + c.shotsTotal * 0.2 +
-        (c.minutesPlayed / 90) * 0.5,
+      score: isLive
+        ? c.wcGoals * 4 + c.wcAssists * 2.5 + c.hatTricks * 8 +
+          (c.tacklesTotal + c.interceptions) * 0.3 + c.shotsTotal * 0.2 +
+          (c.wcMinutes / 90) * 0.5
+        : c.playerNames.length * 2 + c.careerGoals * 0.5,
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
-  // Aggregate by league (across ALL clubs, not just top N)
-  const leagueMap = new Map<string, LeagueStats>();
+  // Aggregate by league
+  const leagueMap = new Map<string, LeagueEntry>();
   for (const [, c] of clubMap) {
     if (!leagueMap.has(c.league)) {
-      leagueMap.set(c.league, { league: c.league, clubs: 0, players: 0, goals: 0, assists: 0, minutesPlayed: 0, hatTricks: 0 });
+      leagueMap.set(c.league, { league: c.league, clubs: 0, players: 0, goals: 0, assists: 0, hatTricks: 0, careerGoals: 0 });
     }
     const l = leagueMap.get(c.league)!;
     l.clubs++;
     l.players += c.playerNames.length;
-    l.goals += c.goals;
-    l.assists += c.assists;
-    l.minutesPlayed += c.minutesPlayed;
+    l.goals += c.wcGoals;
+    l.assists += c.wcAssists;
     l.hatTricks += c.hatTricks;
+    l.careerGoals += c.careerGoals;
   }
-  const leagues = [...leagueMap.values()].sort((a, b) => b.goals - a.goals).slice(0, 8);
+
+  const leagues = [...leagueMap.values()]
+    .sort((a, b) => isLive ? b.goals - a.goals : b.players - a.players)
+    .slice(0, 8);
 
   const maxScore = Math.max(...clubs.map(c => c.score), 1);
+  const maxLeaguePlayers = Math.max(...leagues.map(l => l.players), 1);
 
   return (
     <div className="space-y-6">
-      {/* League Summary */}
+      {/* Pre-tournament notice banner */}
+      {!isLive && (
+        <div className="rounded-xl border border-brand-gold/20 bg-brand-gold/5 px-4 py-2.5 flex items-center gap-2">
+          <span className="text-brand-gold text-[10px]">◆</span>
+          <p className="text-[10px] text-slate-400">
+            <span className="text-brand-gold font-black">Squad Preview</span> — showing WC squad strength &amp; career goals.
+            Live WC stats appear automatically after matches are ingested.
+          </p>
+        </div>
+      )}
+
+      {/* League breakdown */}
       <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
         <div className="px-4 py-3 border-b border-brand-border flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">League WC Impact™</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">
+            {isLive ? "League WC Impact™" : "League Squad Strength™"}
+          </span>
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
-          <span className="ml-auto text-[9px] text-slate-600 uppercase tracking-wider">goals from each league at WC</span>
+          <span className="ml-auto text-[9px] text-slate-600 uppercase tracking-wider">
+            {isLive ? "WC goals by league" : "WC players by league"}
+          </span>
         </div>
         <div className="divide-y divide-brand-border/30">
           {leagues.map((l, i) => {
-            const pct = grandTotalGoals > 0 ? (l.goals / grandTotalGoals) * 100 : 0;
+            const pct = isLive
+              ? (grandTotalGoals > 0 ? (l.goals / grandTotalGoals) * 100 : 0)
+              : (l.players / maxLeaguePlayers) * 100;
             const flag = LEAGUE_FLAG[l.league] ?? "⚽";
             return (
               <div key={l.league} className="px-4 py-3 hover:bg-white/3 transition-colors">
@@ -179,10 +228,17 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-xs font-black text-white">{l.league}</span>
                       <div className="flex items-center gap-3 shrink-0 text-[10px] font-mono">
-                        <span className="text-brand-gold font-black">{l.goals}G</span>
-                        <span className="text-blue-400">{l.assists}A</span>
-                        {l.hatTricks > 0 && (
-                          <span className="text-purple-400 font-black">{l.hatTricks}🎩</span>
+                        {isLive ? (
+                          <>
+                            <span className="text-brand-gold font-black">{l.goals}G</span>
+                            <span className="text-blue-400">{l.assists}A</span>
+                            {l.hatTricks > 0 && <span className="text-purple-400 font-black">{l.hatTricks}🎩</span>}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-white font-black">{l.players} players</span>
+                            <span className="text-slate-500">{l.careerGoals} int'l G</span>
+                          </>
                         )}
                         <span className="text-slate-600">{l.clubs} clubs</span>
                       </div>
@@ -194,7 +250,7 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                       />
                     </div>
                     <p className="text-[10px] text-slate-600 mt-1 italic">
-                      {leagueTalkingPoint(l, i, grandTotalGoals)}
+                      {leagueTalkingPoint(l, i, grandTotalGoals, isLive)}
                     </p>
                   </div>
                 </div>
@@ -204,17 +260,19 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
         </div>
       </div>
 
-      {/* Club Leaderboard */}
+      {/* Club leaderboard */}
       <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
         <div className="px-4 py-3 border-b border-brand-border flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Club WC Impact™</span>
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
-          <span className="ml-auto text-[9px] text-slate-600 uppercase tracking-wider">ranked by WC contribution score</span>
+          <span className="ml-auto text-[9px] text-slate-600 uppercase tracking-wider">
+            {isLive ? "ranked by WC contribution score" : "ranked by squad strength"}
+          </span>
         </div>
         <div className="divide-y divide-brand-border/30">
           {clubs.map((c, i) => {
             const flag = LEAGUE_FLAG[c.league] ?? "⚽";
-            const avgRating = c.ratingCount > 0 ? (c.ratingSum / c.ratingCount).toFixed(1) : null;
+            const avgRating = c.wcRatingCount > 0 ? (c.wcRatingSum / c.wcRatingCount).toFixed(1) : null;
             const barPct = (c.score / maxScore) * 100;
             return (
               <div key={c.club} className="px-4 py-3 hover:bg-white/3 transition-colors">
@@ -228,14 +286,21 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                         <span className="text-[9px] text-slate-600">{c.league} · {c.playerNames.length} player{c.playerNames.length !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 text-[10px] font-mono">
-                        {c.goals > 0 && <span className="text-brand-gold font-black">{c.goals}G</span>}
-                        {c.assists > 0 && <span className="text-blue-400">{c.assists}A</span>}
-                        {c.hatTricks > 0 && <span className="text-purple-400 font-black">{c.hatTricks}🎩</span>}
-                        {avgRating && <span className="text-amber-400">★{avgRating}</span>}
+                        {isLive ? (
+                          <>
+                            {c.wcGoals > 0 && <span className="text-brand-gold font-black">{c.wcGoals}G</span>}
+                            {c.wcAssists > 0 && <span className="text-blue-400">{c.wcAssists}A</span>}
+                            {c.hatTricks > 0 && <span className="text-purple-400 font-black">{c.hatTricks}🎩</span>}
+                            {avgRating && <span className="text-amber-400">★{avgRating}</span>}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-slate-400">{c.careerGoals} int'l G</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {/* Impact bar */}
                     <div className="h-1 rounded-full bg-brand-border overflow-hidden mb-1.5">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-sky-500 to-brand-green"
@@ -243,7 +308,6 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                       />
                     </div>
 
-                    {/* Player chips */}
                     <div className="flex flex-wrap gap-1 mb-1.5">
                       {c.playerNames.slice(0, 6).map(n => (
                         <span key={n} className="text-[9px] bg-brand-border/60 text-slate-400 rounded px-1.5 py-0.5">{n}</span>
@@ -253,9 +317,10 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                       )}
                     </div>
 
-                    {/* Talking point */}
                     <p className="text-[10px] text-slate-500 italic leading-relaxed">
-                      {talkingPoint(c, i, grandTotalGoals)}
+                      {isLive
+                        ? wcTalkingPoint(c, i, grandTotalGoals)
+                        : previewTalkingPoint(c, i)}
                     </p>
                   </div>
                 </div>
@@ -264,7 +329,9 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
           })}
         </div>
         <div className="border-t border-brand-border/50 px-4 py-2 text-[9px] text-slate-700 text-center">
-          WC Impact Score = Goals×4 + Assists×2.5 + Hat-tricks×8 + Defensive actions×0.3 · 🎩 = hat-trick
+          {isLive
+            ? "WC Impact Score = Goals×4 + Assists×2.5 + Hat-tricks×8 + Defensive actions×0.3 · 🎩 = hat-trick"
+            : "Squad Strength = Players×2 + Career Int'l Goals×0.5 · Updates live once match stats ingested"}
         </div>
       </div>
     </div>
