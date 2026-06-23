@@ -6,6 +6,7 @@ import { Building2 } from "lucide-react";
 import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
 import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
 import TournamentXMetrics from "@/components/stats/TournamentXMetrics";
+import ClubWCImpact from "@/components/stats/ClubWCImpact";
 
 function LeagueIcon({ league }: { league: string }): string {
   const map: Record<string, string> = {
@@ -112,6 +113,12 @@ export default async function LeaguesPage() {
             </p>
           </div>
         )}
+
+        {/* Club WC Impact — headline feature */}
+        <div className="mb-8">
+          <h2 className="text-xs font-black uppercase tracking-widest text-slate-600 mb-4">WC Impact by Club &amp; League</h2>
+          <ClubWCImpact limit={12} />
+        </div>
 
         {/* Studio0x Proprietary Metrics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
