@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -124,6 +124,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
+              {
+                key: "syncStatuses",
+                icon: RefreshCw,
+                label: "Sync Match Statuses",
+                desc: "Fix any LIVE/HT matches that have actually finished. Run this if a completed game still shows as live.",
+                action: () => runSeed("syncStatuses", "/api/admin/sync-statuses?secret=wc2026studio0x", "POST"),
+              },
               {
                 key: "matches",
                 icon: Database,

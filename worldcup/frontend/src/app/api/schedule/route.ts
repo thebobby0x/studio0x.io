@@ -223,10 +223,13 @@ function applyDbOverlay(data: ScheduleMatch[], overlay: Map<number, DbEntry>): S
   if (overlay.size === 0) return data;
   return data.map(m => {
     const db = overlay.get(m.id);
-    // Only override if DB has a more authoritative status (FT, LIVE, HT) and api-football still shows NS
     if (!db) return m;
-    if (m.status !== "NS" && m.status === db.status) return m; // already in sync
-    return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed };
+    // api-football reached a terminal status — never let a stale DB entry regress it back to LIVE/HT
+    if (m.status === "FT") return m;
+    // DB is useful when api-football still shows NS but match has actually started/finished
+    if (m.status === "NS") return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed };
+    // For LIVE/HT: let live overlay handle it; don't regress with a potentially stale DB value
+    return m;
   });
 }
 
@@ -315,9 +318,23 @@ export async function GET() {
   }
 
   // ── DB overlay (always fresh): fix stale NS statuses for FT/LIVE/HT matches
-  // api-football sometimes lags; the DB is authoritative for completed games.
   const dbOverlay = await getDbOverlay();
   baseData = applyDbOverlay(baseData, dbOverlay);
+
+  // ── Background self-heal: if api-football says FT but DB still says LIVE/HT, fix the DB ──
+  const staleInDb = baseData.filter(m =>
+    m.status === "FT" &&
+    (dbOverlay.get(m.id)?.status === "LIVE" || dbOverlay.get(m.id)?.status === "HT")
+  );
+  if (staleInDb.length > 0) {
+    console.log(`[schedule] healing ${staleInDb.length} stale LIVE→FT record(s) in DB`);
+    Promise.all(staleInDb.map(m =>
+      prisma.match.updateMany({
+        where: { fixture: m.id },
+        data: { status: "FT", homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0, elapsed: 90 },
+      }).catch(() => {})
+    ));
+  }
 
   // ── Live overlay (15s TTL): real-time status for currently-playing matches ──
   const liveOverlay = await getLiveOverlay(apiKey);
