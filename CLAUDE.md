@@ -397,6 +397,27 @@ $20–50 Anthropic credits covers the full 48-game group stage.
 - Makes team pages much richer — "arriving in form" vs "arriving cold"
 - Implementation: fetch `/players?team=X&league=Y&season=2025` from api-football per player, store in new `PlayerClubStat` model, surface on team pages
 
+### 4. Platform Story — telling the Studio0x narrative correctly
+**The framing that must come through:**
+- The stat engine is the product. The World Cup is the use case.
+- Studio0x is a proprietary AI-powered stat engine for elite sports — WC 2026 is the live reference deployment.
+- The platform is white-label: reskinnable for F1, UCL, NFL, etc. This is the business case for partners and investors.
+
+**What's broken about the current story:**
+- Someone landing on `/` sees a scoreboard app, not a stat engine platform
+- Studio0x branding is secondary to "WC 2026" — should be the other way around
+- The white-label / multi-sport angle is invisible unless you already know to look for it
+- Proprietary metric formula footnotes ("CCI score = Players×2 + Career Goals×0.5") undercut the mystique — that math belongs on a methodology page, not every card
+
+**What to build:**
+1. `/about` page or above-the-fold hero on `/` — Platform Story section
+   - Headline: Studio0x is an AI-powered stat engine for elite sports
+   - Sub: World Cup 2026 is live. F1, UCL, NFL coming.
+   - Visual: show 2–3 proprietary metric names as the differentiator
+2. Move formula footnotes off cards → link to `/methodology` page instead
+3. Make Studio0x brand more prominent than the sport/tournament in the nav and header
+4. Add a "For Partners" or "White Label" CTA visible to non-logged-in users
+
 ---
 
 ## Roadmap (Deferred)
