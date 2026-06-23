@@ -373,6 +373,19 @@ $20–50 Anthropic credits covers the full 48-game group stage.
 
 ---
 
+## Roadmap (Deferred)
+
+Features explicitly scoped out for now but confirmed as future work:
+
+### Internationalisation (i18n)
+- **Status**: Deferred — English-only for WC 2026 launch
+- **Timezone**: Already works correctly — all match times use `toLocaleTimeString()` with no explicit timezone, so the browser auto-converts UTC to the user's local time
+- **Language**: Not implemented — all UI text is hardcoded English
+- **When ready**: Install `next-intl`, extract strings to locale JSON files, add locale routing (`/es/`, `/pt/`, `/fr/`), prompt Claude in target language for AI content
+- **Priority markets**: Brazilian Portuguese and Spanish (largest WC fan bases outside English)
+
+---
+
 ## Platform Architecture Intent (Future)
 
 The codebase is being built toward a **multi-sport white-label platform**:
