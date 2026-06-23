@@ -134,9 +134,16 @@ export default function AdminDashboard({ users }: { users: User[] }) {
               {
                 key: "players",
                 icon: UserCheck,
-                label: "Seed Player Clubs",
-                desc: "Add club/league data to players — activates CCI™ and PPI™ on Leagues page",
+                label: "Seed Clubs (Mock)",
+                desc: "Fill club/league data from curated list — works without API. Good for testing.",
                 action: () => runSeed("players", "/api/admin/seed-players?mock=true", "GET"),
+              },
+              {
+                key: "playersLive",
+                icon: UserCheck,
+                label: "Seed Clubs (Live API)",
+                desc: "Pull real club/caps/goals data from api-football for all WC 2026 players. Requires API key.",
+                action: () => runSeed("playersLive", "/api/admin/seed-players", "POST"),
               },
               {
                 key: "news",

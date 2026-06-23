@@ -321,41 +321,34 @@ async function seedFromApi() {
 
   const headers = { "x-apisports-key": apiKey };
 
-  // Step 1: Get all fixtures from DB to find api-football fixture IDs
-  const matches = await prisma.match.findMany({ select: { fixture: true } });
-  if (matches.length === 0) {
-    return NextResponse.json({ error: "No matches in DB" }, { status: 400 });
+  // Step 1: Get all WC 2026 team IDs in one call — avoids per-fixture sampling
+  interface ApiTeam { team: { id: number; name: string } }
+  let apiTeamIds: number[] = [];
+  try {
+    const res = await fetch(`${API_BASE}/teams?league=1&season=2026`, { headers });
+    const data = await res.json() as { response: ApiTeam[] };
+    apiTeamIds = (data.response ?? []).map((t) => t.team.id);
+  } catch {
+    return NextResponse.json({ error: "Failed to fetch WC 2026 team list from api-football" }, { status: 500 });
   }
 
-  // Step 2: For each fixture, call api-football to get team IDs
-  const apiTeamIds = new Set<number>();
-  // Sample at most 10 fixtures to reduce quota usage
-  const sampleFixtures = matches.slice(0, 10);
-
-  for (const m of sampleFixtures) {
-    try {
-      const res = await fetch(`${API_BASE}/fixtures?id=${m.fixture}`, { headers });
-      const data = await res.json() as { response: Array<{ teams: { home: { id: number }; away: { id: number } } }> };
-      if (data.response?.[0]) {
-        apiTeamIds.add(data.response[0].teams.home.id);
-        apiTeamIds.add(data.response[0].teams.away.id);
-      }
-    } catch {
-      // skip on error
-    }
+  if (apiTeamIds.length === 0) {
+    return NextResponse.json({ error: "No teams returned for league=1 season=2026 — data may not be published yet" }, { status: 400 });
   }
 
-  if (apiTeamIds.size === 0) {
-    return NextResponse.json({ error: "Could not extract team IDs from fixtures" }, { status: 500 });
-  }
-
-  // Step 3: For each team, fetch players with stats (includes club info)
+  // Step 2: For each team, fetch squad with player stats (club, league, caps, goals, photo)
   interface ApiPlayer {
-    player: { id: number; name: string; age: number; photo: string; birth: { date: string } };
-    statistics: Array<{ team: { name: string }; league: { name: string }; games: { appearences: number }; goals: { total: number } }>;
+    player: { id: number; name: string; photo: string; birth: { date: string } };
+    statistics: Array<{
+      team: { name: string };
+      league: { name: string };
+      games: { appearences: number | null };
+      goals: { total: number | null };
+    }>;
   }
 
-  const playerMap = new Map<string, { club: string; league: string; caps: number; goals: number; photoUrl: string; dateOfBirth: string }>();
+  type PlayerInfo = { club: string; league: string; caps: number; goals: number; photoUrl: string; dateOfBirth: string };
+  const playerMap = new Map<string, PlayerInfo>();
 
   for (const teamId of apiTeamIds) {
     try {
@@ -374,18 +367,23 @@ async function seedFromApi() {
         });
       }
     } catch {
-      // skip on error
+      // skip single team failure, continue others
     }
   }
 
-  // Step 4: Match to DB players and update
+  // Step 3: Fuzzy-match DB players to API data (same logic as mock seed)
   const dbPlayers = await prisma.player.findMany();
   let updated = 0;
   const notFound: string[] = [];
 
   for (const dbPlayer of dbPlayers) {
     const nameLower = dbPlayer.name.toLowerCase();
-    const found = playerMap.get(nameLower);
+    // Exact match first, then substring
+    const found = playerMap.get(nameLower) ??
+      [...playerMap.entries()].find(([k]) =>
+        k.includes(nameLower) || nameLower.includes(k)
+      )?.[1];
+
     if (found) {
       await prisma.player.update({
         where: { id: dbPlayer.id },
@@ -404,7 +402,7 @@ async function seedFromApi() {
     }
   }
 
-  return NextResponse.json({ updated, notFound, teamsScanned: apiTeamIds.size });
+  return NextResponse.json({ updated, notFound, teamsScanned: apiTeamIds.length });
 }
 
 async function handler(req: Request) {
