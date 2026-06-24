@@ -373,6 +373,66 @@ $20–50 Anthropic credits covers the full 48-game group stage.
 
 ---
 
+## Tomorrow's Session Priorities (2026-06-24)
+
+### 1. Monetization + Public Launch
+- **Custom domain**: set up `worldcup.studio0x.io` (or `wc2026.studio0x.io`) in Vercel — point DNS, add domain in project settings
+- **AdSense / ad slots**: wire up real ad content in the sponsor admin panel; consider Google AdSense as fallback fill
+- **Pre-launch checklist**:
+  - Top up Anthropic credits before going live (commentary/stories fail silently if depleted)
+  - Run "Seed Clubs (Mock)" + "Ingest Player Stats" from `/admin` so Club WC Impact™ shows live data
+  - Check SEO meta tags (`<title>`, `<meta description>`, OG image) on key pages
+  - Verify Vercel environment variables are all set in production
+
+### 2. WC × Club World Cup Cross-Reference
+- The FIFA Club World Cup ran June–July 2025 (32-club format) — api-football has this data under a different league ID
+- Feature: side-by-side player stat comparison across both tournaments ("Haaland averaged 7.8 at Club WC → 8.1 at WC 2026 — peak form")
+- Implementation: seed a second tournament's `PlayerMatchStat` with a `tournamentTag` discriminator; add comparison view to leagues/team pages
+- Data cost: ~$2–5 in api-football credits to pull Club WC player stats
+
+### 3. Club Form → Country Enrichment (reverse flow)
+- Currently: WC stats → club narrative (Club WC Impact™)
+- New: player's club performance (domestic league + Club WC) → national team profile
+- Messi's Inter Miami stats enrich Argentina's team page; Haaland's Real Madrid form feeds Norway
+- Makes team pages much richer — "arriving in form" vs "arriving cold"
+- Implementation: fetch `/players?team=X&league=Y&season=2025` from api-football per player, store in new `PlayerClubStat` model, surface on team pages
+
+### 4. Platform Story — telling the Studio0x narrative correctly
+**The framing that must come through:**
+- The stat engine is the product. The World Cup is the use case.
+- Studio0x is a proprietary AI-powered stat engine for elite sports — WC 2026 is the live reference deployment.
+- The platform is white-label: reskinnable for F1, UCL, NFL, etc. This is the business case for partners and investors.
+
+**What's broken about the current story:**
+- Someone landing on `/` sees a scoreboard app, not a stat engine platform
+- Studio0x branding is secondary to "WC 2026" — should be the other way around
+- The white-label / multi-sport angle is invisible unless you already know to look for it
+- Proprietary metric formula footnotes ("CCI score = Players×2 + Career Goals×0.5") undercut the mystique — that math belongs on a methodology page, not every card
+
+**What to build:**
+1. `/about` page or above-the-fold hero on `/` — Platform Story section
+   - Headline: Studio0x is an AI-powered stat engine for elite sports
+   - Sub: World Cup 2026 is live. F1, UCL, NFL coming.
+   - Visual: show 2–3 proprietary metric names as the differentiator
+2. Move formula footnotes off cards → link to `/methodology` page instead
+3. Make Studio0x brand more prominent than the sport/tournament in the nav and header
+4. Add a "For Partners" or "White Label" CTA visible to non-logged-in users
+
+---
+
+## Roadmap (Deferred)
+
+Features explicitly scoped out for now but confirmed as future work:
+
+### Internationalisation (i18n)
+- **Status**: Deferred — English-only for WC 2026 launch
+- **Timezone**: Already works correctly — all match times use `toLocaleTimeString()` with no explicit timezone, so the browser auto-converts UTC to the user's local time
+- **Language**: Not implemented — all UI text is hardcoded English
+- **When ready**: Install `next-intl`, extract strings to locale JSON files, add locale routing (`/es/`, `/pt/`, `/fr/`), prompt Claude in target language for AI content
+- **Priority markets**: Brazilian Portuguese and Spanish (largest WC fan bases outside English)
+
+---
+
 ## Platform Architecture Intent (Future)
 
 The codebase is being built toward a **multi-sport white-label platform**:
