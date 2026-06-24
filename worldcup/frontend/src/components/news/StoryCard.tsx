@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp, Play, Pause, Loader2, Telescope } from "lucide-react";
 import FlagImg from "@/components/ui/FlagImg";
+import { registerStoryStop, stopAllStories, startAmbient, stopAmbient } from "@/lib/storyAudio";
 
 export const CATEGORY_COLORS: Record<string, string> = {
   "MATCH REPORT":     "bg-brand-blue/20 text-blue-300",
+  "MATCH PREVIEW":    "bg-teal-500/20 text-teal-300",
   "ANALYSIS":         "bg-brand-gold/20 text-amber-300",
   "STANDINGS":        "bg-emerald-500/20 text-emerald-300",
   "METRIC SPOTLIGHT": "bg-purple-500/20 text-purple-300",
@@ -13,7 +15,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
   "DAILY RECAP":      "bg-brand-gold/20 text-amber-300",
 };
 
-// Looser than the live-feed Story type so archived recaps (new categories) fit too.
 export interface StoryCardData {
   id: string;
   category: string;
@@ -46,25 +47,56 @@ export function DeepDivePanel({ text }: { text: string }) {
 
 export default function StoryCard({ story, showAge = true }: { story: StoryCardData; showAge?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+
+  // Short story audio
   const [audioUrl, setAudioUrl] = useState<string | null>(story.audioUrl ?? null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Deep dive content
   const [deepDive, setDeepDive] = useState<string | null>(null);
   const [deepDiveLoading, setDeepDiveLoading] = useState(false);
   const [deepDiveOpen, setDeepDiveOpen] = useState(false);
+
+  // Deep dive audio
+  const [deepAudioUrl, setDeepAudioUrl] = useState<string | null>(null);
+  const [deepAudioLoading, setDeepAudioLoading] = useState(false);
+  const [deepPlaying, setDeepPlaying] = useState(false);
+  const deepAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
   const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
 
+  // Register a stop callback so other stories can pause this one.
+  // Runs once on mount; refs are always current so no stale capture.
+  useEffect(() => {
+    const stop = () => {
+      audioRef.current?.pause();
+      deepAudioRef.current?.pause();
+      setPlaying(false);
+      setDeepPlaying(false);
+      stopAmbient();
+    };
+    return registerStoryStop(stop);
+  }, []);
+
   const handlePlay = useCallback(async () => {
     if (audioRef.current && audioUrl) {
-      if (playing) { audioRef.current.pause(); setPlaying(false); }
-      else { audioRef.current.play(); setPlaying(true); }
+      if (playing) {
+        audioRef.current.pause();
+        stopAmbient();
+        setPlaying(false);
+      } else {
+        stopAllStories();
+        audioRef.current.play();
+        startAmbient();
+        setPlaying(true);
+      }
       return;
     }
+    stopAllStories();
     setAudioLoading(true);
     try {
       const res = await fetch("/api/ai/tts", {
@@ -77,13 +109,54 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
       setAudioUrl(data.url);
       const audio = new Audio(data.url);
       audioRef.current = audio;
-      audio.onended = () => setPlaying(false);
+      audio.onended = () => { setPlaying(false); stopAmbient(); };
       audio.play();
+      startAmbient();
       setPlaying(true);
     } finally {
       setAudioLoading(false);
     }
   }, [audioUrl, playing, story]);
+
+  const handleDeepPlay = useCallback(async () => {
+    if (!deepDive) return;
+    if (deepAudioRef.current && deepAudioUrl) {
+      if (deepPlaying) {
+        deepAudioRef.current.pause();
+        stopAmbient();
+        setDeepPlaying(false);
+      } else {
+        stopAllStories();
+        deepAudioRef.current.play();
+        startAmbient();
+        setDeepPlaying(true);
+      }
+      return;
+    }
+    stopAllStories();
+    setDeepAudioLoading(true);
+    try {
+      // Strip markdown formatting for clean TTS
+      const cleanDeep = deepDive.replace(/\*\*/g, "").replace(/\n\n+/g, ". ");
+      const fullText = `${story.headline}. Full analysis: ${cleanDeep}`;
+      const res = await fetch("/api/ai/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: fullText, storyId: `${story.id}-deep` }),
+      });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!data.url) return;
+      setDeepAudioUrl(data.url);
+      const audio = new Audio(data.url);
+      deepAudioRef.current = audio;
+      audio.onended = () => { setDeepPlaying(false); stopAmbient(); };
+      audio.play();
+      startAmbient();
+      setDeepPlaying(true);
+    } finally {
+      setDeepAudioLoading(false);
+    }
+  }, [deepAudioUrl, deepDive, deepPlaying, story]);
 
   const handleDeepDive = useCallback(async () => {
     if (deepDive) { setDeepDiveOpen((o) => !o); return; }
@@ -166,7 +239,19 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
             ))}
           </div>
         ) : deepDive ? (
-          <DeepDivePanel text={deepDive} />
+          <>
+            <DeepDivePanel text={deepDive} />
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handleDeepPlay}
+                disabled={deepAudioLoading}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
+              >
+                {deepAudioLoading ? <Loader2 size={12} className="animate-spin" /> : deepPlaying ? <Pause size={12} /> : <Play size={12} />}
+                {deepAudioLoading ? "Generating…" : deepPlaying ? "Pause" : "Listen to Full Analysis"}
+              </button>
+            </div>
+          </>
         ) : null
       )}
     </div>

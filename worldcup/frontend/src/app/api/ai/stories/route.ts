@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export interface Story {
   id: string;
-  category: "MATCH REPORT" | "ANALYSIS" | "STANDINGS" | "METRIC SPOTLIGHT";
+  category: "MATCH REPORT" | "ANALYSIS" | "STANDINGS" | "METRIC SPOTLIGHT" | "GAME RECAP" | "DAILY RECAP" | "MATCH PREVIEW";
   headline: string;
   body: string;
   teamsInvolved: string[];
@@ -194,19 +194,58 @@ async function generateStories(): Promise<Story[]> {
 }
 
 export async function GET() {
+  // ── 1. In-memory editorial stories (AI-generated analysis/standings) ────────
+  let editorialStories: Story[] = [];
   if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
-    return NextResponse.json({ stories: _cache.stories, cached: true });
+    editorialStories = _cache.stories;
+  } else {
+    try {
+      const fresh = await generateStories();
+      if (fresh.length > 0) {
+        _cache = { ts: Date.now(), stories: fresh };
+        editorialStories = fresh;
+      } else {
+        editorialStories = _cache?.stories ?? [];
+      }
+    } catch {
+      editorialStories = _cache?.stories ?? [];
+    }
   }
 
+  // ── 2. Recent DB stories: MATCH PREVIEW, GAME RECAP, DAILY RECAP (last 48h) ─
+  const since = new Date(Date.now() - 48 * 60 * 60_000);
+  let dbStories: Story[] = [];
   try {
-    const stories = await generateStories();
-    if (stories.length > 0) {
-      _cache = { ts: Date.now(), stories };
+    const rows = await prisma.newsStory.findMany({
+      where: {
+        date: { gte: since },
+        category: { in: ["MATCH PREVIEW", "GAME RECAP", "DAILY RECAP"] },
+      },
+      orderBy: { generatedAt: "desc" },
+      take: 15,
+    });
+    dbStories = rows.map(s => ({
+      id: s.id,
+      category: s.category as Story["category"],
+      headline: s.headline,
+      body: s.body,
+      teamsInvolved: s.teamsInvolved,
+      generatedAt: s.generatedAt.toISOString(),
+      audioUrl: s.audioUrl ?? undefined,
+    }));
+  } catch { /* DB unavailable — fall through to editorial only */ }
+
+  // ── 3. Merge: newest DB stories first, editorial after; dedup by headline ───
+  const seen = new Set<string>();
+  const merged: Story[] = [];
+  for (const s of [...dbStories, ...editorialStories]) {
+    if (!seen.has(s.headline)) {
+      seen.add(s.headline);
+      merged.push(s);
     }
-    return NextResponse.json({ stories, cached: false });
-  } catch (e) {
-    return NextResponse.json({ stories: _cache?.stories ?? [], error: String(e) });
   }
+
+  return NextResponse.json({ stories: merged.slice(0, 12), cached: !!_cache });
 }
 
 // Force regenerate
