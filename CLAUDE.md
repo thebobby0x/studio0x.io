@@ -332,7 +332,7 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-06-21)
+## Current Production State (as of 2026-06-24)
 
 **Working:**
 - Live match scores + events (api-football)
@@ -340,13 +340,24 @@ Never push directly to main.
 - Tournament Stories with METRIC SPOTLIGHT category
 - Go Deeper on-demand deep dive per story
 - Match DNA™, Goal Gravity™, Upset Factor™, Live Win Meter on match detail pages
-- Pressing Intensity Index™ and Transition Danger Rating™ on match detail pages (new)
-- Form Meter™ on match detail pages for both teams (new)
-- Elimination Proximity™ on standings page (new)
-- Club Contribution Index™ + Player Performance Index™ on leagues page (new)
-- Leagues page at `/leagues` with club/league breakdown (new)
-- Admin panel at `/admin` with role switcher and user management
+- Pressing Intensity Index™ and Transition Danger Rating™ on match detail pages
+- Form Meter™ on match detail pages for both teams
+- Elimination Proximity™ on standings page
+- Club Contribution Index™ + Player Performance Index™ on leagues page
+- Club WC Impact™ on leagues page (dual-mode: preview squad strength / live WC stats)
+- Leagues page at `/leagues` with club/league breakdown
+- Admin panel at `/admin` with role switcher, user management, Sync Match Statuses button
 - Group standings, tournament odds, travel pulse, predictions, anthems
+- Dashboard global error boundary + 20s live auto-refresh (LiveRefresh component)
+- Stale LIVE status hardened: 4-hour time guard + background self-heal + applyDbOverlay fix
+- Anthem Hub: 19 real tracks (8 team + 4 FIFA from session 1; + 11 new team anthems Jun 24)
+  - Teams with no anthem show greyed out "coming soon" (soundhelix placeholders purged)
+- Batch import endpoint: `/api/admin/batch-import-anthems` (GET/POST, pulls from Drive by file ID)
+
+**Pending one-time admin actions after deployment:**
+- Run batch anthem import on production: `GET /api/admin/batch-import-anthems?secret=wc2026studio0x`
+- Run soundhelix purge: `DELETE /api/admin/anthem?secret=wc2026studio0x&action=purge-placeholders`
+- CRC (Costa Rica) anthem song exists in Drive but team not in WC 2026 DB — skipped for now
 
 **Blocked / incomplete:**
 - All Anthropic features blocked if API credit balance is zero
