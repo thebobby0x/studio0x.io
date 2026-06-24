@@ -4,8 +4,7 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "crons": [
-    { "path": "/api/news/generate",          "schedule": "0 6 * * *" },
-    { "path": "/api/cron/ingest-stats",      "schedule": "30 2 * * *" },
-    { "path": "/api/cron/story-refresh",     "schedule": "*/10 * * * *" }
+    { "path": "/api/news/generate",      "schedule": "0 6 * * *" },
+    { "path": "/api/cron/ingest-stats",  "schedule": "30 2 * * *" }
   ]
 }
