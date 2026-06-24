@@ -77,3 +77,18 @@ export async function PUT(req: Request) {
 
   return NextResponse.json(stream);
 }
+
+// DELETE /api/admin/anthem?secret=&action=purge-placeholders
+// Removes all AudioStream records backed by soundhelix.com placeholder URLs so those
+// teams revert to "coming soon" in the Anthem Hub. Real Vercel Blob URLs are untouched.
+export async function DELETE(req: Request) {
+  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("action") !== "purge-placeholders") {
+    return NextResponse.json({ hint: "Add ?action=purge-placeholders to delete soundhelix placeholder records." });
+  }
+  const deleted = await prisma.audioStream.deleteMany({
+    where: { audioUrl: { contains: "soundhelix.com" } },
+  });
+  return NextResponse.json({ deleted: deleted.count, message: `Removed ${deleted.count} placeholder record(s). Those teams now show as coming soon.` });
+}
