@@ -21,7 +21,9 @@ export async function GET() {
       }).catch(() => {});
     }
 
-    return NextResponse.json(match ?? null);
+    return NextResponse.json(match ?? null, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
   } catch {
     return NextResponse.json(null);
   }

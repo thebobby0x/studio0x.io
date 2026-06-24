@@ -39,7 +39,7 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
       elapsed: (f.fixture.status.elapsed ?? 0) as number,
     };
     const isLive = data.status === "LIVE" || data.status === "HT";
-    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 15_000 : 300_000, data });
+    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 10_000 : 300_000, data });
     return data;
   } catch {
     return null;
@@ -114,6 +114,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Persist updated state non-blocking
   prisma.match.update({ where: { id }, data: { elapsed, status, homeScore, awayScore } }).catch(() => {});
 
+  const isMatchLive = status === "LIVE" || status === "HT";
   return NextResponse.json({
     match: { ...match, elapsed, status, homeScore, awayScore },
     metrics,
@@ -126,6 +127,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       markets: kalshi  ? kalshi.source  : "sim",
       stats:   "sim",
       probs:   (homeW !== null && awayW !== null) ? "polymarket" : "unavailable",
+    },
+  }, {
+    headers: {
+      "Cache-Control": isMatchLive
+        ? "no-store, no-cache, must-revalidate"
+        : "public, max-age=60, s-maxage=60",
     },
   });
 }

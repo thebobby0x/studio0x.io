@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // FIFA World Cup
 const SEASON = 2026;
-const CACHE_TTL = 60_000; // 60s bulk schedule
-const LIVE_TTL  = 15_000; // 15s live overlay
+const CACHE_TTL = 20_000; // 20s bulk schedule (reduced from 60s)
+const LIVE_TTL  = 10_000; // 10s live overlay (reduced from 15s)
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -340,5 +340,13 @@ export async function GET() {
   const liveOverlay = await getLiveOverlay(apiKey);
   const data = applyLiveOverlay(baseData, liveOverlay);
 
-  return NextResponse.json(data);
+  // Prevent CDN/edge from caching live match data
+  const hasLive = data.some(m => m.status === "LIVE" || m.status === "HT");
+  return NextResponse.json(data, {
+    headers: {
+      "Cache-Control": hasLive
+        ? "no-store, no-cache, must-revalidate"
+        : "public, max-age=20, s-maxage=20, stale-while-revalidate=10",
+    },
+  });
 }
