@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAllVenues, type VenueInfo } from "@/lib/venues";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 const COUNTRY_FLAG: Record<string, string> = {
   USA: "🇺🇸",

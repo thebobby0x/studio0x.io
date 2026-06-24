@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy, CalendarDays, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { Trophy, CalendarDays, ChevronRight, LayoutGrid, List, Columns2, Focus } from "lucide-react";
 import LiveMatchCard from "@/components/match/LiveMatchCard";
 import AppNav from "@/components/ui/AppNav";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
@@ -126,9 +126,9 @@ function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; live?: string }>;
 }) {
-  let params: { view?: string } = {};
+  let params: { view?: string; live?: string } = {};
   let matches: Match[] = [];
   let todayMatches: ScheduleMatch[] = [];
 
@@ -143,6 +143,7 @@ export default async function DashboardPage({
   }
 
   const viewMode = params?.view === "list" ? "list" : "tile";
+  const liveMode = params?.live === "split" ? "split" : "focus";
 
   const liveMatches = matches.filter((m) => ["LIVE", "HT"].includes(m.status));
   const ftMatches = matches.filter((m) => m.status === "FT");
@@ -338,8 +339,44 @@ export default async function DashboardPage({
         {/* ── TILE VIEW ───────────────────────────────────────────────────── */}
         {viewMode === "tile" && (
           <>
-            {/* Live match label */}
-            {isMatchLiveNow && (
+            {/* ── Multi-game live banner ── */}
+            {liveMatches.length >= 2 && (
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  <span className="text-sm font-black text-white">
+                    {liveMatches.length} Matches Live Simultaneously
+                  </span>
+                </div>
+                <div className="flex items-center bg-brand-card/60 border border-brand-border rounded-lg overflow-hidden shrink-0">
+                  <Link
+                    href="/?view=tile&live=focus"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      liveMode === "focus"
+                        ? "bg-white text-brand-dark"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Focus size={11} />
+                    Focus
+                  </Link>
+                  <Link
+                    href="/?view=tile&live=split"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      liveMode === "split"
+                        ? "bg-white text-brand-dark"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Columns2 size={11} />
+                    Split
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Live match label — single game only */}
+            {isMatchLiveNow && liveMatches.length < 2 && (
               <div className="flex items-center gap-3 -mb-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                 <span className="text-sm font-black text-white uppercase tracking-wider">
@@ -391,18 +428,72 @@ export default async function DashboardPage({
                   </div>
                 )}
 
-                {/* Live match card (always full-size) */}
-                <Suspense
-                  fallback={
-                    <div
-                      className={`rounded-2xl bg-brand-card border border-brand-border animate-pulse ${
-                        isMatchLiveNow ? "h-96" : "h-80"
-                      }`}
-                    />
-                  }
-                >
-                  <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
-                </Suspense>
+                {/* Live match card — split mode shows all live matches side by side */}
+                {liveMode === "split" && liveMatches.length >= 2 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {liveMatches.slice(0, 2).map((m) => (
+                      <Suspense
+                        key={m.id}
+                        fallback={<div className="h-72 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />}
+                      >
+                        <LiveMatchCard matchId={m.id} hero={false} />
+                      </Suspense>
+                    ))}
+                    {liveMatches.length > 2 && (
+                      <div className="md:col-span-2 text-center text-xs text-slate-600">
+                        +{liveMatches.length - 2} more live — check the{" "}
+                        <Link href="/schedule" className="text-brand-gold hover:underline">schedule</Link>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Suspense
+                    fallback={
+                      <div
+                        className={`rounded-2xl bg-brand-card border border-brand-border animate-pulse ${
+                          isMatchLiveNow ? "h-96" : "h-80"
+                        }`}
+                      />
+                    }
+                  >
+                    <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
+                  </Suspense>
+                )}
+
+                {/* Focus mode: compact "Also Live" cards for simultaneous matches */}
+                {liveMode === "focus" && liveMatches.length >= 2 && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-600 px-1">
+                      Also Live
+                    </div>
+                    {liveMatches
+                      .filter((m) => m.id !== featuredMatch.id)
+                      .slice(0, 3)
+                      .map((m) => (
+                        <Link
+                          key={m.id}
+                          href={`/schedule/${m.fixture}`}
+                          className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 hover:bg-red-500/15 transition-colors group"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                          <FlagImg tla={m.homeTeam.code} size={20} className="shrink-0" />
+                          <span className="text-sm font-semibold text-slate-300 truncate">
+                            {m.homeTeam.name}
+                          </span>
+                          <span className="text-sm font-black text-white tabular-nums shrink-0">
+                            {m.homeScore ?? 0}–{m.awayScore ?? 0}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-300 truncate">
+                            {m.awayTeam.name}
+                          </span>
+                          <FlagImg tla={m.awayTeam.code} size={20} className="shrink-0" />
+                          <span className="ml-auto text-[10px] font-mono text-red-400 shrink-0">
+                            {m.elapsed}&apos;
+                          </span>
+                        </Link>
+                      ))}
+                  </div>
+                )}
 
                 {/* Sections below the hero */}
                 {realVenue && venueInfo && (

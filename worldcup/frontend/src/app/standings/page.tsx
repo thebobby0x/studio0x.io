@@ -6,6 +6,7 @@ import EliminationProximity from "@/components/stats/EliminationProximity";
 import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
 import { getTournamentWinnerMarkets } from "@/lib/polymarket";
+import { prisma } from "@/lib/prisma";
 
 // ── Group Intensity™ ──────────────────────────────────────────────────────────
 // LIVE results-based: measures how tight and entertaining the group actually is
@@ -127,19 +128,64 @@ async function fetchStandings(): Promise<GroupStanding[]> {
   }
 }
 
+type ConductRaw = { yellows: number; reds: number; fouls: number };
+type ConductResult = ConductRaw & { score: number; label: string; color: string };
+
+async function fetchTeamConduct(): Promise<Map<string, ConductResult>> {
+  try {
+    const stats = await prisma.playerTournamentStat.findMany({
+      include: { player: { include: { team: true } } },
+    });
+    if (stats.length === 0) return new Map();
+
+    const raw = new Map<string, ConductRaw>();
+    for (const s of stats) {
+      const tla = s.player.team.code;
+      const e = raw.get(tla) ?? { yellows: 0, reds: 0, fouls: 0 };
+      raw.set(tla, {
+        yellows: e.yellows + s.yellowCards,
+        reds: e.reds + s.redCards,
+        fouls: e.fouls + s.foulsCommitted,
+      });
+    }
+
+    const result = new Map<string, ConductResult>();
+    for (const [tla, d] of raw) {
+      const deductions = d.yellows * 3 + d.reds * 10 + d.fouls * 0.3;
+      const score = Math.max(0, Math.round(100 - deductions));
+      const label =
+        score >= 90 ? "Exemplary" :
+        score >= 75 ? "Disciplined" :
+        score >= 55 ? "Physical" : "Aggressive";
+      const color =
+        score >= 90 ? "text-brand-green" :
+        score >= 75 ? "text-amber-400" :
+        score >= 55 ? "text-orange-400" : "text-red-400";
+      result.set(tla, { ...d, score, label, color });
+    }
+    return result;
+  } catch {
+    return new Map();
+  }
+}
+
 function gdString(gd: number): string {
   if (gd > 0) return `+${gd}`;
   return String(gd);
 }
 
+type ConductEntry = { yellows: number; reds: number; fouls: number; score: number; label: string; color: string };
+
 function GroupCard({
   standing,
   oddsMap,
   totalOdds,
+  conductMap,
 }: {
   standing: GroupStanding;
   oddsMap: Map<string, number>;
   totalOdds: number;
+  conductMap: Map<string, ConductEntry>;
 }) {
   const gi  = groupIntensityScore(standing.teams);
   const gdi = groupDangerIndex(standing.teams, oddsMap, totalOdds);
@@ -174,15 +220,20 @@ function GroupCard({
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[auto_1fr_repeat(6,auto)] gap-x-3 px-4 py-1.5 border-b border-brand-border/50 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+      <div className="grid grid-cols-[auto_1fr_repeat(8,auto)] gap-x-3 px-4 py-1.5 border-b border-brand-border/50 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
         <span className="w-4 text-center">#</span>
         <span>Team</span>
         <span className="w-5 text-center">P</span>
         <span className="w-5 text-center">W</span>
         <span className="w-5 text-center">D</span>
         <span className="w-5 text-center">L</span>
+        <span className="w-5 text-center">GF</span>
+        <span className="w-5 text-center">GA</span>
         <span className="w-7 text-center">GD</span>
         <span className="w-8 text-right">Pts</span>
+        {conductMap.size > 0 && (
+          <span className="w-12 text-right hidden sm:block">Cndct</span>
+        )}
       </div>
 
       {/* Rows */}
@@ -194,7 +245,7 @@ function GroupCard({
           return (
             <div
               key={team.tla}
-              className={`relative grid grid-cols-[auto_1fr_repeat(6,auto)] gap-x-3 items-center px-4 py-2.5 transition-colors ${
+              className={`relative grid grid-cols-[auto_1fr_repeat(8,auto)] gap-x-3 items-center px-4 py-2.5 transition-colors ${
                 isQualifying ? "bg-brand-green/5 hover:bg-brand-green/10" :
                 isBubble     ? "bg-amber-500/3 hover:bg-amber-500/7" :
                                "hover:bg-white/3"
@@ -231,6 +282,8 @@ function GroupCard({
               <span className="w-5 text-center text-xs text-slate-400 tabular-nums">{team.w}</span>
               <span className="w-5 text-center text-xs text-slate-400 tabular-nums">{team.d}</span>
               <span className="w-5 text-center text-xs text-slate-400 tabular-nums">{team.l}</span>
+              <span className="w-5 text-center text-xs text-slate-400 tabular-nums">{team.gf}</span>
+              <span className="w-5 text-center text-xs text-slate-400 tabular-nums">{team.ga}</span>
               <span className={`w-7 text-center text-xs font-medium tabular-nums ${
                 team.gd > 0 ? "text-brand-green" :
                 team.gd < 0 ? "text-red-400" :
@@ -241,6 +294,11 @@ function GroupCard({
               <span className="w-8 text-right text-sm font-black text-white tabular-nums">
                 {team.pts}
               </span>
+              {conductMap.has(team.tla) && (
+                <span className={`text-[9px] font-bold ${conductMap.get(team.tla)!.color} w-12 text-right tabular-nums hidden sm:block`}>
+                  {conductMap.get(team.tla)!.score}
+                </span>
+              )}
             </div>
           );
         })}
@@ -259,14 +317,26 @@ function GroupCard({
           </span>
         </div>
       )}
+      {/* Team Conduct™ legend */}
+      {conductMap.size > 0 && (
+        <div className="px-4 py-2 border-t border-brand-border/30 text-[9px] text-slate-700 hidden sm:block">
+          <span className="font-black uppercase tracking-widest text-brand-gold mr-2">Team Conduct™</span>
+          <span className="text-brand-green mr-2">≥90 Exemplary</span>
+          <span className="text-amber-400 mr-2">≥75 Disciplined</span>
+          <span className="text-orange-400 mr-2">≥55 Physical</span>
+          <span className="text-red-400">&lt;55 Aggressive</span>
+          <span className="ml-2 font-mono">· score = 100 − (Y×3 + R×10 + Fouls×0.3)</span>
+        </div>
+      )}
     </div>
   );
 }
 
 export default async function StandingsPage() {
-  const [standings, oddsData] = await Promise.all([
+  const [standings, oddsData, conductMap] = await Promise.all([
     fetchStandings(),
     getTournamentWinnerMarkets().catch(() => null),
+    fetchTeamConduct(),
   ]);
 
   // Build tla → odds map from Polymarket data
@@ -347,7 +417,7 @@ export default async function StandingsPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {standings.map((standing) => (
-              <GroupCard key={standing.group} standing={standing} oddsMap={oddsMap} totalOdds={totalOdds} />
+              <GroupCard key={standing.group} standing={standing} oddsMap={oddsMap} totalOdds={totalOdds} conductMap={conductMap} />
             ))}
           </div>
         )}

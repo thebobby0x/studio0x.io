@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
 import { prisma } from "@/lib/prisma";
-import { Building2 } from "lucide-react";
+import { Building2, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
 import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
 import TournamentXMetrics from "@/components/stats/TournamentXMetrics";
@@ -172,17 +173,23 @@ export default async function LeaguesPage() {
                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-brand-border bg-white/2">
                       <span className="text-sm font-black text-white truncate">{club}</span>
                       <span className="text-[10px] font-black text-brand-gold tabular-nums ml-2 shrink-0">
-                        {clubPlayers.length}
+                        {clubPlayers.length} players
                       </span>
                     </div>
 
                     {/* Player list */}
                     <div className="divide-y divide-brand-border/30">
                       {clubPlayers.map((player) => (
-                        <div key={player.id} className="flex items-center gap-2.5 px-4 py-2 hover:bg-white/3 transition-colors">
+                        <Link
+                          key={player.id}
+                          href={`/team/${player.team.code}`}
+                          className="flex items-center gap-2.5 px-4 py-2 hover:bg-white/5 transition-colors group"
+                        >
                           <span className="text-base leading-none shrink-0">{player.team.flagEmoji}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-200 truncate">{player.name}</div>
+                            <div className="text-xs font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
+                              {player.name}
+                            </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-slate-600 uppercase tracking-wider">{player.position}</span>
                               <span className="text-[10px] text-slate-700">·</span>
@@ -192,7 +199,8 @@ export default async function LeaguesPage() {
                           {player.number > 0 && (
                             <span className="text-[10px] font-mono text-slate-700 shrink-0">#{player.number}</span>
                           )}
-                        </div>
+                          <ChevronRight size={12} className="text-slate-700 group-hover:text-slate-500 shrink-0 transition-colors" />
+                        </Link>
                       ))}
                     </div>
                   </div>

@@ -209,6 +209,15 @@ function RoundColumn({
   );
 }
 
+const ROUNDS_TOP_TO_BOTTOM: KnockoutRound[] = [
+  "Final",
+  "3rd Place Final",
+  "Semi-finals",
+  "Quarter-finals",
+  "Round of 16",
+  "Round of 32",
+];
+
 // ── Main bracket view ─────────────────────────────────────────────────────────
 
 export default function BracketView({ rounds }: Props) {
@@ -260,38 +269,55 @@ export default function BracketView({ rounds }: Props) {
         </div>
       </div>
 
-      {/* ── Desktop: horizontal scrolling bracket ───────────────────────────── */}
+      {/* ── Desktop: top-down pyramid bracket ───────────────────────────────── */}
       <div className="hidden lg:block">
-        {/* Bracket scroll wrapper */}
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-6 items-start min-w-max py-2">
-            {ALL_ROUNDS.filter((r) => r !== "3rd Place Final").map((r) => (
-              <RoundColumn
-                key={r}
-                round={r}
-                matches={rounds[r]}
-                highlight={highlightRound === r}
-              />
-            ))}
-          </div>
+        {/* Header */}
+        <div className="mb-6 text-center">
+          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+            FIFA World Cup 2026 · Knockout Stage
+          </p>
         </div>
 
-        {/* 3rd Place Final — shown separately below the main bracket */}
-        {rounds["3rd Place Final"].length > 0 && (
-          <div className="mt-6 border-t border-brand-border pt-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                3rd Place Final
+        {/* Rounds stacked top-to-bottom: Final → R32 */}
+        <div className="space-y-6">
+          {ROUNDS_TOP_TO_BOTTOM.map((r) => {
+            const matches = rounds[r];
+            const isHighlight = highlightRound === r;
+            return (
+              <div key={r}>
+                {/* Round label + divider */}
+                <div className="flex items-center gap-3 mb-3">
+                  <h3
+                    className={`text-[11px] font-black uppercase tracking-widest shrink-0 ${
+                      isHighlight ? "text-brand-gold" : "text-slate-500"
+                    }`}
+                  >
+                    {r}
+                  </h3>
+                  <div
+                    className={`flex-1 h-px ${
+                      isHighlight ? "bg-brand-gold/40" : "bg-brand-border"
+                    }`}
+                  />
+                </div>
+
+                {/* Match cards in a wrapping horizontal row */}
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {matches.map((m) => (
+                    <div key={m.id} className="min-w-[160px] max-w-[200px] flex-1">
+                      <MatchCard match={m} />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex-1 h-px bg-brand-border" />
-            </div>
-            <div className="max-w-[200px]">
-              {rounds["3rd Place Final"].map((m) => (
-                <MatchCard key={m.id} match={m} />
-              ))}
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
+
+        {/* Footer note */}
+        <p className="mt-6 text-center text-[10px] font-mono text-slate-700">
+          Group stage concludes Jul 2 · Round of 32 begins Jul 3
+        </p>
       </div>
 
       {/* ── Legend ──────────────────────────────────────────────────────────── */}
