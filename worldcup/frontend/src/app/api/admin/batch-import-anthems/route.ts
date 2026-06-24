@@ -23,7 +23,7 @@ const BATCH = [
   { code: "UZB", driveId: "15432Eu6Q1AoP6WBGc1jylTX2MJr265qr", title: "Olgʼa, Oʻzbekiston!" },
 ];
 
-export async function POST(req: Request) {
+async function runImport(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const results: { code: string; title: string; status: "ok" | "error"; detail?: string; url?: string }[] = [];
@@ -79,3 +79,7 @@ export async function POST(req: Request) {
   const failed = results.filter((r) => r.status === "error").length;
   return NextResponse.json({ summary: `${ok} imported, ${failed} failed`, results });
 }
+
+// GET so this can be triggered directly from a browser address bar
+export async function GET(req: Request) { return runImport(req); }
+export async function POST(req: Request) { return runImport(req); }
