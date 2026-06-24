@@ -17,6 +17,7 @@ import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import LiveRefresh from "@/components/ui/LiveRefresh";
 
 async function getInitialData() {
   try {
@@ -127,13 +128,21 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const params = await searchParams;
-  const viewMode = params?.view === "list" ? "list" : "tile";
+  let params: { view?: string } = {};
+  let matches: Match[] = [];
+  let todayMatches: ScheduleMatch[] = [];
 
-  const [{ matches }, todayMatches] = await Promise.all([
-    getInitialData(),
-    getTodaySchedule(),
-  ]);
+  try {
+    [params, [{ matches }, todayMatches]] = await Promise.all([
+      searchParams,
+      Promise.all([getInitialData(), getTodaySchedule()]),
+    ]);
+  } catch (e) {
+    console.error("[DashboardPage] top-level fetch failed:", e);
+    params = {};
+  }
+
+  const viewMode = params?.view === "list" ? "list" : "tile";
 
   const liveMatches = matches.filter((m) => ["LIVE", "HT"].includes(m.status));
   const ftMatches = matches.filter((m) => m.status === "FT");
@@ -158,6 +167,7 @@ export default async function DashboardPage({
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
+      <LiveRefresh isLive={!!isMatchLiveNow} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         {/* Page header + view toggle */}
