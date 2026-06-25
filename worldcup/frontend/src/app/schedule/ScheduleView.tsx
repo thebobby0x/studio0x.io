@@ -284,6 +284,27 @@ function SubFilterBar({
   );
 }
 
+// ─── Simultaneous game grouping ───────────────────────────────────────────────
+// Groups matches that kick off within 30 minutes of each other as "simultaneous"
+
+function groupSimultaneous(matches: ScheduleMatch[]): ScheduleMatch[][] {
+  if (matches.length === 0) return [];
+  const groups: ScheduleMatch[][] = [];
+  let current: ScheduleMatch[] = [matches[0]];
+  for (let i = 1; i < matches.length; i++) {
+    const prev = new Date(matches[i - 1].utcDate).getTime();
+    const curr = new Date(matches[i].utcDate).getTime();
+    if (curr - prev <= 30 * 60 * 1000) {
+      current.push(matches[i]);
+    } else {
+      groups.push(current);
+      current = [matches[i]];
+    }
+  }
+  groups.push(current);
+  return groups;
+}
+
 // ─── Date group section ───────────────────────────────────────────────────────
 
 function DateSection({
@@ -297,6 +318,8 @@ function DateSection({
   matches: ScheduleMatch[];
   now: number;
 }) {
+  const kickoffGroups = groupSimultaneous(matches);
+
   return (
     <section>
       <div className="flex items-center gap-3 mb-3">
@@ -315,9 +338,25 @@ function DateSection({
         <span className="text-xs text-slate-600 shrink-0">{matches.length}</span>
       </div>
       <div className="space-y-2">
-        {matches.map((m) => (
-          <MatchRow key={m.id} m={m} now={now} />
-        ))}
+        {kickoffGroups.map((group, gi) =>
+          group.length >= 2 ? (
+            <div key={gi} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-semibold text-amber-500/70 uppercase tracking-widest">
+                  Simultaneous
+                </span>
+                <div className="flex-1 h-px bg-amber-500/20" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {group.map((m) => (
+                  <MatchRow key={m.id} m={m} now={now} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            group.map((m) => <MatchRow key={m.id} m={m} now={now} />)
+          )
+        )}
       </div>
     </section>
   );

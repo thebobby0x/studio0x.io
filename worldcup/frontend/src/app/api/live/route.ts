@@ -7,24 +7,26 @@ export async function GET() {
   try {
     // Guard: a match can't still be LIVE/HT if it kicked off more than 4 hours ago
     const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000);
-    const match = await prisma.match.findFirst({
+    const matches = await prisma.match.findMany({
       where: { status: { in: ["LIVE", "HT"] }, date: { gte: cutoff } },
       include: { homeTeam: true, awayTeam: true },
       orderBy: { date: "asc" },
     });
 
-    // If nothing passes the time guard, heal any stragglers in the background
-    if (!match) {
+    // Heal stragglers in the background
+    if (matches.length === 0) {
       prisma.match.updateMany({
         where: { status: { in: ["LIVE", "HT"] }, date: { lt: cutoff } },
         data: { status: "FT", elapsed: 90 },
       }).catch(() => {});
     }
 
-    return NextResponse.json(match ?? null, {
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-    });
+    // Return array — null compat: return first match as primary + count for banner
+    return NextResponse.json(
+      { matches, primary: matches[0] ?? null, count: matches.length },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch {
-    return NextResponse.json(null);
+    return NextResponse.json({ matches: [], primary: null, count: 0 });
   }
 }

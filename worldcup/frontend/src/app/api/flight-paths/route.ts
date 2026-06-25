@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 import { TEAM_HOME_COORDS } from "@/lib/teamHomeCoords";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export interface FlightArc {
   tla: string;

@@ -160,6 +160,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 action: () => runSeed("news", "/api/news/generate?secret=wc2026studio0x", "POST"),
               },
               {
+                key: "fullSquads",
+                icon: Users,
+                label: "Seed Full Squads (Live API)",
+                desc: "Import all 26-man squads for all 48 WC teams from api-football. Creates new player records for any missing. Run this to populate the Leagues page with all called-up players.",
+                action: () => runSeed("fullSquads", "/api/admin/seed-full-squads", "POST"),
+              },
+              {
                 key: "ingest",
                 icon: Activity,
                 label: "Ingest Player Stats",

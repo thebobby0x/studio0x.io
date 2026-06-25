@@ -211,6 +211,7 @@ function AudioSection() {
 
 export default function LiveMatchBanner() {
   const [liveMatch, setLiveMatch] = useState<LiveMatch | null>(null);
+  const [liveCount, setLiveCount] = useState(0);
   const [hasContent, setHasContent] = useState(false);
   const { current: audioTrack } = useAudio();
 
@@ -219,8 +220,9 @@ export default function LiveMatchBanner() {
       try {
         const res = await fetch("/api/live");
         if (res.ok) {
-          const data: LiveMatch | null = await res.json();
-          setLiveMatch(data);
+          const data = await res.json() as { primary: LiveMatch | null; count: number };
+          setLiveMatch(data.primary);
+          setLiveCount(data.count ?? (data.primary ? 1 : 0));
         }
       } catch { /* ignore */ }
     }
@@ -242,7 +244,17 @@ export default function LiveMatchBanner() {
     <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
       <div className="max-w-7xl mx-auto flex justify-between items-center px-4 h-16 gap-4">
         {/* Left: live score or recent/upcoming chips */}
-        <LiveSection liveMatch={liveMatch} />
+        <div className="flex items-center gap-3 min-w-0">
+          <LiveSection liveMatch={liveMatch} />
+          {liveCount >= 2 && (
+            <Link
+              href="/?live=split"
+              className="hidden sm:flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-400 border border-red-500/20 rounded-full px-2.5 py-1 hover:bg-red-500/25 transition-colors shrink-0"
+            >
+              +{liveCount - 1} more live
+            </Link>
+          )}
+        </div>
 
         {/* Right: mini audio player */}
         <AudioSection />
