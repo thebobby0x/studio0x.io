@@ -407,6 +407,7 @@ async function seed(req: Request) {
     // ── 2. Full wipe in FK order so re-seed starts from a clean slate ──────────
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
+    await prisma.playerMatchStat.deleteMany({});
     await prisma.match.deleteMany({});
     // AudioStream rows are NOT wiped — real Blob URLs must survive re-seeding.
     // Placeholders (soundhelix) are overwritten; real URLs are preserved (see step 6).
