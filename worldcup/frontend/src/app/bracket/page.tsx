@@ -139,13 +139,21 @@ async function fetchKnockoutMatches(): Promise<Record<KnockoutRound, BracketMatc
 
 export default async function BracketPage() {
   const rounds = await fetchKnockoutMatches();
+  const now = new Date();
+  const isPreKnockout = now < KNOCKOUT_START;
+  const daysUntil = Math.ceil((KNOCKOUT_START.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Count how many group-stage matches are still NS (not yet played)
+  const groupMatchesRemaining = await prisma.match.count({
+    where: { date: { lt: KNOCKOUT_START }, status: "NS" },
+  }).catch(() => 0);
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-1">
             <GitBranch size={22} className="text-brand-gold" />
             <h1 className="text-3xl font-black text-white tracking-tight">
@@ -156,6 +164,32 @@ export default async function BracketPage() {
             FIFA World Cup 2026 · Round of 32 through the Final · July 3–19
           </p>
         </div>
+
+        {isPreKnockout && (
+          <div className="rounded-2xl bg-brand-card border border-brand-gold/20 px-5 py-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-gold/10 flex items-center justify-center shrink-0">
+                <GitBranch size={18} className="text-brand-gold" />
+              </div>
+              <div>
+                <div className="font-black text-white text-sm">
+                  Bracket Locks In {daysUntil === 1 ? "Tomorrow" : `In ${daysUntil} Days`}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {groupMatchesRemaining > 0
+                    ? `${groupMatchesRemaining} group-stage matches remaining · qualified teams revealed June 25–26`
+                    : "Group stage complete · bracket draws underway · slots confirmed July 3"}
+                </div>
+              </div>
+            </div>
+            <div className="sm:ml-auto shrink-0">
+              <div className="text-right">
+                <div className="text-2xl font-black text-brand-gold tabular-nums">Jul 3</div>
+                <div className="text-[10px] text-slate-500 uppercase tracking-widest">R32 kick-off</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <BracketView rounds={rounds} />
       </main>

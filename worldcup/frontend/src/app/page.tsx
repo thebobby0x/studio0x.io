@@ -171,15 +171,16 @@ export default async function DashboardPage({
       <LiveRefresh isLive={!!isMatchLiveNow} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* Page header + view toggle */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
-              FIFA World Cup <span className="text-brand-gold">2026</span>
-            </h1>
-            <p className="text-slate-500 mt-1 text-sm">
-              Live scores · group winner odds · prediction markets
-            </p>
+        {/* Compact header row */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-sm font-black text-slate-400 uppercase tracking-widest">Dashboard</h1>
+            {liveMatches.length > 0 && (
+              <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full border border-red-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                {liveMatches.length} live
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
