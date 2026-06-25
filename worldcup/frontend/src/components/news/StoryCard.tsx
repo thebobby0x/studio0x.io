@@ -63,7 +63,11 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   const [deepAudioUrl, setDeepAudioUrl] = useState<string | null>(null);
   const [deepAudioLoading, setDeepAudioLoading] = useState(false);
   const [deepPlaying, setDeepPlaying] = useState(false);
+  const [deepAudioError, setDeepAudioError] = useState(false);
   const deepAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Short story audio error state
+  const [audioError, setAudioError] = useState(false);
 
   const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
@@ -98,6 +102,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setAudioLoading(true);
+    setAudioError(false);
     try {
       const res = await fetch("/api/ai/tts", {
         method: "POST",
@@ -105,7 +110,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         body: JSON.stringify({ text: `${story.headline}. ${story.body}`, storyId: story.id }),
       });
       const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) return;
+      if (!data.url) { setAudioError(true); setTimeout(() => setAudioError(false), 4000); return; }
       setAudioUrl(data.url);
       const audio = new Audio(data.url);
       audioRef.current = audio;
@@ -113,6 +118,9 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
       audio.play();
       startAmbient();
       setPlaying(true);
+    } catch {
+      setAudioError(true);
+      setTimeout(() => setAudioError(false), 4000);
     } finally {
       setAudioLoading(false);
     }
@@ -135,6 +143,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setDeepAudioLoading(true);
+    setDeepAudioError(false);
     try {
       // Strip markdown formatting for clean TTS
       const cleanDeep = deepDive.replace(/\*\*/g, "").replace(/\n\n+/g, ". ");
@@ -145,7 +154,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         body: JSON.stringify({ text: fullText, storyId: `${story.id}-deep` }),
       });
       const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) return;
+      if (!data.url) { setDeepAudioError(true); setTimeout(() => setDeepAudioError(false), 4000); return; }
       setDeepAudioUrl(data.url);
       const audio = new Audio(data.url);
       deepAudioRef.current = audio;
@@ -153,6 +162,9 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
       audio.play();
       startAmbient();
       setDeepPlaying(true);
+    } catch {
+      setDeepAudioError(true);
+      setTimeout(() => setDeepAudioError(false), 4000);
     } finally {
       setDeepAudioLoading(false);
     }
@@ -223,10 +235,14 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
           <button
             onClick={handlePlay}
             disabled={audioLoading}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors disabled:opacity-40 ${
+              audioError
+                ? "bg-red-500/10 text-red-400"
+                : "bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20"
+            }`}
           >
             {audioLoading ? <Loader2 size={12} className="animate-spin" /> : playing ? <Pause size={12} /> : <Play size={12} />}
-            {audioLoading ? "Generating…" : playing ? "Pause" : "Listen"}
+            {audioLoading ? "Generating…" : audioError ? "Audio unavailable" : playing ? "Pause" : "Listen"}
           </button>
         </div>
       </div>
@@ -245,10 +261,14 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
               <button
                 onClick={handleDeepPlay}
                 disabled={deepAudioLoading}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20 disabled:opacity-40"
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors disabled:opacity-40 ${
+                  deepAudioError
+                    ? "bg-red-500/10 text-red-400"
+                    : "bg-brand-gold/10 text-amber-300 hover:bg-brand-gold/20"
+                }`}
               >
                 {deepAudioLoading ? <Loader2 size={12} className="animate-spin" /> : deepPlaying ? <Pause size={12} /> : <Play size={12} />}
-                {deepAudioLoading ? "Generating…" : deepPlaying ? "Pause" : "Listen to Full Analysis"}
+                {deepAudioLoading ? "Generating…" : deepAudioError ? "Audio unavailable" : deepPlaying ? "Pause" : "Listen to Full Analysis"}
               </button>
             </div>
           </>

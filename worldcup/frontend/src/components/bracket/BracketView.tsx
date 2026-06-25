@@ -156,10 +156,33 @@ function MatchCard({ match }: { match: BracketMatch }) {
         isWinner={awayWins}
         showScore={showScore}
       />
+
+      {/* Predict strip — shown on upcoming matches with known teams */}
+      {!isTbd && !finished && !live && match.fixture > 0 && (
+        <div className="px-3 py-1.5 border-t border-brand-border bg-brand-gold/5 flex items-center justify-between">
+          <span className="text-[9px] text-slate-600 uppercase tracking-widest">Predict</span>
+          <span className="text-[9px] font-semibold text-brand-gold">→ score</span>
+        </div>
+      )}
+
+      {/* TBD predict placeholder */}
+      {isTbd && (
+        <div className="px-3 py-1.5 border-t border-brand-border flex items-center justify-between opacity-30">
+          <span className="text-[9px] text-slate-600 uppercase tracking-widest">Predict</span>
+          <span className="text-[9px] text-slate-600">awaiting qualifier</span>
+        </div>
+      )}
     </div>
   );
 
   // Make clickable only if it's a real seeded match
+  if (match.fixture > 0 && !finished) {
+    return (
+      <Link href={`/predict?match=${match.fixture}`} className="block group">
+        {cardContent}
+      </Link>
+    );
+  }
   if (match.fixture > 0) {
     return (
       <Link href={`/schedule/${match.fixture}`} className="block">

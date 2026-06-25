@@ -126,9 +126,9 @@ function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; live?: string }>;
+  searchParams: Promise<{ view?: string; live?: string; focus?: string }>;
 }) {
-  let params: { view?: string; live?: string } = {};
+  let params: { view?: string; live?: string; focus?: string } = {};
   let matches: Match[] = [];
   let todayMatches: ScheduleMatch[] = [];
 
@@ -144,17 +144,26 @@ export default async function DashboardPage({
 
   const viewMode = params?.view === "list" ? "list" : "tile";
   const liveMode = params?.live === "split" ? "split" : "focus";
+  const focusIndex = params?.focus === "1" ? 1 : 0;
 
   const liveMatches = matches.filter((m) => ["LIVE", "HT"].includes(m.status));
   const ftMatches = matches.filter((m) => m.status === "FT");
   const nsMatches = matches.filter((m) => m.status === "NS");
 
-  const featuredMatch =
+  // In split mode, use the focused match for detail sections; otherwise use default featured
+  const defaultFeatured =
     liveMatches.length > 0
       ? liveMatches.reduce((a, b) => (new Date(a.date) > new Date(b.date) ? a : b))
       : ftMatches.length > 0
       ? ftMatches[ftMatches.length - 1]
       : (nsMatches[0] ?? matches[matches.length - 1]);
+
+  // In split mode with 2+ live games, the detail sections (win meter, stadium, odds) follow whichever
+  // match the user has focused via ?focus=0|1; otherwise fall back to the normal featured match
+  const featuredMatch =
+    liveMode === "split" && liveMatches.length >= 2
+      ? (liveMatches[focusIndex] ?? liveMatches[0])
+      : defaultFeatured;
 
   const isMatchLiveNow =
     featuredMatch && (featuredMatch.status === "LIVE" || featuredMatch.status === "HT");
@@ -493,6 +502,37 @@ export default async function DashboardPage({
                           </span>
                         </Link>
                       ))}
+                  </div>
+                )}
+
+                {/* In split mode: match selector to control which game's stats show below */}
+                {liveMode === "split" && liveMatches.length >= 2 && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="text-[10px] uppercase tracking-widest text-slate-600 shrink-0">Stats for:</span>
+                    <div className="flex items-center bg-brand-card border border-brand-border rounded-lg overflow-hidden">
+                      {liveMatches.slice(0, 2).map((m, i) => (
+                        <Link
+                          key={m.id}
+                          href={`/?view=tile&live=split&focus=${i}`}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            focusIndex === i
+                              ? "bg-white text-brand-dark"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <FlagImg tla={m.homeTeam.code} size={14} className="shrink-0" />
+                          <span className="hidden sm:inline">{m.homeTeam.name}</span>
+                          <span className="font-black tabular-nums">{m.homeScore ?? 0}–{m.awayScore ?? 0}</span>
+                          <FlagImg tla={m.awayTeam.code} size={14} className="shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
+                    <Link
+                      href={`/schedule/${featuredMatch?.fixture}`}
+                      className="text-[10px] text-brand-gold hover:text-amber-300 transition-colors shrink-0"
+                    >
+                      Full detail →
+                    </Link>
                   </div>
                 )}
 
