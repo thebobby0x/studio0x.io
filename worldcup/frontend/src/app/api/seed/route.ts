@@ -407,6 +407,7 @@ async function seed(req: Request) {
     // ── 2. Full wipe in FK order so re-seed starts from a clean slate ──────────
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
+    await prisma.playerMatchStat.deleteMany({});
     await prisma.match.deleteMany({});
     // AudioStream rows are NOT wiped — real Blob URLs must survive re-seeding.
     // Placeholders (soundhelix) are overwritten; real URLs are preserved (see step 6).
@@ -414,10 +415,15 @@ async function seed(req: Request) {
     const deletedTeams = await prisma.team.deleteMany({});
     if (deletedTeams.count > 0) log.push(`Cleared ${deletedTeams.count} stale team records`);
 
-    // Normalize fixtures to internal shape
+    // Normalize fixtures to internal shape.
+    // Knockout fixtures may have no team codes yet (teams TBD until group stage settles).
+    // We use a "TBD" sentinel TLA so the slot is stored with real date/venue data.
     const fdMatches = afFixtures.map(f => {
-      const homeTla = teamCodeById.get(f.teams.home.id) ?? "";
-      const awayTla = teamCodeById.get(f.teams.away.id) ?? "";
+      const rawHome = teamCodeById.get(f.teams.home.id) ?? "";
+      const rawAway = teamCodeById.get(f.teams.away.id) ?? "";
+      const isKnockout = !f.league.round.toLowerCase().includes("group");
+      const homeTla = rawHome || (isKnockout ? "TBD" : "");
+      const awayTla = rawAway || (isKnockout ? "TBD" : "");
       return {
         id:       f.fixture.id,
         utcDate:  f.fixture.date,
@@ -457,9 +463,16 @@ async function seed(req: Request) {
         })
       )
     );
+    // Ensure TBD sentinel team exists for knockout placeholder slots
+    await prisma.team.upsert({
+      where: { code: "TBD" },
+      create: { code: "TBD", name: "TBD", flagEmoji: "🏳️", groupStage: "KO" },
+      update: {},
+    });
+
     const allTeams = await prisma.team.findMany({ select: { id: true, code: true } });
     const teamIdByTla = new Map(allTeams.map(t => [t.code, t.id]));
-    log.push(`Upserted ${teamsData.length} teams`);
+    log.push(`Upserted ${teamsData.length} teams (+ TBD sentinel)`);
 
     // ── 5. Batch create players (skipDuplicates = idempotent) ────────────────
     const playersData = Object.entries(SQUADS).flatMap(([tla, players]) => {
