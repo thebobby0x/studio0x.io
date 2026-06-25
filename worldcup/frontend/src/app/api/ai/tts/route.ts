@@ -45,13 +45,23 @@ export async function POST(req: Request) {
 
   if (!elRes.ok) {
     const err = await elRes.text();
-    return NextResponse.json({ error: `ElevenLabs: ${err}` }, { status: 502 });
+    console.error(`[TTS] ElevenLabs ${elRes.status}: ${err}`);
+    return NextResponse.json({ error: `ElevenLabs ${elRes.status}: ${err}` }, { status: 502 });
   }
 
-  const blob = await put(blobKey, elRes.body!, {
-    access: "public",
-    contentType: "audio/mpeg",
-  });
+  // Buffer audio so we can store it and return a URL — streaming directly to put()
+  // risks a silent crash if Blob storage fails mid-stream.
+  const audioBuffer = Buffer.from(await elRes.arrayBuffer());
 
-  return NextResponse.json({ url: blob.url, cached: false });
+  try {
+    const blob = await put(blobKey, audioBuffer, {
+      access: "public",
+      contentType: "audio/mpeg",
+    });
+    return NextResponse.json({ url: blob.url, cached: false });
+  } catch (blobErr) {
+    const msg = blobErr instanceof Error ? blobErr.message : String(blobErr);
+    console.error("[TTS] Blob put failed:", msg);
+    return NextResponse.json({ error: `Audio cache failed: ${msg}` }, { status: 502 });
+  }
 }

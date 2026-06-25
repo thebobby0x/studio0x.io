@@ -261,9 +261,10 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 
 | Route | Purpose |
 |---|---|
-| `POST /api/seed` | Seeds teams + matches from api-football (run once on new DB) |
+| `POST /api/seed` | Seeds teams + matches from api-football (run once on new DB, or to refresh knockout fixtures) |
 | `POST /api/admin/seed-players?mock=true` | Seeds 30+ key players with club/league data (mock mode, no API needed) |
 | `POST /api/admin/seed-players` | Seeds players from api-football live squad data |
+| `POST /api/admin/seed-full-squads` | Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players) |
 | `POST /api/ai/stories` | Force-regenerates story cache (also invalidated after 1hr) |
 | `PATCH /api/admin/users` | Updates user role (SUPER_ADMIN only) |
 | `POST /api/admin/view-as` | Sets impersonation cookie |
@@ -330,9 +331,26 @@ Never push directly to main.
     client-side so it works anywhere you pass a `teamTla` prop. The team detail page needs
     more content added in a future session.
 
+11. **Seed wipe order must delete child tables first** — The correct order to avoid FK RESTRICT violations:
+    `kalshiMarket` → `liveMetric` → `playerMatchStat` → `match` → `player` → `team`.
+    Missing `playerMatchStat` before `match` caused a hard crash when PlayerMatchStat rows existed.
+
+12. **Power Rankings™ formula had `* 100` bug** — The pts/game component was `ptsPerGame * 40 / 3 * 100`
+    instead of `ptsPerGame * 40 / 3`. This pushed all raw scores to ~4000+, causing `Math.min(100, score)`
+    to clamp every team to 100. Fixed Jun 25.
+
+13. **TBD sentinel team for knockout fixtures** — When api-football hasn't assigned teams to knockout
+    fixtures yet, we store them using a `TBD` sentinel team (code: "TBD"). The bracket page maps
+    `team.code === "TBD"` → null so cards render as TBD placeholders with real dates/venues.
+    After group stage settles and api-football updates fixtures, re-run `/api/seed` to replace TBD with real teams.
+
+14. **TTS route: buffer before Blob put** — `elRes.body` is a stream that can only be read once.
+    Always `Buffer.from(await elRes.arrayBuffer())` before calling `put()`. Wrap `put()` in try/catch
+    so Blob failures are logged and returned as errors rather than silently crashing the route.
+
 ---
 
-## Current Production State (as of 2026-06-24)
+## Current Production State (as of 2026-06-25)
 
 **Working:**
 - Live match scores + events (api-football)
@@ -353,16 +371,25 @@ Never push directly to main.
 - Anthem Hub: 19 real tracks (8 team + 4 FIFA from session 1; + 11 new team anthems Jun 24)
   - Teams with no anthem show greyed out "coming soon" (soundhelix placeholders purged)
 - Batch import endpoint: `/api/admin/batch-import-anthems` (GET/POST, pulls from Drive by file ID)
+- `/api/live` returns all concurrent live matches (multi-game aware dashboard)
+- LiveMatchBanner shows "+N more live" chip for simultaneous games
+- Dashboard split view with `?focus=0|1` match selector
+- Bracket pre-knockout announcement card + predict strips on upcoming slots
+- Full squad seed route (`POST /api/admin/seed-full-squads`) — admin button added
+- Power Rankings™ formula fixed (was clamping all teams to 100) — Jun 25
+- TTS route hardened with proper buffering + error logging — Jun 25
 
-**Pending one-time admin actions after deployment:**
-- Run batch anthem import on production: `GET /api/admin/batch-import-anthems?secret=wc2026studio0x`
-- Run soundhelix purge: `DELETE /api/admin/anthem?secret=wc2026studio0x&action=purge-placeholders`
+**Pending one-time admin actions:**
+- **Run "Seed Full Squads (Live API)"** from `/admin` — player count is 78 (mock), needs ~1,248
+- **Run "Seed Clubs (Mock)" + "Ingest Player Stats"** after full squads seeded
+- **Re-run `/api/seed`** after July 3 to pull R32 knockout fixtures from api-football
+- Check TTS audio in production — Vercel logs will show exact error after PR #78 deploys
 - CRC (Costa Rica) anthem song exists in Drive but team not in WC 2026 DB — skipped for now
 
 **Blocked / incomplete:**
-- All Anthropic features blocked if API credit balance is zero
+- TTS audio may still be failing in production — exact cause unknown until Vercel logs checked
+- Bracket all TBD — api-football has 72 fixtures (group stage only); knockout fixtures after July 3
 - PlayerTournamentStat empty until seeded — PPI™ shows empty state
-- Club/league data empty until seed route is run — CCI™ shows empty state
 - `team/[tla]` page needs more content (FormMeter is wired but page is sparse)
 - `workflow` scope missing from CONTENT_REPO_TOKEN PAT (blocks social workflow pushes)
 - Social API secrets (LinkedIn, X, Medium) not yet set up in studio0x-content repo
@@ -384,16 +411,21 @@ $20–50 Anthropic credits covers the full 48-game group stage.
 
 ---
 
-## Tomorrow's Session Priorities (2026-06-24)
+## Tomorrow's Session Priorities (2026-06-25)
+
+### 0. Morning admin actions (do first)
+- Merge PR #78 (Power Rankings fix + TTS hardening) if not already merged
+- Run "Seed Full Squads (Live API)" from `/admin` → gets player count to ~1,248
+- Run "Seed Clubs (Mock)" + "Ingest Player Stats"
+- Check Vercel function logs for the TTS error — click Listen on a story, then check logs
 
 ### 1. Monetization + Public Launch
 - **Custom domain**: set up `worldcup.studio0x.io` (or `wc2026.studio0x.io`) in Vercel — point DNS, add domain in project settings
 - **AdSense / ad slots**: wire up real ad content in the sponsor admin panel; consider Google AdSense as fallback fill
 - **Pre-launch checklist**:
   - Top up Anthropic credits before going live (commentary/stories fail silently if depleted)
-  - Run "Seed Clubs (Mock)" + "Ingest Player Stats" from `/admin` so Club WC Impact™ shows live data
   - Check SEO meta tags (`<title>`, `<meta description>`, OG image) on key pages
-  - Verify Vercel environment variables are all set in production
+  - Verify all Vercel environment variables are set in production (especially ELEVENLABS_API_KEY, BLOB_READ_WRITE_TOKEN)
 
 ### 2. WC × Club World Cup Cross-Reference
 - The FIFA Club World Cup ran June–July 2025 (32-club format) — api-football has this data under a different league ID

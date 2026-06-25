@@ -80,7 +80,7 @@ function powerRankings(standings: GroupStanding[]) {
       const winRate    = t.w   / t.p;
 
       const score = Math.round(
-        ptsPerGame * 40 / 3 * 100    // max 3 pts/game → max 40
+        ptsPerGame * 40 / 3           // max 3 pts/game → max 40
         + Math.max(0, gdPerGame + 5) / 10 * 30  // centred on gd=0
         + gfPerGame / 4 * 20          // 4 goals/game → max 20
         + winRate * 10                // win rate component
