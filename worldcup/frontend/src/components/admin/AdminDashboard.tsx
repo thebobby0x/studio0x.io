@@ -191,6 +191,22 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                   setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
                 },
               },
+              {
+                key: "purgeAnthems",
+                icon: Trash2,
+                label: "Purge Placeholder Anthems",
+                desc: "Delete all soundhelix placeholder audio records. Teams revert to greyed-out coming-soon state.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, purgeAnthems: "loading" }));
+                  try {
+                    const res = await fetch("/api/admin/anthem?secret=wc2026studio0x&action=purge-placeholders", { method: "DELETE" });
+                    setSeedStatus(s => ({ ...s, purgeAnthems: res.ok ? "done" : "error" }));
+                  } catch {
+                    setSeedStatus(s => ({ ...s, purgeAnthems: "error" }));
+                  }
+                  setTimeout(() => setSeedStatus(s => ({ ...s, purgeAnthems: "idle" })), 5000);
+                },
+              },
             ].map(({ key, icon: Icon, label, desc, action }) => {
               const status = seedStatus[key] ?? "idle";
               return (
