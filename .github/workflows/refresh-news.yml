@@ -1,0 +1,42 @@
+name: Refresh News Stories
+
+# Keeps World Cup news recaps/previews fresh on the Vercel Hobby plan, which
+# cannot run sub-daily crons. Pings the in-app story-refresh endpoint every
+# ~15 minutes. The Vercel daily 6 AM /api/news/generate cron remains the
+# comprehensive backstop (daily round-ups + full backfill).
+#
+# SETUP: add a repository secret named NEWS_REFRESH_SECRET set to the admin
+# secret (currently "wc2026studio0x"). The value is masked in logs.
+#
+# Note: scheduled GitHub Actions only run from the default branch (main) and
+# are best-effort (may be delayed a few minutes under GitHub load) — fine for
+# news freshness. workflow_dispatch lets you trigger it manually from the
+# Actions tab.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Don't pile up overlapping runs if one is slow.
+concurrency:
+  group: refresh-news
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping story-refresh endpoint
+        env:
+          REFRESH_SECRET: ${{ secrets.NEWS_REFRESH_SECRET }}
+        run: |
+          if [ -z "$REFRESH_SECRET" ]; then
+            echo "NEWS_REFRESH_SECRET not set — add it in repo Settings → Secrets → Actions." >&2
+            exit 1
+          fi
+          curl -fsS -X POST \
+            "https://worldcup-2026-sandy.vercel.app/api/cron/story-refresh?secret=${REFRESH_SECRET}" \
+            --max-time 120 \
+            && echo "story-refresh pinged OK" \
+            || echo "story-refresh ping failed (non-fatal — will retry next run)"
