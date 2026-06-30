@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import StoryCard, { type StoryCardData } from "@/components/news/StoryCard";
 import AppNav from "@/components/ui/AppNav";
 import { Newspaper } from "lucide-react";
+import { maybeScheduleRefresh } from "@/lib/storyRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,10 @@ function prettyDay(key: string): string {
 }
 
 export default async function NewsPage() {
+  // Viewing the news page opportunistically refreshes stories (post-response,
+  // throttled) so freshness isn't solely dependent on dashboard traffic.
+  maybeScheduleRefresh();
+
   let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
   try {
     stories = await prisma.newsStory.findMany({

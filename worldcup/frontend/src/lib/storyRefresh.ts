@@ -1,7 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const MODEL = "claude-haiku-4-5-20251001";
+
+// Shared opportunistic-refresh throttle. Any server route/page (dashboard, news,
+// schedule…) can call maybeScheduleRefresh() to fire a story refresh AFTER its
+// response is sent — without hammering the LLM. ~3 min per warm container.
+// This is the sub-daily freshness mechanism on Hobby (which can't run sub-daily
+// crons); the 6 AM /api/news/generate cron is the comprehensive daily backstop.
+let _lastRefresh = 0;
+const REFRESH_INTERVAL = 3 * 60_000;
+
+export function maybeScheduleRefresh() {
+  if (Date.now() - _lastRefresh < REFRESH_INTERVAL) return;
+  _lastRefresh = Date.now();
+  after(async () => {
+    try { await runStoryRefresh(); } catch { /* non-blocking */ }
+  });
+}
 
 function parseStory(text: string): { headline: string; body: string } | null {
   const m = text.match(/\{[\s\S]*\}/);
