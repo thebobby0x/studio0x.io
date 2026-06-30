@@ -32,7 +32,8 @@ export const ANTHEM_MANIFEST: AnthemSource[] = [
   // ── Team anthems (12 newer countries) ──
   { driveFileId: "1HSByvlXit1cS9RpA5D9p0SEvNUV7Iaj0", teamCode: "BEL", title: "Rode Duivels 2026", durationSecs: 180 },
   { driveFileId: "1tYgNe7cZMF_z40Z2B2VeuwDYcqT-TPaS", teamCode: "BRA", title: "Hexa 2026", durationSecs: 180 },
-  { driveFileId: "1EBtzMp8jHmgWI0a9ooLe9FhABrCEgXY4", teamCode: "CRC", title: "Pura Vida, mae", durationSecs: 180 },
+  // Costa Rica (CRC) did not qualify for WC26 — moved to the future "NON WC26
+  // Anthems" page. Drive file "Pura Vida, mae" preserved; just excluded here.
   { driveFileId: "1zYek9gP5RXM7_JweQuyJoFlUoPzGz-Lu", teamCode: "ECU", title: "La Tri en el Mundo", durationSecs: 180 },
   { driveFileId: "1dSk0XiECpehe6m_MY3ejNjB03b707_z4", teamCode: "EGY", title: "Pharaohs 2026", durationSecs: 180 },
   { driveFileId: "1TcKMBD8zhxzNhHtDxKSd6zl7QCIyDUHR", teamCode: "JPN", title: "Blue Wave 2026", durationSecs: 180 },

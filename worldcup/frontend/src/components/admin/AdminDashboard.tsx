@@ -215,6 +215,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
               },
               {
+                key: "purgeAnthemBlobs",
+                icon: Trash2,
+                label: "Purge ALL Anthem Blobs (one-time)",
+                desc: "Deletes every file in anthems/ to reclaim the full 1GB quota. Safe — Google Drive is the source; the reimport re-downloads everything. Run this ONCE, then Wipe + Reimport.",
+                action: () => runSeed("purgeAnthemBlobs", "/api/admin/blob-cleanup?secret=wc2026studio0x&purgeAnthems=CONFIRM_DRIVE_OK", "GET"),
+              },
+              {
                 key: "relinkAnthems",
                 icon: Music2,
                 label: "Relink Anthems + Fix Titles",
