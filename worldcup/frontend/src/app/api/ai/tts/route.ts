@@ -57,6 +57,9 @@ export async function POST(req: Request) {
     const blob = await put(blobKey, audioBuffer, {
       access: "public",
       contentType: "audio/mpeg",
+      // Two concurrent first-time requests for the same line both miss the head()
+      // cache; without this the second put() 502s (default is no-overwrite).
+      allowOverwrite: true,
     });
     return NextResponse.json({ url: blob.url, cached: false });
   } catch (blobErr) {

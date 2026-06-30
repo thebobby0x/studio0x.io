@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { ANTHEM_MANIFEST, type AnthemSource } from "@/lib/anthemManifest";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Hobby cap — 24 Drive downloads run sequentially
 
 function checkAuth(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -8,30 +12,10 @@ function checkAuth(req: Request) {
   return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
 }
 
-// All 12 Drive files from the WC2026 · Anthems folder
-const PRESET: Item[] = [
-  { driveFileId: "1_s8nMbjqvKa1SaWegM21WsjE6Q1MqC4M", teamCode: "ARG", title: "Bombo Murguero", durationSecs: 193 },
-  { driveFileId: "1EPfXfQ3oy-7fqmO8V0OhLOWDsRuOaG8Q", teamCode: "BIH", title: "Zmajevi Na Pistu Bosna i Hercegovina", durationSecs: 328 },
-  { driveFileId: "1A8W74-H11Os4tn26T_q6w4WqIWkmVVfG", teamCode: "CAN", title: "Rouges dans Brume", durationSecs: 284 },
-  { driveFileId: "1nUal-cDanLtEA_6qZr5QtNHNtVqJqUeP", teamCode: "ENG", title: "England All Da Way", durationSecs: 170 },
-  { driveFileId: "14Q8er7YpnkhuMHQlZEcK6xi9IGsxXqEb", teamCode: "FRA", title: "Bleus dans Brume", durationSecs: 277 },
-  { driveFileId: "1nFD_kvcY62PWVlPXDBOVINcRBDtBs8PI", teamCode: "MEX", title: "Bandera Subiendo (En Vivo de Miami)", durationSecs: 315 },
-  { driveFileId: "16D7EMWYmOOGGaA_QfLq7yDPy5SErn55d", teamCode: "RSA", title: "Wêreldspel Anthem (Afrikaanse Terrace Remix)", durationSecs: 485 },
-  { driveFileId: "1hkwBRvV417qDOiZQvkeGEvJs4Rk_XJWk", teamCode: "USA", title: "Back When It Hit Like That", durationSecs: 276 },
-  // FIFA universal playlist
-  { driveFileId: "1ghtOnRMhDf4mWLjYDeJNx5SMKSpXb28l", title: "We Already Won", durationSecs: 293 },
-  { driveFileId: "1LYcYGLwU-H3P3CNrcfEKdGkhgkPRAKdh", title: "One Champion Above All Champions", durationSecs: 250 },
-  { driveFileId: "1qCkEY0HwxKah8awyJrX6jIRkjKX92iN9", title: "There Can Only Be One Number One", durationSecs: 151 },
-  { driveFileId: "1pCgCapwESphxhdhgo99_zT7G4UHsWWX5", title: "World Cup Kings - We Ballin", durationSecs: 293 },
-];
-
-interface Item {
-  driveFileId: string;
-  teamCode?: string;
-  title: string;
-  durationSecs?: number;
-  artistCredit?: string;
-}
+// The full anthem set now lives in src/lib/anthemManifest.ts (single source of
+// truth). preset=true imports every track; add clear=true to wipe first.
+const PRESET = ANTHEM_MANIFEST;
+type Item = AnthemSource;
 
 async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?: string; error?: string }> {
   const { driveFileId, teamCode, title, durationSecs, artistCredit } = item;
@@ -57,6 +41,7 @@ async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?
   const blob = await put(filename, audioRes.body, {
     access: "public",
     contentType: "audio/mpeg",
+    allowOverwrite: true,
   });
 
   // Upsert anthem record
@@ -91,7 +76,7 @@ export async function GET(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   if (searchParams.get("preset") !== "true") {
-    return NextResponse.json({ hint: "Add &preset=true to import all 12 WC2026 anthems. Add &clear=true to wipe placeholder songs first.", count: PRESET.length, tracks: PRESET.map(p => p.title) });
+    return NextResponse.json({ hint: `Add &preset=true to import all ${PRESET.length} WC2026 anthems. Add &clear=true to wipe ALL existing anthems first (full reset).`, count: PRESET.length, tracks: PRESET.map(p => p.title) });
   }
 
   if (searchParams.get("clear") === "true") {

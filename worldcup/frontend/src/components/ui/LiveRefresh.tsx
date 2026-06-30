@@ -12,12 +12,15 @@ export default function LiveRefresh({ isLive }: { isLive: boolean }) {
     if (!isLive) return;
     // Refresh server data every 20s so status, scores and minute stay current
     const id = setInterval(() => router.refresh(), 20_000);
-    // Also refresh when the tab comes back into focus (user switching back mid-match)
-    const onFocus = () => router.refresh();
-    window.addEventListener("visibilitychange", onFocus);
+    // Also refresh when the tab comes back into view (user switching back mid-match).
+    // visibilitychange fires on BOTH hide and show — only refresh on show.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
-      window.removeEventListener("visibilitychange", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [isLive, router]);
 

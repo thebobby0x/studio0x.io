@@ -35,9 +35,19 @@ async function getInitialData() {
       liveByFixture = new Map(live.map((m) => [m.id, m]));
     }
 
+    // A match cannot still be LIVE/HT if it kicked off more than 4h ago — guards
+    // against "stuck LIVE" rows when the schedule overlay can't reach this match
+    // (mirrors the same guard in /api/live).
+    const staleCutoff = Date.now() - 4 * 60 * 60 * 1000;
+
     const matches = dbMatches.map((m) => {
       const live = liveByFixture.get(m.fixture);
-      if (!live) return m;
+      if (!live) {
+        if ((m.status === "LIVE" || m.status === "HT") && m.date.getTime() < staleCutoff) {
+          return { ...m, status: "FT", elapsed: 90 };
+        }
+        return m;
+      }
       return {
         ...m,
         status: live.status,
@@ -168,6 +178,10 @@ export default async function DashboardPage({
   const isMatchLiveNow =
     featuredMatch && (featuredMatch.status === "LIVE" || featuredMatch.status === "HT");
 
+  // Auto-refresh whenever ANY match is live, not just the featured one — otherwise
+  // scores on the board freeze when the featured pick happens to be FT/NS.
+  const isAnyMatchLive = liveMatches.length > 0;
+
   const realVenue =
     featuredMatch?.venue && featuredMatch.venue !== "World Cup Stadium"
       ? featuredMatch.venue
@@ -177,7 +191,7 @@ export default async function DashboardPage({
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
-      <LiveRefresh isLive={!!isMatchLiveNow} />
+      <LiveRefresh isLive={isAnyMatchLive} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         {/* Compact header row */}

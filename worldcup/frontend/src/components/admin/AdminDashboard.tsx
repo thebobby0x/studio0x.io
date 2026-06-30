@@ -214,6 +214,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 desc: "Scans uploaded anthem URLs for country codes, links records to the correct teams, and restores original song titles. Run this after re-uploading files.",
                 action: () => runSeed("relinkAnthems", "/api/admin/anthem-relink?secret=wc2026studio0x", "GET"),
               },
+              {
+                key: "resetAnthems",
+                icon: Music2,
+                label: "Wipe + Reimport ALL Anthems (Drive)",
+                desc: "Deletes every anthem (incl. placeholders) and re-imports all 24 tracks fresh from Google Drive in one pass — correct teams, flags and titles. The one-button anthem reset.",
+                action: () => runSeed("resetAnthems", "/api/admin/batch-anthem?secret=wc2026studio0x&preset=true&clear=true", "GET"),
+              },
             ].map(({ key, icon: Icon, label, desc, action }) => {
               const status = seedStatus[key] ?? "idle";
               return (

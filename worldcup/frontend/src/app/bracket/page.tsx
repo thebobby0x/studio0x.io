@@ -4,23 +4,20 @@ import AppNav from "@/components/ui/AppNav";
 import BracketView from "@/components/bracket/BracketView";
 import { prisma } from "@/lib/prisma";
 import { GitBranch } from "lucide-react";
+import {
+  type KnockoutRound,
+  KNOCKOUT_START,
+  ROUND_DATES,
+  ROUND_SIZES,
+  ALL_ROUNDS,
+  classifyRound,
+  daysUntil,
+} from "@/lib/tournament";
 
-// ── Round classification by date ──────────────────────────────────────────────
-// Match model has no `round` field, so we classify by date ranges:
-//   Round of 32    → Jul 3–5 2026
-//   Round of 16    → Jul 6–9 2026
-//   Quarter-finals → Jul 10–11 2026
-//   Semi-finals    → Jul 14 2026
-//   3rd Place      → Jul 17 2026
-//   Final          → Jul 19 2026
+// Round classification, dates and sizes now live in src/lib/tournament.ts so
+// every surface (bracket, schedule, banner, pulse) agrees on the same numbers.
 
-export type KnockoutRound =
-  | "Round of 32"
-  | "Round of 16"
-  | "Quarter-finals"
-  | "Semi-finals"
-  | "3rd Place Final"
-  | "Final";
+export type { KnockoutRound };
 
 export interface BracketMatch {
   id: string;
@@ -36,43 +33,6 @@ export interface BracketMatch {
   city: string;
   round: KnockoutRound;
 }
-
-const KNOCKOUT_START = new Date("2026-07-03T00:00:00Z");
-
-const ROUND_DATES: { round: KnockoutRound; from: Date; to: Date }[] = [
-  { round: "Round of 32",    from: new Date("2026-07-03T00:00:00Z"), to: new Date("2026-07-05T23:59:59Z") },
-  { round: "Round of 16",    from: new Date("2026-07-06T00:00:00Z"), to: new Date("2026-07-09T23:59:59Z") },
-  { round: "Quarter-finals", from: new Date("2026-07-10T00:00:00Z"), to: new Date("2026-07-11T23:59:59Z") },
-  { round: "Semi-finals",    from: new Date("2026-07-14T00:00:00Z"), to: new Date("2026-07-14T23:59:59Z") },
-  { round: "3rd Place Final",from: new Date("2026-07-17T00:00:00Z"), to: new Date("2026-07-17T23:59:59Z") },
-  { round: "Final",          from: new Date("2026-07-19T00:00:00Z"), to: new Date("2026-07-19T23:59:59Z") },
-];
-
-function classifyRound(date: Date): KnockoutRound | null {
-  for (const entry of ROUND_DATES) {
-    if (date >= entry.from && date <= entry.to) return entry.round;
-  }
-  return null;
-}
-
-// Expected match counts per round (WC 2026 48-team format)
-const ROUND_SIZES: Record<KnockoutRound, number> = {
-  "Round of 32":    16,
-  "Round of 16":    8,
-  "Quarter-finals": 4,
-  "Semi-finals":    2,
-  "3rd Place Final":1,
-  "Final":          1,
-};
-
-const ALL_ROUNDS: KnockoutRound[] = [
-  "Round of 32",
-  "Round of 16",
-  "Quarter-finals",
-  "Semi-finals",
-  "3rd Place Final",
-  "Final",
-];
 
 async function fetchKnockoutMatches(): Promise<Record<KnockoutRound, BracketMatch[]>> {
   let dbMatches: BracketMatch[] = [];
@@ -141,7 +101,7 @@ export default async function BracketPage() {
   const rounds = await fetchKnockoutMatches();
   const now = new Date();
   const isPreKnockout = now < KNOCKOUT_START;
-  const daysUntil = Math.ceil((KNOCKOUT_START.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const daysToKnockout = daysUntil(KNOCKOUT_START, now);
 
   // Count how many group-stage matches are still NS (not yet played)
   const groupMatchesRemaining = await prisma.match.count({
@@ -173,11 +133,11 @@ export default async function BracketPage() {
               </div>
               <div>
                 <div className="font-black text-white text-sm">
-                  Bracket Locks In {daysUntil === 1 ? "Tomorrow" : `In ${daysUntil} Days`}
+                  Bracket Locks In {daysToKnockout === 1 ? "Tomorrow" : `In ${daysToKnockout} Days`}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   {groupMatchesRemaining > 0
-                    ? `${groupMatchesRemaining} group-stage matches remaining · qualified teams revealed June 25–26`
+                    ? `${groupMatchesRemaining} group-stage matches remaining · group stage ends July 2`
                     : "Group stage complete · bracket draws underway · slots confirmed July 3"}
                 </div>
               </div>
