@@ -135,14 +135,82 @@ async function runImport(items: Item[], clear: boolean) {
   );
 }
 
-// GET ?secret=...&preset=true[&clear=true]  — import the full manifest.
-// clear=true prunes stale records AFTER a successful import (never wipe-first).
+// Import only a slice of the manifest (no prune). Used by the chunked admin
+// button so no single HTTP request risks the 60s Hobby timeout.
+async function runImportSlice(offset: number, count: number) {
+  const slice = PRESET.slice(offset, offset + count);
+  const results: ImportResult[] = new Array(slice.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= slice.length) return;
+      try {
+        results[i] = await importOne(slice[i]);
+      } catch (e) {
+        results[i] = { title: slice[i].title, ok: false, error: String(e) };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, slice.length) }, worker));
+
+  const imported = results.filter(r => r.ok).length;
+  const failed = results.filter(r => !r.ok).length;
+  const nextOffset = offset + slice.length;
+  return NextResponse.json({
+    offset,
+    count: slice.length,
+    imported,
+    failed,
+    total: PRESET.length,
+    done: nextOffset >= PRESET.length,
+    nextOffset: nextOffset >= PRESET.length ? null : nextOffset,
+    results,
+  });
+}
+
+// Prune any AudioStream rows that aren't part of the current manifest (leftover
+// placeholders, duplicates, unlinked originals). Fast — no downloads. Run this
+// once after all chunks have imported.
+async function finalizePrune() {
+  const teamCodes = ANTHEM_MANIFEST.filter(a => a.teamCode).map(a => a.teamCode!.toUpperCase());
+  const fifaTitles = ANTHEM_MANIFEST.filter(a => !a.teamCode).map(a => a.title);
+
+  const teams = await prisma.team.findMany({ where: { code: { in: teamCodes } }, select: { id: true } });
+  const keptTeam = await prisma.audioStream.findMany({ where: { teamId: { in: teams.map(t => t.id) } }, select: { id: true } });
+  const keptFifa = await prisma.audioStream.findMany({ where: { teamId: null, title: { in: fifaTitles } }, select: { id: true } });
+  const keptIds = [...keptTeam, ...keptFifa].map(r => r.id);
+
+  if (keptIds.length === 0) {
+    return NextResponse.json({ pruned: 0, kept: 0, note: "Nothing matched the manifest — skipped prune to avoid wiping everything." });
+  }
+  const del = await prisma.audioStream.deleteMany({ where: { id: { notIn: keptIds } } });
+  return NextResponse.json({ pruned: del.count, kept: keptIds.length });
+}
+
+// GET ?secret=...&preset=true[&clear=true]            → import whole manifest (one shot)
+// GET ?secret=...&preset=true&offset=N&count=M        → import a slice only (chunked button)
+// GET ?secret=...&finalize=true                       → prune stale rows after chunks
 export async function GET(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
-  if (searchParams.get("preset") !== "true") {
-    return NextResponse.json({ hint: `Add &preset=true to import all ${PRESET.length} WC2026 anthems. Add &clear=true to also prune any stale records after import (full reset).`, count: PRESET.length, tracks: PRESET.map(p => p.title) });
+
+  if (searchParams.get("finalize") === "true") {
+    return finalizePrune();
   }
+
+  if (searchParams.get("preset") !== "true") {
+    return NextResponse.json({ hint: `Add &preset=true to import all ${PRESET.length} WC2026 anthems. Use the /admin button for chunked import, or &offset=N&count=M for a slice, then &finalize=true to prune.`, count: PRESET.length, tracks: PRESET.map(p => p.title) });
+  }
+
+  const offsetParam = searchParams.get("offset");
+  if (offsetParam !== null) {
+    const offset = Math.max(0, parseInt(offsetParam, 10) || 0);
+    const count = Math.max(1, parseInt(searchParams.get("count") ?? "6", 10) || 6);
+    return runImportSlice(offset, count);
+  }
+
+  // One-shot (may timeout on Hobby for the full 24 — the button uses chunks instead)
   return runImport(PRESET, searchParams.get("clear") === "true");
 }
 

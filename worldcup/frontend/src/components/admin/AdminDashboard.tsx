@@ -218,8 +218,30 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 key: "resetAnthems",
                 icon: Music2,
                 label: "Wipe + Reimport ALL Anthems (Drive)",
-                desc: "Deletes every anthem (incl. placeholders) and re-imports all 24 tracks fresh from Google Drive in one pass — correct teams, flags and titles. The one-button anthem reset.",
-                action: () => runSeed("resetAnthems", "/api/admin/batch-anthem?secret=wc2026studio0x&preset=true&clear=true", "GET"),
+                desc: "Re-imports all 24 tracks fresh from Google Drive in small chunks (no timeout), then prunes stale records — correct teams, flags and titles. The one-button anthem reset.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, resetAnthems: "loading" }));
+                  try {
+                    // Import in chunks of 6 so no single request hits the 60s Hobby
+                    // function limit, then finalize (prune stale rows).
+                    const CHUNK = 6;
+                    let offset = 0;
+                    let totalImported = 0;
+                    for (let guard = 0; guard < 20; guard++) {
+                      const res = await fetch(`/api/admin/batch-anthem?secret=wc2026studio0x&preset=true&offset=${offset}&count=${CHUNK}`);
+                      if (!res.ok) throw new Error(`chunk ${offset} failed (${res.status})`);
+                      const data = await res.json() as { imported: number; done: boolean; nextOffset: number | null };
+                      totalImported += data.imported ?? 0;
+                      if (data.done || data.nextOffset == null) break;
+                      offset = data.nextOffset;
+                    }
+                    const fin = await fetch("/api/admin/batch-anthem?secret=wc2026studio0x&finalize=true");
+                    setSeedStatus(s => ({ ...s, resetAnthems: fin.ok && totalImported > 0 ? "done" : "error" }));
+                  } catch {
+                    setSeedStatus(s => ({ ...s, resetAnthems: "error" }));
+                  }
+                  setTimeout(() => setSeedStatus(s => ({ ...s, resetAnthems: "idle" })), 6000);
+                },
               },
             ].map(({ key, icon: Icon, label, desc, action }) => {
               const status = seedStatus[key] ?? "idle";
