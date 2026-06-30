@@ -268,6 +268,15 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 | `POST /api/ai/stories` | Force-regenerates story cache (also invalidated after 1hr) |
 | `PATCH /api/admin/users` | Updates user role (SUPER_ADMIN only) |
 | `POST /api/admin/view-as` | Sets impersonation cookie |
+| `GET /api/admin/batch-anthem?preset=true&offset=N&count=M` | Imports a slice of the anthem manifest (chunked — used by the Wipe+Reimport button to dodge the 60s limit) |
+| `GET /api/admin/batch-anthem?finalize=true` | Prunes anthem DB rows down to the current manifest (no downloads) |
+| `GET /api/admin/blob-cleanup` | Purges regenerable tts/+deep-dives/ caches + orphaned anthem dupes (`?dryRun=true` previews) |
+| `GET /api/admin/blob-cleanup?purgeAnthems=CONFIRM_DRIVE_OK` | Deletes ALL anthems/ blobs to reclaim quota (Drive is the source; behind the "Purge ALL Anthem Blobs" button) |
+| `GET /api/admin/anthem-relink` | Re-links orphaned anthem records to teams + restores canonical titles from the manifest |
+
+**Anthem source of truth:** `src/lib/anthemManifest.ts` (Drive file IDs + exact titles). To add a
+team anthem, add one entry there. Re-import via the **"Wipe + Reimport ALL Anthems"** admin button.
+Costa Rica excluded (did not qualify) — destined for a future "NON WC26 Anthems" page/manifest.
 
 ---
 
@@ -348,9 +357,41 @@ Never push directly to main.
     Always `Buffer.from(await elRes.arrayBuffer())` before calling `put()`. Wrap `put()` in try/catch
     so Blob failures are logged and returned as errors rather than silently crashing the route.
 
+15. **Vercel Blob 1 GB Hobby quota is the silent killer** — when `put()` fails with
+    `"Storage quota exceeded for Hobby plan (1GB maximum)"`, EVERY Blob write fails: TTS audio
+    ("Audio unavailable") AND anthem imports. Reads keep working (public URLs need no token), so it
+    looks like the system is fine. **Symptoms mimic missing keys — check Blob usage FIRST.** The
+    bloat is usually orphaned `anthems/` dupes, not caches. Free space with the **"Free Up Blob
+    Storage"** or **"Purge ALL Anthem Blobs"** admin buttons (`/api/admin/blob-cleanup`).
+
+16. **Never write timestamped Blob filenames for re-importable content** — the old anthem import
+    wrote `anthems/${Date.now()}-${title}.mp3` every run without deleting old copies, piling up to
+    1 GB over months. Use STABLE names (`anthems/<code-or-slug>.mp3`) + `allowOverwrite: true` so
+    re-imports overwrite instead of accumulating.
+
+17. **Import-then-prune, never wipe-first** — an early anthem reimport ran `deleteMany()` BEFORE
+    importing; a mid-run failure (quota/timeout) then left the hub empty AND 500'd. Always import
+    first, and prune stale rows only after ≥1 success. See `runImport`/`finalizePrune` in
+    `batch-anthem/route.ts`.
+
+18. **60s Hobby function limit kills bulk Drive imports** — 24 sequential Drive downloads exceed
+    60s → 504 FUNCTION_INVOCATION_TIMEOUT. The reimport is CHUNKED (`?offset=N&count=M`, 6 at a
+    time) and driven by the admin button loop, then `?finalize=true`. Don't paste the one-shot
+    `preset=true` URL for the full set — it times out; use the button.
+
+19. **Multi-param admin URLs get mangled in browser/agent hand-offs** — the `&purgeAnthems=…` flag
+    was silently dropped TWICE when relayed as a URL. Put destructive/multi-param actions behind
+    **admin buttons** (URL baked into the fetch), not hand-typed URLs.
+
 ---
 
-## Current Production State (as of 2026-06-25)
+## Current Production State (as of 2026-06-30)
+
+**Jun 30 resolved (see `docs/eod-2026-06-30.md`):** TTS audio now plays (root cause was a full
+1 GB Blob store rejecting every write, not missing keys); anthems rebuilt to 19 team + 4 FIFA with
+flags/titles; countdowns unified (`lib/tournament.ts`); dashboard stale-LIVE + refresh fixes;
+stories generate in-process. New Blob cleanup/purge + chunked-import tooling shipped. Env vars
+`BLOB_READ_WRITE_TOKEN` / `ELEVENLABS_API_KEY` confirmed present in prod.
 
 **Working:**
 - Live match scores + events (api-football)
