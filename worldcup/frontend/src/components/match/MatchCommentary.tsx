@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Radio, RefreshCw, Play, Pause, Loader2 } from "lucide-react";
+import { Radio, RefreshCw, Play, Pause, Loader2, AlertCircle } from "lucide-react";
 
 type Persona = "analyst" | "fan" | "comedian";
 
@@ -64,33 +64,48 @@ function LineItem({
 }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState(false);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const eventEmoji = detectEmoji(entry.text);
-  const storyId = `commentary-${matchId}-${btoa(entry.text).slice(0, 16)}`;
+  // Unicode-safe base64 — commentary contains emoji, and bare btoa() throws on
+  // any non-Latin-1 char (CLAUDE.md gotcha #1), which would crash this render.
+  const storyId = `commentary-${matchId}-${btoa(unescape(encodeURIComponent(entry.text))).slice(0, 16)}`;
 
   async function handlePlay() {
     if (audioRef.current && audioUrl) {
       if (playing) { audioRef.current.pause(); setPlaying(false); }
-      else { audioRef.current.play(); setPlaying(true); }
+      else { audioRef.current.play().catch(() => setPlaying(false)); setPlaying(true); }
       return;
     }
     setAudioLoading(true);
+    setAudioError(false);
     try {
       const res = await fetch("/api/ai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: entry.text, storyId }),
       });
-      const data = await res.json() as { url?: string };
-      if (!data.url) return;
+      const data = await res.json() as { url?: string; error?: string };
+      if (!data.url) {
+        // Surface the failure instead of silently dead-ending (e.g. missing
+        // ELEVENLABS_API_KEY / BLOB_READ_WRITE_TOKEN in env).
+        console.error("[TTS] commentary playback failed:", data.error ?? "no url returned");
+        setAudioError(true);
+        setTimeout(() => setAudioError(false), 4000);
+        return;
+      }
       setAudioUrl(data.url);
       const audio = new Audio(data.url);
       audioRef.current = audio;
       audio.onended = () => setPlaying(false);
-      audio.play();
+      await audio.play().catch(() => setPlaying(false));
       setPlaying(true);
+    } catch (e) {
+      console.error("[TTS] commentary request error:", e);
+      setAudioError(true);
+      setTimeout(() => setAudioError(false), 4000);
     } finally {
       setAudioLoading(false);
     }
@@ -109,10 +124,12 @@ function LineItem({
       <button
         onClick={handlePlay}
         disabled={audioLoading}
-        title="Listen"
-        className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center w-6 h-6 rounded-full bg-brand-gold/10 text-amber-400 hover:bg-brand-gold/20 disabled:opacity-40"
+        title={audioError ? "Audio unavailable" : "Listen"}
+        className={`shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center w-6 h-6 rounded-full disabled:opacity-40 ${
+          audioError ? "bg-red-500/10 text-red-400" : "bg-brand-gold/10 text-amber-400 hover:bg-brand-gold/20"
+        }`}
       >
-        {audioLoading ? <Loader2 size={10} className="animate-spin" /> : playing ? <Pause size={10} /> : <Play size={10} />}
+        {audioLoading ? <Loader2 size={10} className="animate-spin" /> : audioError ? <AlertCircle size={10} /> : playing ? <Pause size={10} /> : <Play size={10} />}
       </button>
     </div>
   );

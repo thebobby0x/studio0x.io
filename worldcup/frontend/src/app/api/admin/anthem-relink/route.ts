@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { CODE_TO_TITLE } from "@/lib/anthemManifest";
 
 function checkAuth(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,30 +8,8 @@ function checkAuth(req: Request) {
   return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
 }
 
-// Canonical song titles keyed by team code.
-// Add new entries here when new anthems are uploaded.
-const CODE_TO_TITLE: Record<string, string> = {
-  ARG: "Bombo Murguero",
-  BIH: "Zmajevi Na Pistu Bosna i Hercegovina",
-  CAN: "Rouges dans Brume",
-  ENG: "England All Da Way",
-  FRA: "Bleus dans Brume",
-  MEX: "Bandera Subiendo (En Vivo de Miami)",
-  RSA: "Wêreldspel Anthem (Afrikaanse Terrace Remix)",
-  USA: "Back When It Hit Like That",
-  BEL: "Rode Duivels 2026",
-  BRA: "Hexa 2026",
-  CRC: "Pura Vida, mae",
-  ECU: "La Tri en el Mundo",
-  EGY: "Pharaohs 2026",
-  JPN: "Blue Wave 2026",
-  MAR: "Lions of Atlas 2026",
-  NED: "Oranje Machine 2026",
-  PAN: "La Marea Roja",
-  QAT: "Al-Annabi Anthem 2026",
-  URU: "Celeste en la Calle",
-  UZB: "Olgʼa, Oʻzbekiston!",
-};
+// Canonical titles come from the shared manifest (src/lib/anthemManifest.ts) so
+// there is exactly one place to edit when anthems change.
 
 // Extract a known team code from a Vercel Blob URL by matching against all
 // team codes in the DB. Handles both upload patterns:

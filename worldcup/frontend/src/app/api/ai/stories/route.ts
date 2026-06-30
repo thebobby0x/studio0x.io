@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { runStoryRefresh } from "@/lib/storyRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -252,19 +253,18 @@ export async function GET() {
   }
 
   // ── 4. Background story refresh (post-response, rate-limited) ───────────────
-  // Replaces the sub-daily cron that Vercel Hobby doesn't support.
-  // Runs /api/cron/story-refresh after the response is sent so dashboard
-  // loads automatically trigger pre/post-match story generation.
+  // Replaces the sub-daily cron that Vercel Hobby doesn't support. Dashboard
+  // loads trigger pre/post-match story generation after the response is sent.
+  //
+  // Invoked IN-PROCESS (not via internal HTTP fetch) — the old fetch had a
+  // base-URL operator-precedence bug (`https://undefined`) and depended on
+  // CRON_SECRET being set, so it usually never fired. Direct call has no URL,
+  // no network, and no auth dependency.
   if (Date.now() - _lastRefresh > REFRESH_INTERVAL) {
     _lastRefresh = Date.now();
     after(async () => {
       try {
-        const base = process.env.NEXTAUTH_URL ?? process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        await fetch(`${base}/api/cron/story-refresh`, {
-          headers: { authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` },
-        });
+        await runStoryRefresh();
       } catch { /* non-blocking — ignore errors */ }
     });
   }

@@ -4,7 +4,7 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "crons": [
-    { "path": "/api/news/generate",      "schedule": "0 6 * * *" },
-    { "path": "/api/cron/ingest-stats",  "schedule": "30 2 * * *" }
+    { "path": "/api/news/generate?secret=wc2026studio0x",     "schedule": "0 6 * * *" },
+    { "path": "/api/cron/ingest-stats?secret=wc2026studio0x",  "schedule": "30 2 * * *" }
   ]
 }

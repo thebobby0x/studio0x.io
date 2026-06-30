@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { ANTHEM_MANIFEST } from "@/lib/anthemManifest";
 
 function checkAuth(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -8,20 +9,13 @@ function checkAuth(req: Request) {
   return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
 }
 
-const BATCH = [
-  { code: "BEL", driveId: "1HSByvlXit1cS9RpA5D9p0SEvNUV7Iaj0", title: "Rode Duivels 2026" },
-  { code: "BRA", driveId: "1tYgNe7cZMF_z40Z2B2VeuwDYcqT-TPaS", title: "Hexa 2026" },
-  { code: "CRC", driveId: "1EBtzMp8jHmgWI0a9ooLe9FhABrCEgXY4", title: "Pura Vida, mae" },
-  { code: "ECU", driveId: "1zYek9gP5RXM7_JweQuyJoFlUoPzGz-Lu", title: "La Tri en el Mundo" },
-  { code: "EGY", driveId: "1dSk0XiECpehe6m_MY3ejNjB03b707_z4", title: "Pharaohs 2026" },
-  { code: "JPN", driveId: "1TcKMBD8zhxzNhHtDxKSd6zl7QCIyDUHR", title: "Blue Wave 2026" },
-  { code: "MAR", driveId: "1j9E2SvbRffwKC7CGc81pF6HNqJnG_0Qo", title: "Lions of Atlas 2026" },
-  { code: "NED", driveId: "1ZXwlQQiVOX6Yen6_p4N2YdIwrLcIKaH8", title: "Oranje Machine 2026" },
-  { code: "PAN", driveId: "1dNpHyaa-J50RoJQO8rwCduScKM-5P8wL", title: "La Marea Roja" },
-  { code: "QAT", driveId: "1MbRpxV5rcrYcHVvwFXx1KYcvLbbfjMd7", title: "Al-Annabi Anthem 2026" },
-  { code: "URU", driveId: "1MPjjmgLHChgfdOYTbOqi5MXfNi-v2XTi", title: "Celeste en la Calle" },
-  { code: "UZB", driveId: "15432Eu6Q1AoP6WBGc1jylTX2MJr265qr", title: "Olgʼa, Oʻzbekiston!" },
-];
+// Derived from the shared manifest — the 12 "newer" team anthems (BEL…UZB).
+// Kept for backwards compatibility; prefer /api/admin/batch-anthem?preset=true
+// which imports the entire manifest in one call.
+const NEWER_CODES = ["BEL", "BRA", "CRC", "ECU", "EGY", "JPN", "MAR", "NED", "PAN", "QAT", "URU", "UZB"];
+const BATCH = ANTHEM_MANIFEST
+  .filter((a) => a.teamCode && NEWER_CODES.includes(a.teamCode))
+  .map((a) => ({ code: a.teamCode!, driveId: a.driveFileId, title: a.title }));
 
 async function runImport(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
