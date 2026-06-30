@@ -27,7 +27,7 @@ async function importOne(item: Item): Promise<ImportResult> {
   let audioRes: Response;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 45_000);
+    const timer = setTimeout(() => ctrl.abort(), 20_000);
     audioRes = await fetch(downloadUrl, { signal: ctrl.signal });
     clearTimeout(timer);
   } catch (e) {
@@ -85,16 +85,28 @@ async function importOne(item: Item): Promise<ImportResult> {
   }
 }
 
+// Process items with a bounded concurrency pool. Sequential downloads of all
+// 24 tracks blow past the 60s Hobby function limit (504 GATEWAY_TIMEOUT); running
+// a handful in parallel keeps total wall-clock well under the cap. Order of the
+// results array is preserved so the response is readable.
+const CONCURRENCY = 6;
+
 async function runImport(items: Item[], clear: boolean) {
-  const results: ImportResult[] = [];
-  for (const item of items) {
-    // importOne never throws now — but guard anyway so one bad item can't 500 the route.
-    try {
-      results.push(await importOne(item));
-    } catch (e) {
-      results.push({ title: item.title, ok: false, error: String(e) });
+  const results: ImportResult[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      try {
+        results[i] = await importOne(items[i]);
+      } catch (e) {
+        // importOne shouldn't throw, but never let one item abort the pool.
+        results[i] = { title: items[i].title, ok: false, error: String(e) };
+      }
     }
   }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker));
 
   const keptIds = results.filter(r => r.ok && r.id).map(r => r.id!) as string[];
 
