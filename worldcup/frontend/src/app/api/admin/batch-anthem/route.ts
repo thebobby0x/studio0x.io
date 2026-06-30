@@ -41,8 +41,13 @@ async function importOne(item: Item): Promise<ImportResult> {
   // Buffer + write to Blob. Wrapped so a Blob failure (e.g. missing
   // BLOB_READ_WRITE_TOKEN) returns a per-track error instead of throwing out of
   // the whole route with a 500.
-  const safe = title.replace(/[^a-zA-Z0-9]/g, "_");
-  const filename = `anthems/${Date.now()}-${safe}.mp3`;
+  // STABLE filename so re-imports overwrite the same blob instead of piling up
+  // new copies every run (which previously filled the 1GB Blob quota). With
+  // allowOverwrite:true this caps anthem storage at one file per track.
+  const slug = teamCode
+    ? teamCode.toLowerCase()
+    : title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const filename = `anthems/${slug}.mp3`;
   let blobUrl: string;
   try {
     const buffer = Buffer.from(await audioRes.arrayBuffer());

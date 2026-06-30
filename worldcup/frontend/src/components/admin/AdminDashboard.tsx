@@ -208,6 +208,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 },
               },
               {
+                key: "blobCleanup",
+                icon: Trash2,
+                label: "Free Up Blob Storage",
+                desc: "Purges regenerable TTS/deep-dive audio caches + orphaned anthem dupes from Vercel Blob. Run this if audio shows 'unavailable' or the anthem import fails (1GB Hobby quota full).",
+                action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
+              },
+              {
                 key: "relinkAnthems",
                 icon: Music2,
                 label: "Relink Anthems + Fix Titles",
