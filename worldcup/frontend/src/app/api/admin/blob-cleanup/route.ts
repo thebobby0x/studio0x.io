@@ -66,10 +66,43 @@ async function cleanup(dryRun: boolean) {
   });
 }
 
-// GET ?secret=...[&dryRun=true]   — dryRun previews without deleting
+// Deletes EVERY blob under anthems/ unconditionally. This bypasses the empty-DB
+// safety guard and is only correct when the canonical source (Google Drive) is
+// intact — the reimport re-downloads all tracks from Drive afterward. Requires
+// an explicit confirm token so it can't fire by accident.
+async function purgeAnthemBlobs() {
+  let freed = 0;
+  let count = 0;
+  const toDelete: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await list({ cursor, prefix: "anthems/", limit: 1000 });
+    for (const b of res.blobs) {
+      toDelete.push(b.url);
+      freed += b.size;
+      count++;
+    }
+    cursor = res.cursor || undefined;
+  } while (cursor);
+
+  for (let i = 0; i < toDelete.length; i += 100) {
+    await del(toDelete.slice(i, i + 100));
+  }
+  return NextResponse.json({
+    purgedAnthemBlobs: count,
+    freedMB: +(freed / 1e6).toFixed(1),
+    note: "All anthems/ blobs deleted. Re-import from Drive to repopulate.",
+  });
+}
+
+// GET ?secret=...[&dryRun=true]                  — cache + orphan cleanup (preview with dryRun)
+// GET ?secret=...&purgeAnthems=CONFIRM_DRIVE_OK  — delete ALL anthems/ blobs (Drive is source)
 export async function GET(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
+  if (searchParams.get("purgeAnthems") === "CONFIRM_DRIVE_OK") {
+    return purgeAnthemBlobs();
+  }
   return cleanup(searchParams.get("dryRun") === "true");
 }
 export async function POST(req: Request) {
