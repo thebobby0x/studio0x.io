@@ -17,7 +17,9 @@ function checkAuth(req: Request) {
 const PRESET = ANTHEM_MANIFEST;
 type Item = AnthemSource;
 
-async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?: string; error?: string }> {
+type ImportResult = { title: string; ok: boolean; id?: string; url?: string; error?: string };
+
+async function importOne(item: Item): Promise<ImportResult> {
   const { driveFileId, teamCode, title, durationSecs, artistCredit } = item;
 
   // Download from Google Drive (file must be publicly accessible)
@@ -25,7 +27,7 @@ async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?
   let audioRes: Response;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60_000);
+    const timer = setTimeout(() => ctrl.abort(), 45_000);
     audioRes = await fetch(downloadUrl, { signal: ctrl.signal });
     clearTimeout(timer);
   } catch (e) {
@@ -36,59 +38,100 @@ async function importOne(item: Item): Promise<{ title: string; ok: boolean; url?
     return { title, ok: false, error: `Drive returned ${audioRes.status} — is the file publicly accessible?` };
   }
 
+  // Buffer + write to Blob. Wrapped so a Blob failure (e.g. missing
+  // BLOB_READ_WRITE_TOKEN) returns a per-track error instead of throwing out of
+  // the whole route with a 500.
   const safe = title.replace(/[^a-zA-Z0-9]/g, "_");
   const filename = `anthems/${Date.now()}-${safe}.mp3`;
-  const blob = await put(filename, audioRes.body, {
-    access: "public",
-    contentType: "audio/mpeg",
-    allowOverwrite: true,
-  });
+  let blobUrl: string;
+  try {
+    const buffer = Buffer.from(await audioRes.arrayBuffer());
+    const blob = await put(filename, buffer, {
+      access: "public",
+      contentType: "audio/mpeg",
+      allowOverwrite: true,
+    });
+    blobUrl = blob.url;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { title, ok: false, error: `Blob write failed (check BLOB_READ_WRITE_TOKEN): ${msg}` };
+  }
 
   // Upsert anthem record
   const credit = artistCredit ?? "Suno AI × Studio0x";
   const secs = durationSecs ?? 180;
 
-  if (!teamCode) {
-    // FIFA universal track
-    const existing = await prisma.audioStream.findFirst({ where: { teamId: null, title } });
-    if (existing) {
-      await prisma.audioStream.update({ where: { id: existing.id }, data: { audioUrl: blob.url, durationSecs: secs, artistCredit: credit } });
-    } else {
-      await prisma.audioStream.create({ data: { teamId: null, title, audioUrl: blob.url, durationSecs: secs, artistCredit: credit } });
+  try {
+    if (!teamCode) {
+      // FIFA universal track
+      const existing = await prisma.audioStream.findFirst({ where: { teamId: null, title } });
+      const rec = existing
+        ? await prisma.audioStream.update({ where: { id: existing.id }, data: { audioUrl: blobUrl, durationSecs: secs, artistCredit: credit } })
+        : await prisma.audioStream.create({ data: { teamId: null, title, audioUrl: blobUrl, durationSecs: secs, artistCredit: credit } });
+      return { title, ok: true, id: rec.id, url: blobUrl };
     }
-  } else {
+
     const team = await prisma.team.findUnique({ where: { code: teamCode.toUpperCase() } });
     if (!team) return { title, ok: false, error: `Team ${teamCode} not in DB` };
 
-    await prisma.audioStream.upsert({
+    const rec = await prisma.audioStream.upsert({
       where: { teamId: team.id },
-      update: { audioUrl: blob.url, title, durationSecs: secs, artistCredit: credit },
-      create: { teamId: team.id, title, audioUrl: blob.url, durationSecs: secs, artistCredit: credit },
+      update: { audioUrl: blobUrl, title, durationSecs: secs, artistCredit: credit },
+      create: { teamId: team.id, title, audioUrl: blobUrl, durationSecs: secs, artistCredit: credit },
     });
+    return { title, ok: true, id: rec.id, url: blobUrl };
+  } catch (e) {
+    return { title, ok: false, error: `DB write failed: ${e instanceof Error ? e.message : String(e)}` };
   }
-
-  return { title, ok: true, url: blob.url };
 }
 
-// GET ?secret=...&preset=true[&clear=true]  — import the hardcoded 12-file WC2026 list
-// Add &clear=true to wipe all existing audio streams first (removes placeholder/demo songs)
+async function runImport(items: Item[], clear: boolean) {
+  const results: ImportResult[] = [];
+  for (const item of items) {
+    // importOne never throws now — but guard anyway so one bad item can't 500 the route.
+    try {
+      results.push(await importOne(item));
+    } catch (e) {
+      results.push({ title: item.title, ok: false, error: String(e) });
+    }
+  }
+
+  const keptIds = results.filter(r => r.ok && r.id).map(r => r.id!) as string[];
+
+  // IMPORTANT: prune AFTER a successful import, and ONLY when at least one track
+  // imported. Never wipe-then-fail (which previously left the hub empty if the
+  // very first Blob write threw). If everything failed, leave existing data intact.
+  let pruned = 0;
+  if (clear && keptIds.length > 0) {
+    const del = await prisma.audioStream.deleteMany({ where: { id: { notIn: keptIds } } });
+    pruned = del.count;
+  }
+
+  const imported = results.filter(r => r.ok).length;
+  const failed = results.filter(r => !r.ok).length;
+  const status = imported === 0 ? 502 : 200;
+  return NextResponse.json(
+    {
+      imported,
+      failed,
+      pruned,
+      clearedStaleOnly: clear,
+      ...(imported === 0 ? { error: "All tracks failed — nothing imported, existing anthems left untouched. See results[].error (likely BLOB_READ_WRITE_TOKEN missing)." } : {}),
+      results,
+    },
+    { status }
+  );
+}
+
+// GET ?secret=...&preset=true[&clear=true]  — import the full manifest.
+// clear=true prunes stale records AFTER a successful import (never wipe-first).
 export async function GET(req: Request) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   if (searchParams.get("preset") !== "true") {
-    return NextResponse.json({ hint: `Add &preset=true to import all ${PRESET.length} WC2026 anthems. Add &clear=true to wipe ALL existing anthems first (full reset).`, count: PRESET.length, tracks: PRESET.map(p => p.title) });
+    return NextResponse.json({ hint: `Add &preset=true to import all ${PRESET.length} WC2026 anthems. Add &clear=true to also prune any stale records after import (full reset).`, count: PRESET.length, tracks: PRESET.map(p => p.title) });
   }
-
-  if (searchParams.get("clear") === "true") {
-    await prisma.audioStream.deleteMany({});
-  }
-
-  const results = [];
-  for (const item of PRESET) {
-    const result = await importOne(item);
-    results.push(result);
-  }
-  return NextResponse.json({ results, imported: results.filter(r => r.ok).length, failed: results.filter(r => !r.ok).length });
+  return runImport(PRESET, searchParams.get("clear") === "true");
 }
 
 // POST ?secret=... body: Item[]  — custom list import
@@ -98,11 +141,5 @@ export async function POST(req: Request) {
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Body must be a non-empty array of items" }, { status: 400 });
   }
-
-  const results = [];
-  for (const item of items) {
-    const result = await importOne(item);
-    results.push(result);
-  }
-  return NextResponse.json({ results, imported: results.filter(r => r.ok).length, failed: results.filter(r => !r.ok).length });
+  return runImport(items, false);
 }
