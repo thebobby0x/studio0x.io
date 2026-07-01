@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
+import { isMatchInProgress } from "@/lib/tournament";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 
@@ -160,10 +161,16 @@ export default async function DashboardPage({
   const ftMatches = matches.filter((m) => m.status === "FT");
   const nsMatches = matches.filter((m) => m.status === "NS");
 
+  // Games underway — truly LIVE/HT plus any whose kickoff just passed while the
+  // feed still reads NS. A live game must ALWAYS take the hero over a past result.
+  const inProgress = matches
+    .filter((m) => isMatchInProgress(m.status, new Date(m.date).getTime()))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   // In split mode, use the focused match for detail sections; otherwise use default featured
   const defaultFeatured =
-    liveMatches.length > 0
-      ? liveMatches.reduce((a, b) => (new Date(a.date) > new Date(b.date) ? a : b))
+    inProgress.length > 0
+      ? inProgress[0]
       : ftMatches.length > 0
       ? ftMatches[ftMatches.length - 1]
       : (nsMatches[0] ?? matches[matches.length - 1]);

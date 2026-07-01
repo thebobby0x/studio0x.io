@@ -52,6 +52,23 @@ export function classifyRound(date: Date): KnockoutRound | null {
   return null;
 }
 
+// A match counts as "in progress" for hero/featured selection when the feed says
+// LIVE/HT, OR its kickoff time has passed and it isn't finished yet. The second
+// case covers the api-football lag right after kickoff, when a game that's really
+// underway still reads NS — so a live game always wins the hero slot immediately.
+// Bounded to a match-length window (150 min) so a stale/postponed NS fixture
+// doesn't masquerade as live indefinitely.
+const MATCH_WINDOW_MS = 150 * 60_000;
+
+export function isMatchInProgress(status: string, kickoffMs: number, nowMs: number = Date.now()): boolean {
+  if (status === "LIVE" || status === "HT") return true;
+  if (status === "NS") {
+    const since = nowMs - kickoffMs;
+    return since >= 0 && since < MATCH_WINDOW_MS;
+  }
+  return false;
+}
+
 // ── Countdown helpers (the ONE rounding rule everyone shares) ─────────────────
 
 /**

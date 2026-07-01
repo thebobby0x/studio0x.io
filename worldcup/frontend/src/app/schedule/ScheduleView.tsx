@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import { isMatchInProgress } from "@/lib/tournament";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,9 +49,12 @@ function formatDayLabel(dateStr: string): string {
 // ─── Featured Hero Card ───────────────────────────────────────────────────────
 
 function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?: string }) {
-  const isLive = m.status === "LIVE" || m.status === "HT";
+  // A match whose kickoff has passed but still reads NS (feed lag) is really
+  // underway — treat it as live so it heroes correctly and shows a LIVE state.
+  const kickedOff = m.status === "NS" && isMatchInProgress(m.status, new Date(m.utcDate).getTime(), now);
+  const isLive = m.status === "LIVE" || m.status === "HT" || kickedOff;
   const isDone = m.status === "FT";
-  const { label: ctLabel, urgent } = m.status === "NS" ? countdown(m.utcDate, now) : { label: "", urgent: false };
+  const { label: ctLabel, urgent } = m.status === "NS" && !kickedOff ? countdown(m.utcDate, now) : { label: "", urgent: false };
 
   return (
     <Link
@@ -108,7 +112,7 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
               <div className="flex items-center justify-center gap-1.5 mt-2">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-sm font-mono text-red-400">
-                  {m.status === "HT" ? "HT" : `${m.minute}'`}
+                  {m.status === "HT" ? "HT" : kickedOff ? "Kicking off" : `${m.minute}'`}
                 </span>
               </div>
             </>
@@ -123,7 +127,7 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
               <div className="text-[11px] text-slate-500 mt-2 uppercase tracking-widest">Full Time</div>
             </>
           )}
-          {m.status === "NS" && (
+          {m.status === "NS" && !kickedOff && (
             <>
               <div
                 suppressHydrationWarning
@@ -413,10 +417,15 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
     [matches, todayStr]
   );
 
-  // Featured: live → next today → next any day → most recent FT
+  // Featured: in-progress (incl. just-kicked-off) → next today → next any day → most recent FT
   const featured = useMemo(() => {
-    const live = matches.find((m) => m.status === "LIVE" || m.status === "HT");
-    if (live) return live;
+    // True live first, then a game whose kickoff just passed (feed still catching up).
+    const trulyLive = matches.find((m) => m.status === "LIVE" || m.status === "HT");
+    if (trulyLive) return trulyLive;
+    const justStarted = matches
+      .filter((m) => m.status === "NS" && isMatchInProgress(m.status, new Date(m.utcDate).getTime(), now))
+      .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime());
+    if (justStarted.length) return justStarted[0];
     const nextToday = todayMatches.find((m) => m.status === "NS");
     if (nextToday) return nextToday;
     const allNS = matches
@@ -428,14 +437,14 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
         .filter((m) => m.status === "FT")
         .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime())[0] ?? null
     );
-  }, [matches, todayMatches]);
+  }, [matches, todayMatches, now]);
 
   const featuredLabel = useMemo(() => {
     if (!featured) return undefined;
-    if (featured.status === "LIVE" || featured.status === "HT") return "Live Now";
+    if (isMatchInProgress(featured.status, new Date(featured.utcDate).getTime(), now)) return "Live Now";
     if (featured.status === "FT") return "Most Recent Result";
     return utcToLocal(featured.utcDate) === todayStr ? "Next Up Today" : "Next Match";
-  }, [featured, todayStr]);
+  }, [featured, todayStr, now]);
 
   const otherToday = useMemo(
     () => todayMatches.filter((m) => m.id !== featured?.id),
