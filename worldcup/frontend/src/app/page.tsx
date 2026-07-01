@@ -19,6 +19,7 @@ import { venueCity, getVenueInfo } from "@/lib/venues";
 import { isMatchInProgress } from "@/lib/tournament";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
+import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 
 async function getInitialData() {
   try {
@@ -195,6 +196,29 @@ export default async function DashboardPage({
       : null;
   const venueInfo = realVenue ? getVenueInfo(realVenue) : null;
 
+  // ── 3-zone hero data: Upcoming (left) · Live/Next (center) · Results (right) ──
+  const toHero = (m: Match): HeroMatch => ({
+    id: m.id,
+    fixture: m.fixture,
+    date: new Date(m.date).toISOString(),
+    status: m.status,
+    home: { name: m.homeTeam.name, code: m.homeTeam.code },
+    away: { name: m.awayTeam.name, code: m.awayTeam.code },
+    homeScore: m.homeScore ?? 0,
+    awayScore: m.awayScore ?? 0,
+    elapsed: m.elapsed ?? 0,
+    group: m.homeTeam.groupStage,
+  });
+  const heroLive = inProgress.map(toHero);
+  const heroUpcoming = nsMatches
+    .slice()
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map(toHero);
+  const heroResults = ftMatches
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .map(toHero);
+
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
@@ -250,6 +274,9 @@ export default async function DashboardPage({
             </Link>
           </div>
         </div>
+
+        {/* ── 3-zone hero: Upcoming · Live/Next · Results ── */}
+        <LiveHero live={heroLive} upcoming={heroUpcoming} results={heroResults} />
 
         {/* Today's match strip */}
         {todayMatches.length > 0 && (
