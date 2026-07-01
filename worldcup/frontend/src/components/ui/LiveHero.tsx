@@ -28,10 +28,13 @@ function liveMinute(m: HeroMatch, now: number): string {
   return "";
 }
 
-// ── The big center card (a live game, or the next kickoff) ───────────────────
-function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: "live" | "next" }) {
-  const minute = liveMinute(m, now);
+// ── The big center card — a live game, the next kickoff, or a recent result ──
+type BigMode = "live" | "next" | "result";
+
+function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMode }) {
   const isLive = mode === "live";
+  const isResult = mode === "result";
+  const minute = liveMinute(m, now);
   const ct = mode === "next" ? formatKickoffCountdown(m.date, now, { withPrefix: false }) : null;
 
   return (
@@ -40,6 +43,8 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: "live
       className={`group relative flex flex-col justify-center rounded-2xl border bg-brand-card px-5 py-6 sm:py-8 transition-all hover:shadow-2xl ${
         isLive
           ? "border-brand-green/50 shadow-lg shadow-brand-green/10"
+          : isResult
+          ? "border-brand-border"
           : "border-brand-gold/30 shadow-md shadow-brand-gold/5"
       }`}
     >
@@ -53,12 +58,14 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: "live
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             {minute || "LIVE"}
           </span>
+        ) : isResult ? (
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Full Time</span>
         ) : (
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Next Up</span>
         )}
       </div>
 
-      {/* teams + score */}
+      {/* teams + score/countdown */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
         {/* home */}
         <div className="flex flex-col items-center text-center gap-2 min-w-0">
@@ -68,15 +75,9 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: "live
           </div>
         </div>
 
-        {/* center: score or countdown */}
+        {/* center */}
         <div className="text-center min-w-[92px]">
-          {mode === "live" ? (
-            <div className="text-4xl sm:text-6xl font-black tabular-nums text-white tracking-tighter leading-none">
-              {m.homeScore ?? 0}
-              <span className="text-brand-border mx-1.5 sm:mx-2.5">–</span>
-              {m.awayScore ?? 0}
-            </div>
-          ) : (
+          {mode === "next" ? (
             <>
               <div
                 suppressHydrationWarning
@@ -89,6 +90,21 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: "live
               <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">
                 {ct?.urgent ? "kicks off" : "countdown"}
               </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={`text-4xl sm:text-6xl font-black tabular-nums tracking-tighter leading-none ${
+                  isResult ? "text-slate-300" : "text-white"
+                }`}
+              >
+                {m.homeScore ?? 0}
+                <span className="text-brand-border mx-1.5 sm:mx-2.5">–</span>
+                {m.awayScore ?? 0}
+              </div>
+              {isResult && (
+                <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Full Time</div>
+              )}
             </>
           )}
         </div>
@@ -160,27 +176,41 @@ export default function LiveHero({
     return () => clearInterval(id);
   }, []);
 
+  // ── Center: two big cards pairing the live game with context ──
+  //  · 2+ live  → both live games
+  //  · 1 live   → next-up (left) + live (right)   ← "now + next"
+  //  · 0 live   → recent result (left) + next-up (right)
   const liveGames = live.slice(0, 2);
-  // Center shows live games; if none, the next kickoff becomes the hero.
   const nextGame = upcoming[0] ?? null;
-  const centerIsLive = liveGames.length > 0;
+  const recentResult = results[0] ?? null;
 
-  // Left column = upcoming (drop the one promoted to center-next), take 6.
-  const upcomingList = (centerIsLive ? upcoming : upcoming.slice(1)).slice(0, 6);
-  const resultsList = results.slice(0, 6);
+  const centerSlots: { m: HeroMatch; mode: BigMode }[] = [];
+  if (liveGames.length >= 2) {
+    centerSlots.push({ m: liveGames[0], mode: "live" }, { m: liveGames[1], mode: "live" });
+  } else if (liveGames.length === 1) {
+    if (nextGame) centerSlots.push({ m: nextGame, mode: "next" });
+    else if (recentResult) centerSlots.push({ m: recentResult, mode: "result" });
+    centerSlots.push({ m: liveGames[0], mode: "live" });
+  } else {
+    if (recentResult) centerSlots.push({ m: recentResult, mode: "result" });
+    if (nextGame) centerSlots.push({ m: nextGame, mode: "next" });
+  }
+
+  // Don't repeat a big-card match in the side lists.
+  const bigIds = new Set(centerSlots.map((s) => s.m.id));
+  const upcomingList = upcoming.filter((m) => !bigIds.has(m.id)).slice(0, 6);
+  const resultsList = results.filter((m) => !bigIds.has(m.id)).slice(0, 6);
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)_minmax(0,1fr)] gap-4">
       {/* CENTER first in the DOM so it stacks on top on mobile */}
       <div className="order-1 lg:order-2 flex flex-col gap-4">
-        {centerIsLive ? (
-          <div className={`grid gap-4 ${liveGames.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
-            {liveGames.map((m) => (
-              <BigMatchCard key={m.id} m={m} now={now} mode="live" />
+        {centerSlots.length > 0 ? (
+          <div className={`grid gap-4 ${centerSlots.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
+            {centerSlots.map((s) => (
+              <BigMatchCard key={s.m.id} m={s.m} now={now} mode={s.mode} />
             ))}
           </div>
-        ) : nextGame ? (
-          <BigMatchCard m={nextGame} now={now} mode="next" />
         ) : (
           <div className="rounded-2xl border border-brand-border bg-brand-card px-5 py-10 text-center text-sm text-slate-600">
             No matches scheduled.
