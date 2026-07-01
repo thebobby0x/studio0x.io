@@ -32,8 +32,8 @@ jobs:
           REFRESH_SECRET: ${{ secrets.NEWS_REFRESH_SECRET }}
         run: |
           if [ -z "$REFRESH_SECRET" ]; then
-            echo "NEWS_REFRESH_SECRET not set — add it in repo Settings → Secrets → Actions." >&2
-            exit 1
+            echo "::warning::NEWS_REFRESH_SECRET not set — skipping ping. Add it in repo Settings → Secrets and variables → Actions to activate."
+            exit 0
           fi
           curl -fsS -X POST \
             "https://worldcup-2026-sandy.vercel.app/api/cron/story-refresh?secret=${REFRESH_SECRET}" \
