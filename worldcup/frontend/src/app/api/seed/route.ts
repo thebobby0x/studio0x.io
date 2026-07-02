@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
+import { isAdminAuthed } from "@/lib/adminAuth";
 
 const AF_BASE  = "https://v3.football.api-sports.io";
 const AF_LEAGUE = 1;    // FIFA World Cup
@@ -341,10 +342,7 @@ type AFTeam = {
 };
 
 async function seed(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  const ok = secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isAdminAuthed(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) {
@@ -404,16 +402,15 @@ async function seed(req: Request) {
     );
     log.push(`Fetched ${afTeams.length} team records (${teamCodeById.size} with codes)`);
 
-    // ── 2. Full wipe in FK order so re-seed starts from a clean slate ──────────
+    // ── 2. Wipe MATCH data only (FK order). Teams and players are NOT wiped:
+    // teams upsert by code below (stable IDs), so AudioStream.teamId links and
+    // Player.teamId links survive every re-seed. Wiping teams was the root cause
+    // of the recurring "anthems show trophies" breakage (SetNull on team delete).
     await prisma.kalshiMarket.deleteMany({});
     await prisma.liveMetric.deleteMany({});
     await prisma.playerMatchStat.deleteMany({});
     await prisma.match.deleteMany({});
-    // AudioStream rows are NOT wiped — real Blob URLs must survive re-seeding.
-    // Placeholders (soundhelix) are overwritten; real URLs are preserved (see step 6).
-    await prisma.player.deleteMany({});
-    const deletedTeams = await prisma.team.deleteMany({});
-    if (deletedTeams.count > 0) log.push(`Cleared ${deletedTeams.count} stale team records`);
+    log.push("Wiped match data (teams, players, anthems preserved)");
 
     // Normalize fixtures to internal shape.
     // Knockout fixtures may have no team codes yet (teams TBD until group stage settles).
@@ -554,9 +551,8 @@ async function seed(req: Request) {
     log.push(`Upserted ${marketsData.length} Kalshi market records`);
 
     // ── 9. Anthems LAST (non-critical, slowest) — parallelised ───────────────
-    // Upsert by the stable anthem `id`, NOT teamId: the wipe nulls AudioStream.teamId
-    // (nullable relation) but leaves the rows, so a teamId-keyed create would collide
-    // on the existing `id`. Keying on `id` reattaches the orphan to the new team.
+    // Teams are no longer wiped (stable IDs), so anthem links survive re-seeds.
+    // Upsert by stable anthem `id` remains for idempotency + legacy-orphan repair.
     // Real Blob URLs are preserved; only soundhelix placeholders are (re)written.
     const anthemResults = await Promise.all(
       Object.entries(ANTHEMS).map(async ([tla, a]) => {

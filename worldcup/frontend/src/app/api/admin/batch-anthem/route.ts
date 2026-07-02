@@ -2,15 +2,11 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { ANTHEM_MANIFEST, type AnthemSource } from "@/lib/anthemManifest";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Hobby cap — 24 Drive downloads run sequentially
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 // The full anthem set now lives in src/lib/anthemManifest.ts (single source of
 // truth). preset=true imports every track; add clear=true to wipe first.
@@ -197,7 +193,7 @@ async function finalizePrune() {
 // GET ?secret=...&preset=true&offset=N&count=M        → import a slice only (chunked button)
 // GET ?secret=...&finalize=true                       → prune stale rows after chunks
 export async function GET(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
 
   if (searchParams.get("finalize") === "true") {
@@ -221,7 +217,7 @@ export async function GET(req: Request) {
 
 // POST ?secret=... body: Item[]  — custom list import
 export async function POST(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const items = (await req.json()) as Item[];
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Body must be a non-empty array of items" }, { status: 400 });

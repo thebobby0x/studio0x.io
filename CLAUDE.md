@@ -261,7 +261,8 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 
 | Route | Purpose |
 |---|---|
-| `POST /api/seed` | Seeds teams + matches from api-football (run once on new DB, or to refresh knockout fixtures) |
+| `POST /api/admin/sync-fixtures` | **Preferred**: NON-destructive fixture sync — new fixtures/knockouts, scores, statuses, TBD→real team upgrades. Also runs nightly via the 2:30am cron. |
+| `POST /api/seed` | Full re-seed of match data (kalshi/liveMetric/playerMatchStat/match wiped + rebuilt). Teams/players/anthems are PRESERVED (upserted by code, stable IDs). Use sync-fixtures unless you need a hard reset. |
 | `POST /api/admin/seed-players?mock=true` | Seeds 30+ key players with club/league data (mock mode, no API needed) |
 | `POST /api/admin/seed-players` | Seeds players from api-football live squad data |
 | `POST /api/admin/seed-full-squads` | Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players) |
@@ -277,6 +278,17 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 **Anthem source of truth:** `src/lib/anthemManifest.ts` (Drive file IDs + exact titles). To add a
 team anthem, add one entry there. Re-import via the **"Wipe + Reimport ALL Anthems"** admin button.
 Costa Rica excluded (did not qualify) — destined for a future "NON WC26 Anthems" page/manifest.
+
+**Admin auth (single source):** `src/lib/adminAuth.ts` — every admin/seed/cron route accepts
+(1) SUPER_ADMIN session, (2) `Bearer CRON_SECRET`, (3) `?secret=` matching the `SEED_SECRET`
+env var, or (4) the legacy hardcoded secret ONLY while `SEED_SECRET` is unset. **Rotation is
+self-activating:** set `SEED_SECRET` in Vercel env and the hardcoded value (public repo!) stops
+working. Rotation checklist: set `SEED_SECRET` + `CRON_SECRET` in Vercel, update the GH Action
+secret `NEWS_REFRESH_SECRET`, update `vercel.json` cron `?secret=` params, redeploy.
+
+**Nightly cron (2:30am, `/api/cron/ingest-stats`)** runs three jobs: fixture sync (non-destructive
+DB refresh — the permanent fix for stale data), player-stats ingest, and Blob cache eviction when
+the store exceeds ~800 MB (prevents the 1 GB quota wall from ever silently killing audio again).
 
 ---
 

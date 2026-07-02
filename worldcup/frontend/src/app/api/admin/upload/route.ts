@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 function extractDriveId(url: string): string | null {
   const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -17,7 +13,7 @@ function extractDriveId(url: string): string | null {
 
 // POST with multipart FormData (file upload) or JSON { driveUrl, filename? } (Drive import)
 export async function POST(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = req.headers.get("content-type") ?? "";
 

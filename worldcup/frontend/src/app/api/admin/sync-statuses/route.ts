@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { isAdminAuthed } from "@/lib/adminAuth";
 
 const BASE = "https://v3.football.api-sports.io";
 const STATUS_MAP: Record<string, string> = {
@@ -12,10 +12,7 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
-  const session = await auth();
-  const url = new URL(req.url);
-  const secret = url.searchParams.get("secret");
-  if (session?.user?.role !== "SUPER_ADMIN" && secret !== "wc2026studio0x") {
+  if (!(await isAdminAuthed(req))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

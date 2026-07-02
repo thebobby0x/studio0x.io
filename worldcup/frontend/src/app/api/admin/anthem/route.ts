@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 // GET /api/admin/anthem?secret=... — list all teams + current anthem
 export async function GET(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const teams = await prisma.team.findMany({
     include: { anthem: true },
     orderBy: { name: "asc" },
@@ -19,7 +15,7 @@ export async function GET(req: Request) {
 
 // PUT /api/admin/anthem?secret=... — add or update anthem for a team
 export async function PUT(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as {
     teamCode: string;
@@ -82,7 +78,7 @@ export async function PUT(req: Request) {
 // Removes all AudioStream records backed by soundhelix.com placeholder URLs so those
 // teams revert to "coming soon" in the Anthem Hub. Real Vercel Blob URLs are untouched.
 export async function DELETE(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   if (searchParams.get("action") !== "purge-placeholders") {
     return NextResponse.json({ hint: "Add ?action=purge-placeholders to delete soundhelix placeholder records." });

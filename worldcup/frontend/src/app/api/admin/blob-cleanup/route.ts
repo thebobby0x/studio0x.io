@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { list, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 // Frees Vercel Blob space (the Hobby plan caps at 1GB and a full store makes
 // every put() — TTS audio AND anthem imports — fail with "quota exceeded").
@@ -98,7 +94,7 @@ async function purgeAnthemBlobs() {
 // GET ?secret=...[&dryRun=true]                  — cache + orphan cleanup (preview with dryRun)
 // GET ?secret=...&purgeAnthems=CONFIRM_DRIVE_OK  — delete ALL anthems/ blobs (Drive is source)
 export async function GET(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   if (searchParams.get("purgeAnthems") === "CONFIRM_DRIVE_OK") {
     return purgeAnthemBlobs();
@@ -106,6 +102,6 @@ export async function GET(req: Request) {
   return cleanup(searchParams.get("dryRun") === "true");
 }
 export async function POST(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return cleanup(false);
 }

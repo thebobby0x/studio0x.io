@@ -132,6 +132,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 action: () => runSeed("syncStatuses", "/api/admin/sync-statuses?secret=wc2026studio0x", "POST"),
               },
               {
+                key: "syncFixtures",
+                icon: RefreshCw,
+                label: "Sync Fixtures (Safe)",
+                desc: "Non-destructive daily-sync, on demand: pulls new fixtures (knockouts!), scores, statuses and TBD→real team upgrades from api-football. Never deletes anything — use this instead of Re-seed.",
+                action: () => runSeed("syncFixtures", "/api/admin/sync-fixtures?secret=wc2026studio0x", "POST"),
+              },
+              {
                 key: "matches",
                 icon: Database,
                 label: "Re-seed Matches",

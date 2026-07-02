@@ -209,14 +209,23 @@ export default async function DashboardPage({
     elapsed: m.elapsed ?? 0,
     group: m.homeTeam.groupStage,
   });
+  // Secondary sort on fixture id: final group matchdays kick off simultaneously,
+  // so date alone ties and ordering becomes arbitrary. Fixture id is stable and
+  // roughly chronological within a matchday.
   const heroLive = inProgress.map(toHero);
   const heroUpcoming = nsMatches
     .slice()
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .sort(
+      (a, b) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime() || a.fixture - b.fixture
+    )
     .map(toHero);
   const heroResults = ftMatches
     .slice()
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.date).getTime() - new Date(a.date).getTime() || b.fixture - a.fixture
+    )
     .map(toHero);
 
   return (

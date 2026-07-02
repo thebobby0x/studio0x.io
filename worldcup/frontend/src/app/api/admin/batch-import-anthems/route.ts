@@ -2,12 +2,8 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { ANTHEM_MANIFEST } from "@/lib/anthemManifest";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 // Derived from the shared manifest — the 12 "newer" team anthems (BEL…UZB).
 // Kept for backwards compatibility; prefer /api/admin/batch-anthem?preset=true
@@ -18,7 +14,7 @@ const BATCH = ANTHEM_MANIFEST
   .map((a) => ({ code: a.teamCode!, driveId: a.driveFileId, title: a.title }));
 
 async function runImport(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const results: { code: string; title: string; status: "ok" | "error"; detail?: string; url?: string }[] = [];
 

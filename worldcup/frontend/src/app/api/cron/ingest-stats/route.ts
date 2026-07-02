@@ -1,24 +1,44 @@
 import { NextResponse } from "next/server";
+import { isAdminAuthed } from "@/lib/adminAuth";
+import { syncFixtures } from "@/lib/fixtureSync";
+import { evictCachesIfNearQuota } from "@/lib/blobMaintenance";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
-// Delegate to the admin ingest route — just forward with cron auth header
+// ── Nightly maintenance cron (2:30 AM UTC, see vercel.json) ──────────────────
+// Three jobs, most-important first so a timeout can't starve the critical one:
+//   1. Fixture sync   — non-destructive upsert from api-football. New fixtures
+//      (knockout rounds!), scores, statuses, TBD→real team upgrades. This is
+//      the permanent fix for the DB going stale as the tournament advances.
+//   2. Stats ingest   — per-player match stats for finished games (PPI™ etc).
+//      Invoked in-process; no internal HTTP hop.
+//   3. Blob eviction  — purges regenerable audio caches if the store nears the
+//      1 GB quota, so writes can never silently start failing again.
 export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!(await isAdminAuthed(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const base = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+  // 1. Fixture sync
+  const sync = await syncFixtures().catch((e) => ({
+    ok: false as const, skipped: String(e), teamsUpserted: 0, matchesCreated: 0, matchesUpdated: 0, unchanged: 0, errors: [] as string[],
+  }));
 
-  const res = await fetch(`${base}/api/admin/ingest-match-stats`, {
-    headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-    cache: "no-store",
-  });
+  // 2. Stats ingest — call the admin route handler in-process with a request
+  // that passes its auth (no network, no base-URL fragility).
+  let ingest: unknown = { skipped: "ingest failed to run" };
+  try {
+    const { GET: ingestGET } = await import("@/app/api/admin/ingest-match-stats/route");
+    const secret = process.env.SEED_SECRET ?? "wc2026studio0x";
+    const res = await ingestGET(new Request(`http://internal/api/admin/ingest-match-stats?secret=${encodeURIComponent(secret)}`));
+    ingest = await res.json();
+  } catch (e) {
+    ingest = { skipped: String(e) };
+  }
 
-  const json = await res.json();
-  return NextResponse.json(json, { status: res.status });
+  // 3. Blob cache eviction (quota guard)
+  const blob = await evictCachesIfNearQuota();
+
+  return NextResponse.json({ ok: true, sync, ingest, blob });
 }
