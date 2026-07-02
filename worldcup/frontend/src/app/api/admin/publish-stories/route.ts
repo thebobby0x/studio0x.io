@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import type { Story } from "@/app/api/ai/stories/route";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 function storiesToMarkdown(stories: Story[], date: string): string {
   const lines = [
@@ -108,7 +104,7 @@ async function pushToGitHub(
 // POST /api/admin/publish-stories?secret=...
 // Body: { stories: Story[] } or empty (will fetch from /api/ai/stories)
 export async function POST(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ghToken = process.env.CONTENT_REPO_TOKEN;
   const contentRepo = process.env.CONTENT_REPO ?? "thebobby0x/studio0x-content";

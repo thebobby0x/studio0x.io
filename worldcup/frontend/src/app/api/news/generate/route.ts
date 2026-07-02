@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { isAdminAuthed as authed } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -13,15 +14,6 @@ const CONCURRENCY = 5;
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-function authed(req: Request): boolean {
-  const { searchParams } = new URL(req.url);
-  if (searchParams.get("secret") === "wc2026studio0x") return true;
-  if (process.env.SEED_SECRET && searchParams.get("secret") === process.env.SEED_SECRET) return true;
-  // Vercel Cron sends this header automatically when CRON_SECRET is configured
-  const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
-  return false;
-}
 
 function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -74,7 +66,7 @@ type MatchWithTeams = {
 };
 
 async function handler(req: Request) {
-  if (!authed(req)) {
+  if (!(await authed(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const key = process.env.ANTHROPIC_API_KEY;

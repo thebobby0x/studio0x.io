@@ -523,8 +523,8 @@ export default function PredictPage() {
               </div>
             ) : matches.length === 0 ? (
               <div className="text-center text-slate-500 text-sm py-12">
-                No matches found — run the seed first at{" "}
-                <code className="text-brand-gold">/api/seed?secret=wc2026studio0x</code>
+                No matches found — an admin can load them from{" "}
+                <code className="text-brand-gold">/admin</code> → Re-seed Matches
               </div>
             ) : (
               Object.entries(byDay).map(([day, dayMatches]) => (

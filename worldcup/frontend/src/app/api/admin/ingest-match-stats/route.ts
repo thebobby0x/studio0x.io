@@ -1,19 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAdminAuthed as authed } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const AF_BASE = "https://v3.football.api-sports.io";
 
-function authed(req: Request): boolean {
-  const { searchParams } = new URL(req.url);
-  if (searchParams.get("secret") === "wc2026studio0x") return true;
-  if (process.env.SEED_SECRET && searchParams.get("secret") === process.env.SEED_SECRET) return true;
-  const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
-  return false;
-}
 
 interface AfPlayerStat {
   player: { id: number; name: string; photo?: string };
@@ -192,7 +185,7 @@ async function ingestFixture(fixtureId: number): Promise<{ playersIngested: numb
 }
 
 async function handler(req: Request) {
-  if (!authed(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await authed(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const fixtureParam = searchParams.get("fixture");

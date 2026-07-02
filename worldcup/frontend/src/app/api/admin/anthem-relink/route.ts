@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CODE_TO_TITLE } from "@/lib/anthemManifest";
+import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
 
-function checkAuth(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  return secret === "wc2026studio0x" || (!!process.env.SEED_SECRET && secret === process.env.SEED_SECRET);
-}
 
 // Canonical titles come from the shared manifest (src/lib/anthemManifest.ts) so
 // there is exactly one place to edit when anthems change.
@@ -33,7 +29,7 @@ function extractCodeFromUrl(url: string, knownCodes: Set<string>): string | null
 // Also restores canonical song titles for all known codes.
 // Idempotent — safe to run multiple times.
 export async function GET(req: Request) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [allStreams, allTeams] = await Promise.all([
     prisma.audioStream.findMany({ include: { team: true } }),
