@@ -17,7 +17,7 @@ export default function FloatingMiniPlayer() {
   const hasNext = playlist.length > 1;
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-brand-card/95 backdrop-blur-md border border-brand-border shadow-2xl shadow-black/50 min-w-[280px] max-w-[420px] w-[92vw]">
+    <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-brand-card/95 backdrop-blur-md border border-brand-border shadow-2xl shadow-black/50 min-w-[280px] max-w-[420px] w-[92vw]">
       {/* Flag + track info */}
       <div className="text-xl shrink-0 select-none">{current.flagEmoji}</div>
       <div className="flex-1 min-w-0">
