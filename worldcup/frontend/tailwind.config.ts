@@ -5,13 +5,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Brand colors resolve to CSS variables (RGB triples in globals.css) so
+        // the whole app re-skins via [data-theme] — dark (default) and light —
+        // while alpha modifiers (bg-brand-gold/10 etc) keep working.
         brand: {
-          green:  "#10b981",
-          gold:   "#f59e0b",
-          blue:   "#3b82f6",
-          dark:   "#060b18",
-          card:   "#0d1828",
-          border: "#182a42",
+          green:  "rgb(var(--green) / <alpha-value>)",
+          gold:   "rgb(var(--gold) / <alpha-value>)",
+          blue:   "rgb(var(--blue) / <alpha-value>)",
+          dark:   "rgb(var(--bg) / <alpha-value>)",
+          card:   "rgb(var(--card) / <alpha-value>)",
+          border: "rgb(var(--border) / <alpha-value>)",
         },
       },
       fontFamily: {
