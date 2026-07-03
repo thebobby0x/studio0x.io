@@ -160,7 +160,9 @@ export async function syncFixtures(): Promise<SyncResult> {
             homeTeamId,
             awayTeamId,
             venue,
-            city: f.fixture.venue.city ?? getVenueInfo(venue)?.city ?? "",
+            // Prefer OUR canonical city name (matches travel-stats/venue maps);
+            // api-football's raw city string only as fallback.
+            city: getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "",
             date,
             status,
             homeScore,
