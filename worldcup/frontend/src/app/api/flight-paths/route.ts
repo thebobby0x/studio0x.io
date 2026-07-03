@@ -54,7 +54,30 @@ export async function GET() {
     const ftMatches = sorted.filter((m) => m.status === "FT");
     const nsMatches = sorted.filter((m) => m.status === "NS");
 
-    if (nsMatches.length === 0) continue;
+    // No upcoming match = eliminated (or tournament over): show a homebound arc
+    // for 72h after their last final whistle, then drop them from the map.
+    // During knockouts half the field exits each round — the fly-home wave is
+    // both accurate and a great visual.
+    if (nsMatches.length === 0) {
+      const lastFt = ftMatches[ftMatches.length - 1];
+      if (!lastFt) continue;
+      const lastVenueInfo = getVenueInfo(lastFt.venue);
+      if (!lastVenueInfo) continue;
+      const msSince = now.getTime() - lastFt.date.getTime();
+      if (msSince > 72 * 60 * 60 * 1000) continue;
+      arcs.push({
+        tla,
+        fromLat: lastVenueInfo.lat,
+        fromLng: lastVenueInfo.lng,
+        toLat: homeCoords.lat,
+        toLng: homeCoords.lng,
+        phase: "venue-to-venue",
+        fromLabel: lastVenueInfo.city,
+        toLabel: `${homeCoords.country} (home)`,
+        status: msSince <= TRANSIT_WINDOW_MS ? "in-transit" : "arrived",
+      });
+      continue;
+    }
 
     const nextMatch = nsMatches[0];
     const nextVenueInfo = getVenueInfo(nextMatch.venue);
