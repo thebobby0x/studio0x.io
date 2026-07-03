@@ -45,6 +45,7 @@ interface AFFixture {
   fixture: {
     id: number;
     date: string;
+    referee: string | null;
     status: { short: string; elapsed: number | null };
     venue: { name: string | null; city: string | null };
   };
@@ -130,7 +131,7 @@ export async function syncFixtures(): Promise<SyncResult> {
 
   // ── 3. Diff-aware match upsert by fixture id ───────────────────────────────
   const existing = await prisma.match.findMany({
-    select: { fixture: true, status: true, homeScore: true, awayScore: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true },
+    select: { fixture: true, status: true, homeScore: true, awayScore: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true },
   });
   const existingByFixture = new Map(existing.map((m) => [m.fixture, m]));
 
@@ -149,6 +150,7 @@ export async function syncFixtures(): Promise<SyncResult> {
     const awayScore = f.goals.away ?? 0;
     const elapsed = f.fixture.status.elapsed ?? 0;
     const date = new Date(f.fixture.date);
+    const referee = f.fixture.referee?.trim() || null;
 
     const cur = existingByFixture.get(f.fixture.id);
     try {
@@ -168,6 +170,7 @@ export async function syncFixtures(): Promise<SyncResult> {
             homeScore,
             awayScore,
             elapsed,
+            referee,
           },
         });
         result.matchesCreated++;
@@ -179,11 +182,12 @@ export async function syncFixtures(): Promise<SyncResult> {
           cur.elapsed !== elapsed ||
           cur.date.getTime() !== date.getTime() ||
           cur.homeTeamId !== homeTeamId || // TBD → real team upgrade
-          cur.awayTeamId !== awayTeamId;
+          cur.awayTeamId !== awayTeamId ||
+          (referee !== null && cur.referee !== referee); // don't null-out a known ref
         if (changed) {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
-            data: { status, homeScore, awayScore, elapsed, date, homeTeamId, awayTeamId },
+            data: { status, homeScore, awayScore, elapsed, date, homeTeamId, awayTeamId, ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {

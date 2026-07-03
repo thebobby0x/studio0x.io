@@ -209,6 +209,7 @@ model Match {
   awayScore    Int               @default(0)
   elapsed      Int               @default(0)
   round        String            @default("Group Stage")
+  referee      String?           // match official (from api-football) — powers Officials profiles
   goalEvents   Json?             // admin override: [{minute,team,scorer,assist,isOwnGoal,isPenalty}]
   metrics      LiveMetric[]
   markets      KalshiMarket[]
