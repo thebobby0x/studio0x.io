@@ -5,6 +5,28 @@ It captures decisions, context, and conventions that would otherwise be lost bet
 
 ---
 
+## MONOREPO BOUNDARIES (agreed 7/3 with the store session — all sessions obey)
+
+Four tenants share `thebobby0x/studio0x.io`, each with its own Claude session:
+- **worldcup/** → this file's app (Vercel project `worldcup-2026`, Neon Postgres). THIS session's lane.
+- **store/**, **supabase/**, **tools/** → the STORE session's lane (Supabase `cmwdvxvxlfjeaknftobb`).
+- **studio0x-content/**, **tail-finder/** → other tenants.
+
+**Shared root files — do not change without flagging the other session in the PR:**
+- `CNAME` + GitHub Pages settings → serve apex `studio0x.io` (root `index.html` + store).
+  **NEVER disable GitHub Pages or touch CNAME — it takes the store down.**
+- Root `index.html` → store session owns.
+- `CLAUDE.md` → sectioned; append your own sections, never rewrite others'.
+- `docs/` → namespaced: worldcup uses `docs/eod-*.md` / `docs/backlog-*.md`; store uses `docs/EOD-*.md` (avoid case-collisions — prefer distinct prefixes).
+- `.github/workflows/refresh-news.yml` → worldcup's (schedule+manual only, never on push).
+- Root `package.json`/lockfile → shared legacy (prisma); worldcup builds from `worldcup/frontend/` only.
+
+**Deploy separation:** worldcup's `vercel.json` has an `ignoreCommand` so Vercel only
+builds on `worldcup/**` changes — store/content commits no longer trigger worldcup builds.
+Worldcup never reads store/, supabase/, tools/; uses its OWN Neon DB, never the store's Supabase.
+
+---
+
 ## What This Project Is
 
 **Studio0x.io** is an AI-powered sports stats and media platform. The first deployment

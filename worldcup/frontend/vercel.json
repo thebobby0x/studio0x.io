@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ..",
   "crons": [
     { "path": "/api/news/generate?secret=wc2026studio0x",     "schedule": "0 6 * * *" },
     { "path": "/api/cron/ingest-stats?secret=wc2026studio0x",  "schedule": "30 2 * * *" }
