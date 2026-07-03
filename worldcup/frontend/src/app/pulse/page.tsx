@@ -409,6 +409,15 @@ export default function PulsePage() {
           </button>
         </div>
 
+        {/* Officials teaser */}
+        <a
+          href="/officials"
+          className="block rounded-xl bg-brand-card/60 border border-brand-border px-4 py-3 text-sm text-slate-400 hover:text-white hover:border-brand-gold/40 transition-all"
+        >
+          <span className="font-semibold text-white">The Officials™</span> — referee profiles, movements
+          & our cheeky discipline metrics (Whistle Index™, Card Threshold™, Let It Flow™) →
+        </a>
+
         {/* World map (always visible) */}
         <WorldFlightMap />
 
