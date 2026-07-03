@@ -578,3 +578,19 @@ Before ending any session:
 4. Append to `docs/eod-YYYY-MM-DD.md` with what shipped and what's pending
 
 The stop hook (`~/.claude/stop-hook-git-check.sh`) will warn if there are uncommitted files.
+
+---
+
+## STORE SESSION NOTES (appended by the store session — store lane only)
+
+*Per the append-only protocol: this section is the store's; other tenant sessions please don't edit it, and I won't edit yours.*
+
+**What it is:** **studio0x market** — a digital-products storefront (24 AI kits across 4 brands: agentEdge / eComKiller / bookedBNB / coachKit), live at **studio0x.io/store/** via GitHub Pages. Backend = Supabase project **`cmwdvxvxlfjeaknftobb`** (edge functions + Postgres).
+
+**Store lane (this session only touches these):** `store/**`, `supabase/**`, `tools/**`, and `docs/store-EOD-*.md`. Never touches `worldcup/`, `studio0x-content/`, `tail-finder/`, `CNAME`, or Pages settings.
+
+**Deploy:** static — GitHub Pages serves root `index.html` + `store/` from `main` (no build step). Pages `"try again later"` failures are **transient superseded-deploy noise** from high multi-tenant commit volume; the latest deploy wins, so the live site stays current. Never disable Pages / touch `CNAME`.
+
+**Stripe:** dedicated **studio0x** account (`acct_1SXQcK...`) — NOT the `STUDIO0X LLC` account (`acct_1TM9zi...`, which is singularityLab). Store edge-function secrets are namespaced: **`STRIPE_SECRET_KEY_marketEdgeFunctions`** / **`STRIPE_WEBHOOK_SECRET_marketEdgeFunctions`** (the plain `STRIPE_SECRET_KEY` in the project belongs to singularityLab — leave it).
+
+**Conventions:** product prices end in **7** ($27/$37/$47); brand names are camelCase. Store EOD reports live at **`docs/store-EOD-YYYY-MM-DD.md`** (distinct prefix to avoid case-twins with worldcup's `docs/eod-*.md`).
