@@ -59,6 +59,7 @@ const ENGINES = [
 // Apply a brand's theme + copy to the umbrella page chrome.
 async function applyBrand() {
   if (!BRAND_KEY) return;
+  document.documentElement.setAttribute("data-brand", BRAND_KEY); // enables per-industry CSS themes
   try {
     const { data: brand } = await supabase
       .from("brands").select("*").eq("key", BRAND_KEY).maybeSingle();

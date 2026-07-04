@@ -543,3 +543,52 @@ body[data-view="list"] .card-actions .btn { flex: 0 0 auto; }
 }
 .brand-section .engine-section { margin-top: 26px; }
 .brand-section .engine-section h2 { font-size: 1.15rem; }
+
+/* ── PER-INDUSTRY BRAND THEMES ─────────────────────────────────────────
+   Brand pages set html[data-brand="<key>"] (applyBrand in store.js). The hero
+   + a subtle page wash follow each brand's own --accent/--accent2 (from the
+   brands table) instead of the default Miami pink/blue, and each industry gets
+   a distinct character. Degrades gracefully if color-mix is unsupported. */
+html[data-brand] body {
+  background:
+    radial-gradient(1200px 620px at 50% -260px, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    var(--bg);
+}
+html[data-brand] .hero {
+  border-bottom-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background:
+    radial-gradient(900px 440px at 12% -12%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 62%),
+    radial-gradient(780px 420px at 96% -4%, color-mix(in srgb, var(--accent2) 22%, transparent), transparent 58%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
+
+/* agentEdge — real estate: cool, precise, trustworthy (single crisp sweep) */
+html[data-brand="agentedge"] .hero {
+  background:
+    radial-gradient(1040px 460px at 8% -16%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
+
+/* eComKiller — ecommerce: hot, high-energy, conversion (dual punch) */
+html[data-brand="ecomkiller"] .hero {
+  background:
+    radial-gradient(820px 420px at 14% -12%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 56%),
+    radial-gradient(680px 380px at 92% 6%, color-mix(in srgb, var(--accent2) 26%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
+
+/* bookedBNB — short-term rental: warm, welcoming hospitality (sunset warmth) */
+html[data-brand="bookedbnb"] .hero {
+  background:
+    radial-gradient(940px 460px at 20% -14%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 60%),
+    radial-gradient(720px 420px at 90% -2%, rgba(255,170,90,0.16), transparent 58%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
+
+/* coachKit — coaching: premium, elegant, growth (centered luxe glow) */
+html[data-brand="coachkit"] .hero {
+  background:
+    radial-gradient(980px 500px at 50% -20%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%),
+    radial-gradient(600px 360px at 84% 4%, color-mix(in srgb, var(--accent2) 22%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
