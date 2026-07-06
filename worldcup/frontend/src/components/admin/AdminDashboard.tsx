@@ -41,6 +41,7 @@ export default function AdminDashboard({ users }: { users: User[] }) {
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [savedRole, setSavedRole] = useState<string | null>(null);
   const [seedStatus, setSeedStatus] = useState<Record<string, "idle" | "loading" | "done" | "error">>({});
+  const [showMaintenance, setShowMaintenance] = useState(false);
 
   async function runSeed(key: string, url: string, method: "GET" | "POST" = "POST") {
     setSeedStatus(s => ({ ...s, [key]: "loading" }));
@@ -53,6 +54,37 @@ export default function AdminDashboard({ users }: { users: User[] }) {
       setTimeout(() => setSeedStatus(s => ({ ...s, [key]: "idle" })), 4000);
     }
   }
+
+  type SeedTool = {
+    key: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    label: string;
+    desc: string;
+    action: () => void | Promise<void>;
+  };
+
+  const renderSeedTool = ({ key, icon: Icon, label, desc, action }: SeedTool) => {
+    const status = seedStatus[key] ?? "idle";
+    return (
+      <button
+        key={key}
+        onClick={action}
+        disabled={status === "loading"}
+        className="text-left rounded-xl border border-brand-border bg-brand-card p-4 hover:border-brand-gold/50 transition-colors disabled:opacity-60"
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <Icon size={14} className={status === "done" ? "text-brand-green" : status === "error" ? "text-red-400" : "text-brand-gold"} />
+          <div className="font-bold text-white text-sm">{label}</div>
+        </div>
+        <div className="text-[11px] text-slate-500">{desc}</div>
+        {status !== "idle" && (
+          <div className={`text-[10px] mt-2 font-semibold ${status === "loading" ? "text-slate-400 animate-pulse" : status === "done" ? "text-brand-green" : "text-red-400"}`}>
+            {status === "loading" ? "Running…" : status === "done" ? "✓ Done" : "✗ Failed — check Vercel logs"}
+          </div>
+        )}
+      </button>
+    );
+  };
 
   async function switchView(role: Role) {
     setViewLoading(role);
@@ -116,48 +148,23 @@ export default function AdminDashboard({ users }: { users: User[] }) {
           </div>
         </section>
 
-        {/* Seed Tools */}
+        {/* Seed Tools — 6 daily-driver buttons; rare/destructive tools live in the
+            collapsed Maintenance section below. (Retired as superseded/one-time-done:
+            Sync Match Statuses → covered by Sync Fixtures; Purge Placeholder Anthems
+            and Purge ALL Anthem Blobs → completed one-time migrations. Endpoints remain.) */}
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <Database size={14} className="text-slate-400" />
-            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Data Seeds</h2>
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Data</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              {
-                key: "syncStatuses",
-                icon: RefreshCw,
-                label: "Sync Match Statuses",
-                desc: "Fix any LIVE/HT matches that have actually finished. Run this if a completed game still shows as live.",
-                action: () => runSeed("syncStatuses", "/api/admin/sync-statuses?secret=wc2026studio0x", "POST"),
-              },
+            {([
               {
                 key: "syncFixtures",
                 icon: RefreshCw,
                 label: "Sync Fixtures (Safe)",
-                desc: "Non-destructive daily-sync, on demand: pulls new fixtures (knockouts!), scores, statuses and TBD→real team upgrades from api-football. Never deletes anything — use this instead of Re-seed.",
+                desc: "Non-destructive sync, on demand: new fixtures (knockouts!), scores, statuses, TBD→real team upgrades. Also runs nightly. Never deletes anything.",
                 action: () => runSeed("syncFixtures", "/api/admin/sync-fixtures?secret=wc2026studio0x", "POST"),
-              },
-              {
-                key: "matches",
-                icon: Database,
-                label: "Re-seed Matches",
-                desc: "Fetch all 48 WC fixtures from api-football & update DB statuses/scores",
-                action: () => runSeed("matches", "/api/seed?secret=wc2026studio0x", "GET"),
-              },
-              {
-                key: "players",
-                icon: UserCheck,
-                label: "Seed Clubs (Mock)",
-                desc: "Fill club/league data from curated list — works without API. Good for testing.",
-                action: () => runSeed("players", "/api/admin/seed-players?mock=true", "GET"),
-              },
-              {
-                key: "playersLive",
-                icon: UserCheck,
-                label: "Seed Clubs (Live API)",
-                desc: "Pull real club/caps/goals data from api-football for all WC 2026 players. Requires API key.",
-                action: () => runSeed("playersLive", "/api/admin/seed-players", "POST"),
               },
               {
                 key: "news",
@@ -170,76 +177,28 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 key: "fullSquads",
                 icon: Users,
                 label: "Seed Full Squads (Live API)",
-                desc: "Import all 26-man squads for all 48 WC teams from api-football. Creates new player records for any missing. Run this to populate the Leagues page with all called-up players.",
+                desc: "Import all 26-man squads for all 48 WC teams from api-football. Populates the Leagues page with all called-up players.",
                 action: () => runSeed("fullSquads", "/api/admin/seed-full-squads", "POST"),
+              },
+              {
+                key: "playersLive",
+                icon: UserCheck,
+                label: "Seed Clubs (Live API)",
+                desc: "Pull real club/caps/goals data from api-football for all WC 2026 players.",
+                action: () => runSeed("playersLive", "/api/admin/seed-players", "POST"),
               },
               {
                 key: "ingest",
                 icon: Activity,
                 label: "Ingest Player Stats",
-                desc: "Pull per-match stats from api-football for all finished games. Powers PPI™ and cross-metrics.",
+                desc: "Pull per-match stats from api-football for all finished games. Powers PPI™, Officials™ and cross-metrics. Also runs nightly.",
                 action: () => runSeed("ingest", "/api/admin/ingest-match-stats?secret=wc2026studio0x", "POST"),
-              },
-              {
-                key: "purge",
-                icon: Trash2,
-                label: "Purge & Regenerate Stories",
-                desc: "Delete all existing news stories then regenerate from scratch with corrected prompts.",
-                action: async () => {
-                  setSeedStatus(s => ({ ...s, purge: "loading" }));
-                  try {
-                    const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
-                    if (!del.ok) throw new Error("purge failed");
-                    const gen = await fetch("/api/news/generate?secret=wc2026studio0x", { method: "POST" });
-                    setSeedStatus(s => ({ ...s, purge: gen.ok ? "done" : "error" }));
-                  } catch {
-                    setSeedStatus(s => ({ ...s, purge: "error" }));
-                  }
-                  setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
-                },
-              },
-              {
-                key: "purgeAnthems",
-                icon: Trash2,
-                label: "Purge Placeholder Anthems",
-                desc: "Delete all soundhelix placeholder audio records. Teams revert to greyed-out coming-soon state.",
-                action: async () => {
-                  setSeedStatus(s => ({ ...s, purgeAnthems: "loading" }));
-                  try {
-                    const res = await fetch("/api/admin/anthem?secret=wc2026studio0x&action=purge-placeholders", { method: "DELETE" });
-                    setSeedStatus(s => ({ ...s, purgeAnthems: res.ok ? "done" : "error" }));
-                  } catch {
-                    setSeedStatus(s => ({ ...s, purgeAnthems: "error" }));
-                  }
-                  setTimeout(() => setSeedStatus(s => ({ ...s, purgeAnthems: "idle" })), 5000);
-                },
-              },
-              {
-                key: "blobCleanup",
-                icon: Trash2,
-                label: "Free Up Blob Storage",
-                desc: "Purges regenerable TTS/deep-dive audio caches + orphaned anthem dupes from Vercel Blob. Run this if audio shows 'unavailable' or the anthem import fails (1GB Hobby quota full).",
-                action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
-              },
-              {
-                key: "purgeAnthemBlobs",
-                icon: Trash2,
-                label: "Purge ALL Anthem Blobs (one-time)",
-                desc: "Deletes every file in anthems/ to reclaim the full 1GB quota. Safe — Google Drive is the source; the reimport re-downloads everything. Run this ONCE, then Wipe + Reimport.",
-                action: () => runSeed("purgeAnthemBlobs", "/api/admin/blob-cleanup?secret=wc2026studio0x&purgeAnthems=CONFIRM_DRIVE_OK", "GET"),
-              },
-              {
-                key: "relinkAnthems",
-                icon: Music2,
-                label: "Relink Anthems + Fix Titles",
-                desc: "Scans uploaded anthem URLs for country codes, links records to the correct teams, and restores original song titles. Run this after re-uploading files.",
-                action: () => runSeed("relinkAnthems", "/api/admin/anthem-relink?secret=wc2026studio0x", "GET"),
               },
               {
                 key: "resetAnthems",
                 icon: Music2,
                 label: "Wipe + Reimport ALL Anthems (Drive)",
-                desc: "Re-imports all 24 tracks fresh from Google Drive in small chunks (no timeout), then prunes stale records — correct teams, flags and titles. The one-button anthem reset.",
+                desc: "Re-imports every manifest track fresh from Google Drive in small chunks, then prunes stale records — correct teams, flags and titles.",
                 action: async () => {
                   setSeedStatus(s => ({ ...s, resetAnthems: "loading" }));
                   try {
@@ -264,29 +223,70 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                   setTimeout(() => setSeedStatus(s => ({ ...s, resetAnthems: "idle" })), 6000);
                 },
               },
-            ].map(({ key, icon: Icon, label, desc, action }) => {
-              const status = seedStatus[key] ?? "idle";
-              return (
-                <button
-                  key={key}
-                  onClick={action}
-                  disabled={status === "loading"}
-                  className="text-left rounded-xl border border-brand-border bg-brand-card p-4 hover:border-brand-gold/50 transition-colors disabled:opacity-60"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon size={14} className={status === "done" ? "text-brand-green" : status === "error" ? "text-red-400" : "text-brand-gold"} />
-                    <div className="font-bold text-white text-sm">{label}</div>
-                  </div>
-                  <div className="text-[11px] text-slate-500">{desc}</div>
-                  {status !== "idle" && (
-                    <div className={`text-[10px] mt-2 font-semibold ${status === "loading" ? "text-slate-400 animate-pulse" : status === "done" ? "text-brand-green" : "text-red-400"}`}>
-                      {status === "loading" ? "Running…" : status === "done" ? "✓ Done" : "✗ Failed — check Vercel logs"}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+            ] as SeedTool[]).map(renderSeedTool)}
           </div>
+
+          {/* Maintenance & Danger Zone — rare repairs + destructive resets, collapsed
+              so daily use stays clean. Nothing here is needed in normal operation. */}
+          <button
+            onClick={() => setShowMaintenance(v => !v)}
+            className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors pt-2"
+          >
+            <ChevronRight size={12} className={`transition-transform ${showMaintenance ? "rotate-90" : ""}`} />
+            Maintenance & Danger Zone
+          </button>
+          {showMaintenance && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {([
+                {
+                  key: "matches",
+                  icon: Database,
+                  label: "Re-seed Matches (Hard Reset)",
+                  desc: "DESTRUCTIVE: wipes and rebuilds all match data (stats/markets included). Teams, players and anthems are preserved. Use Sync Fixtures instead unless something is truly broken.",
+                  action: () => runSeed("matches", "/api/seed?secret=wc2026studio0x", "GET"),
+                },
+                {
+                  key: "players",
+                  icon: UserCheck,
+                  label: "Seed Clubs (Mock)",
+                  desc: "Testing only: fill club/league data from a curated list without hitting the API.",
+                  action: () => runSeed("players", "/api/admin/seed-players?mock=true", "GET"),
+                },
+                {
+                  key: "purge",
+                  icon: Trash2,
+                  label: "Purge & Regenerate Stories",
+                  desc: "DESTRUCTIVE: deletes all news stories, then regenerates from scratch.",
+                  action: async () => {
+                    setSeedStatus(s => ({ ...s, purge: "loading" }));
+                    try {
+                      const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                      if (!del.ok) throw new Error("purge failed");
+                      const gen = await fetch("/api/news/generate?secret=wc2026studio0x", { method: "POST" });
+                      setSeedStatus(s => ({ ...s, purge: gen.ok ? "done" : "error" }));
+                    } catch {
+                      setSeedStatus(s => ({ ...s, purge: "error" }));
+                    }
+                    setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
+                  },
+                },
+                {
+                  key: "blobCleanup",
+                  icon: Trash2,
+                  label: "Free Up Blob Storage",
+                  desc: "Purges regenerable TTS/deep-dive caches + orphaned anthem dupes. Runs automatically each night — manual escape hatch if audio shows 'unavailable'.",
+                  action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
+                },
+                {
+                  key: "relinkAnthems",
+                  icon: Music2,
+                  label: "Relink Anthems + Fix Titles",
+                  desc: "Repair tool: re-links anthem records to teams by filename country code and restores manifest titles. Rarely needed since links no longer sever.",
+                  action: () => runSeed("relinkAnthems", "/api/admin/anthem-relink?secret=wc2026studio0x", "GET"),
+                },
+              ] as SeedTool[]).map(renderSeedTool)}
+            </div>
+          )}
         </section>
 
         {/* Quick Tools */}
