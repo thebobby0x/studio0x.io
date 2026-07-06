@@ -176,11 +176,11 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
   // Load on mount + persona change
   useEffect(() => { fetchCommentary(persona, true); }, [fetchCommentary, persona]);
 
-  // Auto-refresh every 45s during live matches
+  // Auto-refresh every 30s during live matches
   useEffect(() => {
     const id = setInterval(() => {
       if (liveStatus === "LIVE" || liveStatus === "HT") fetchCommentary(persona);
-    }, 45_000);
+    }, 30_000);
     return () => clearInterval(id);
   }, [fetchCommentary, persona, liveStatus]);
 

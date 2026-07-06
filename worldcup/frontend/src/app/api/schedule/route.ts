@@ -5,7 +5,7 @@ const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // FIFA World Cup
 const SEASON = 2026;
 const CACHE_TTL = 20_000; // 20s bulk schedule (reduced from 60s)
-const LIVE_TTL  = 10_000; // 10s live overlay (reduced from 15s)
+const LIVE_TTL  = 6_000;  // 6s live overlay — knockouts = max 2 staggered games/day, ample API headroom
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",

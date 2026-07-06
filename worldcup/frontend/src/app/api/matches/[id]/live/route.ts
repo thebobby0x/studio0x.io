@@ -39,7 +39,7 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
       elapsed: (f.fixture.status.elapsed ?? 0) as number,
     };
     const isLive = data.status === "LIVE" || data.status === "HT";
-    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 10_000 : 300_000, data });
+    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 8_000 : 300_000, data });
     return data;
   } catch {
     return null;
