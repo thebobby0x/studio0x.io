@@ -8,6 +8,10 @@ export interface GoalEvent {
   assist: string | null;
   isOwnGoal: boolean;
   isPenalty: boolean;
+  // True when this goal was reconstructed from the scoreline (events feed
+  // lagging) — minute is approximate and scorer is not yet known. UIs must
+  // never present pending goals as confirmed scorer facts.
+  pending?: boolean;
 }
 
 interface ApiFootballEvent {
@@ -29,18 +33,18 @@ function seededRand(seed: number): () => number {
   };
 }
 
-// Build plausible goal events when the live events feed has none yet, so the
-// Match DNA timeline still reflects the on-screen score. Scorers are drawn
-// from each team's real squad (attacking positions first), deterministically.
-function simulateGoals(
+// Reconstruct placeholder goal events when the live events feed lags the
+// scoreline, so the Match DNA timeline still reflects the on-screen score.
+// NEVER invents scorer names — a real, named player must never be shown as
+// having scored when we don't actually know who did. Minutes are approximate
+// slots and every event is flagged `pending` so UIs render it honestly.
+function reconstructGoals(
   fixture: number,
   homeTeam: string,
   awayTeam: string,
   homeScore: number,
   awayScore: number,
   maxMinute: number,
-  homePlayers: { name: string; position: string }[],
-  awayPlayers: { name: string; position: string }[],
 ): GoalEvent[] {
   const total = homeScore + awayScore;
   if (total === 0) return [];
@@ -70,31 +74,16 @@ function simulateGoals(
     [sides[i], sides[j]] = [sides[j], sides[i]];
   }
 
-  const pickScorer = (
-    players: { name: string; position: string }[],
-    teamName: string,
-    n: number,
-  ): string => {
-    if (players.length === 0) return `${teamName} player`;
-    const attackers = players.filter((p) =>
-      /forward|attack|midfield|winger|striker/i.test(p.position)
-    );
-    const pool = attackers.length > 0 ? attackers : players;
-    return pool[(n + Math.floor(rand() * pool.length)) % pool.length].name;
-  };
-
   return minutes.map((minute, i) => {
-    const side = sides[i];
-    const isHome = side === "home";
+    const isHome = sides[i] === "home";
     return {
       minute,
       team: isHome ? homeTeam : awayTeam,
-      scorer: isHome
-        ? pickScorer(homePlayers, homeTeam, i)
-        : pickScorer(awayPlayers, awayTeam, i),
+      scorer: "Scorer TBC",
       assist: null,
       isOwnGoal: false,
       isPenalty: false,
+      pending: true,
     };
   });
 }
@@ -172,35 +161,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ goals: [] });
   }
 
-  // Fallback: synthesize goal events from the current score so the Match DNA
-  // timeline stays in sync with the scoreboard during live play.
+  // Fallback: reconstruct placeholder events from the current score so the
+  // Match DNA timeline stays in sync with the scoreboard during live play.
   const isLive = ["LIVE", "HT"].includes(match.status);
   if (!isLive || match.homeScore + match.awayScore === 0) {
     return NextResponse.json({ goals: [] });
   }
 
-  const [homePlayers, awayPlayers] = await Promise.all([
-    prisma.player.findMany({
-      where: { teamId: match.homeTeamId },
-      select: { name: true, position: true },
-    }),
-    prisma.player.findMany({
-      where: { teamId: match.awayTeamId },
-      select: { name: true, position: true },
-    }),
-  ]);
-
-  const maxMinute = match.status === "HT" ? 45 : match.status === "FT" ? 90 : match.elapsed || 90;
-  const goals = simulateGoals(
+  const maxMinute = match.status === "HT" ? 45 : match.elapsed || 90;
+  const goals = reconstructGoals(
     match.fixture,
     match.homeTeam.name,
     match.awayTeam.name,
     match.homeScore,
     match.awayScore,
     maxMinute,
-    homePlayers,
-    awayPlayers,
   );
 
-  return NextResponse.json({ goals });
+  return NextResponse.json({ goals, source: "reconstructed" });
 }

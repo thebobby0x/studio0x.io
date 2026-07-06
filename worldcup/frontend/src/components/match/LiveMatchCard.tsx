@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
-import type { LiveData } from "@/lib/types";
+import type { LiveData, LiveMetrics } from "@/lib/types";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
+import type { TeamLiveStats } from "@/lib/liveStats";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
@@ -20,6 +21,27 @@ const METRIC_LABELS: Record<string, string> = {
   red_cards:    "Red Cards",
 };
 
+// Rehydrate the flattened metrics record into the TeamLiveStats shape that
+// MatchDNA's Live Pressure block reads. Missing keys stay null (unreported).
+function toTeamLiveStats(m: LiveMetrics[string] | undefined): TeamLiveStats {
+  return {
+    possession:   m?.possession ?? null,
+    totalShots:   m?.total_shots ?? null,
+    shotsOn:      m?.shots_on ?? null,
+    shotsOff:     m?.shots_off ?? null,
+    blockedShots: m?.blocked_shots ?? null,
+    corners:      m?.corners ?? null,
+    fouls:        m?.fouls ?? null,
+    offsides:     m?.offsides ?? null,
+    yellowCards:  m?.yellow_cards ?? null,
+    redCards:     m?.red_cards ?? null,
+    saves:        m?.saves ?? null,
+    passes:       m?.passes ?? null,
+    passAccuracy: m?.pass_accuracy ?? null,
+    xg:           m?.xg ?? null,
+  };
+}
+
 function GoalDisplay({ goals, homeTeam, awayTeam }: {
   goals: GoalEvent[];
   homeTeam: string;
@@ -32,6 +54,8 @@ function GoalDisplay({ goals, homeTeam, awayTeam }: {
 
   function formatGoal(g: GoalEvent): string {
     const minute = `${g.minute}'`;
+    // Reconstructed goals have no confirmed scorer — never show a name.
+    if (g.pending) return `⚽ ~${minute} · scorer TBC`;
     if (g.isOwnGoal) {
       return `OG ⚽ ${minute} (${g.scorer})`;
     }
@@ -113,6 +137,9 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
   const isLive = match.status === "LIVE" || match.status === "HT";
   const isDone = match.status === "FT";
   const showGoals = (isLive || isDone) && goals && goals.length > 0;
+  // Real team stats only — never feed simulated numbers into metric panels
+  const statsReal = dataSources?.stats === "api-football" && Object.keys(hm).length > 0;
+  const dnaStats = statsReal ? { home: toTeamLiveStats(hm), away: toTeamLiveStats(am) } : null;
 
   const city = venueCity(match.venue, match.city);
   const venueInfo = getVenueInfo(match.venue);
@@ -190,8 +217,10 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
               homeTeamName={match.homeTeam.name}
               awayTeamName={match.awayTeam.name}
               homeTeamCode={homeCode}
+              awayTeamCode={awayCode}
               matchStatus={match.status}
               currentMinute={match.elapsed}
+              stats={dnaStats}
             />
           </div>
         )}
@@ -299,16 +328,18 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         />
       )}
 
-      {/* Match DNA™ */}
-      {(isLive || isDone) && goals && goals.length > 0 && (
+      {/* Match DNA™ — renders on goals OR live stats, so a 0-0 still moves */}
+      {(isLive || isDone) && goals && (goals.length > 0 || (isLive && statsReal)) && (
         <div className="px-4 pb-4">
           <MatchDNA
             goals={goals}
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
             homeTeamCode={homeCode}
+            awayTeamCode={awayCode}
             matchStatus={match.status}
             currentMinute={match.elapsed}
+            stats={dnaStats}
           />
         </div>
       )}

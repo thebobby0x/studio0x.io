@@ -10,17 +10,15 @@ import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import HeroWeather from "@/components/venue/HeroWeather";
-import MatchDNA from "@/components/stats/MatchDNA";
 import UpsetMeter from "@/components/stats/UpsetMeter";
-import GoalGravity, { computeGoalGravity } from "@/components/stats/GoalGravity";
 import PressingIntensityIndex from "@/components/stats/PressingIntensityIndex";
-import TransitionDangerRating from "@/components/stats/TransitionDangerRating";
 import FormMeter from "@/components/stats/FormMeter";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
+import MatchPulse from "@/components/match/MatchPulse";
+import MatchMarkets from "@/components/match/MatchMarkets";
 import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
-import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -259,6 +257,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           </div>
         </div>
 
+        {/* Live prediction market — every match with a real Kalshi market */}
+        <MatchMarketsPanel fixtureId={m.id} />
+
         {/* Stadium info + live weather */}
         {venueInfo && venueFromDB?.venue && (
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
@@ -267,9 +268,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {/* AI Commentary — shown for live and finished matches */}
         {(isLive || isDone) && <CommentaryPanel fixtureId={m.id} />}
 
-        {/* Match DNA™ + Clutch Index™ — only for played/live matches */}
+        {/* Match DNA™ + Clutch Index™ — live-polling, moves even at 0-0 */}
         {(isDone || isLive) && (
-          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} matchStatus={m.status} currentMinute={m.minute ?? undefined} />
+          <MatchDNAPanel fixtureId={m.id} homeTeamName={m.homeTeam.name} awayTeamName={m.awayTeam.name} homeTeamCode={m.homeTeam.tla} awayTeamCode={m.awayTeam.tla} />
         )}
 
         {/* Upset Factor™ — only for FT matches with Polymarket odds available */}
@@ -436,67 +437,28 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 }
 
 async function MatchDNAPanel({
-  fixtureId, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute,
+  fixtureId, homeTeamName, awayTeamName, homeTeamCode, awayTeamCode,
 }: {
   fixtureId: number;
   homeTeamName: string;
   awayTeamName: string;
   homeTeamCode: string;
-  matchStatus?: string;
-  currentMinute?: number;
+  awayTeamCode: string;
 }) {
   try {
     const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
     if (!dbMatch) return null;
 
-    const apiKey = process.env.API_FOOTBALL_KEY;
-    if (!apiKey) return null;
-
-    const res = await fetch(
-      `https://v3.football.api-sports.io/fixtures/events?fixture=${fixtureId}`,
-      { headers: { "x-apisports-key": apiKey }, next: { revalidate: 60 } }
-    );
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    const goals: GoalEvent[] = (json.response ?? [])
-      .filter((e: { type: string }) => e.type === "Goal")
-      .map((e: { time: { elapsed: number }; team: { name: string }; player: { name: string }; assist: { name: string | null }; detail: string }) => ({
-        minute: e.time.elapsed,
-        team: e.team.name,
-        scorer: e.player.name,
-        assist: e.assist?.name ?? null,
-        isOwnGoal: e.detail === "Own Goal",
-        isPenalty: e.detail === "Penalty",
-      }));
-
-    if (goals.length === 0) return null;
-
-    const gravityGoals = computeGoalGravity(
-      goals,
-      homeTeamName,
-      `${homeTeamName} vs ${awayTeamName}`,
-    );
-
+    // Client component polls goals + live stats so the metric panels keep
+    // moving through a live match (possession/shots drive them even at 0-0).
     return (
       <div className="space-y-4">
-        <MatchDNA
-          goals={goals}
+        <MatchPulse
+          matchId={dbMatch.id}
           homeTeamName={homeTeamName}
           awayTeamName={awayTeamName}
           homeTeamCode={homeTeamCode}
-          matchStatus={matchStatus}
-          currentMinute={currentMinute}
-        />
-        <GoalGravity
-          goals={gravityGoals}
-          homeTeamName={homeTeamName}
-          awayTeamName={awayTeamName}
-        />
-        <TransitionDangerRating
-          goals={goals}
-          homeTeamName={homeTeamName}
-          awayTeamName={awayTeamName}
+          awayTeamCode={awayTeamCode}
         />
         <PressingIntensityIndex
           matchId={dbMatch.id}
@@ -505,6 +467,16 @@ async function MatchDNAPanel({
         />
       </div>
     );
+  } catch {
+    return null;
+  }
+}
+
+async function MatchMarketsPanel({ fixtureId }: { fixtureId: number }) {
+  try {
+    const dbMatch = await prisma.match.findFirst({ where: { fixture: fixtureId }, select: { id: true } });
+    if (!dbMatch) return null;
+    return <MatchMarkets matchId={dbMatch.id} />;
   } catch {
     return null;
   }

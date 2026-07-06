@@ -18,12 +18,20 @@ interface KalshiRawMarket {
   volume_fp?: string;
 }
 
+export interface KalshiOutcomeDetail {
+  bid: number | null;   // best yes bid, dollars (0-1)
+  ask: number | null;   // best yes ask, dollars (0-1)
+  last: number | null;  // last trade price, dollars (0-1)
+  volume: number;       // contracts traded on this outcome
+}
+
 export interface KalshiLivePrices {
   home_win: number;
   draw: number;
   away_win: number;
   volume: number;
   tickers: { home_win: string; draw: string; away_win: string };
+  detail: { home_win: KalshiOutcomeDetail; draw: KalshiOutcomeDetail; away_win: KalshiOutcomeDetail };
   source: "live" | "cache";
 }
 
@@ -227,6 +235,13 @@ export async function getKalshiMarkets(
 
     const totalVol = parseVolume(homeMarket?.volume_fp) + parseVolume(drawMarket?.volume_fp) + parseVolume(awayMarket?.volume_fp);
 
+    const toDetail = (m: KalshiRawMarket | null): KalshiOutcomeDetail => ({
+      bid:    parseDollars(m?.yes_bid_dollars) ?? null,
+      ask:    parseDollars(m?.yes_ask_dollars) ?? null,
+      last:   parseDollars(m?.last_price_dollars) ?? null,
+      volume: parseVolume(m?.volume_fp),
+    });
+
     const result: KalshiLivePrices = {
       home_win:  Math.round(homeWinPrice * 100) / 100,
       draw:      Math.round(drawPrice * 100) / 100,
@@ -236,6 +251,11 @@ export async function getKalshiMarkets(
         home_win: homeMarket?.ticker ?? "",
         draw:     drawMarket?.ticker ?? "",
         away_win: awayMarket?.ticker ?? "",
+      },
+      detail: {
+        home_win: toDetail(homeMarket),
+        draw:     toDetail(drawMarket),
+        away_win: toDetail(awayMarket),
       },
       source: "live",
     };

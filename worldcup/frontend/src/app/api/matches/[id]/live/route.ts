@@ -2,11 +2,34 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { simulateStats, simulateMarkets, elapsedFromDate, statusFromElapsed } from "@/lib/simulation";
 import { getKalshiMarkets } from "@/lib/kalshi";
+import { getFixtureStatistics } from "@/lib/liveStats";
 import { getFDLiveMatch } from "@/lib/footballData";
 import { getTeamTournamentProb } from "@/lib/polymarket";
 import { liveWinProbability, preMatchWinProbFromTournamentOdds } from "@/lib/probabilities";
 
 const AF_BASE = "https://v3.football.api-sports.io";
+
+// Flatten TeamLiveStats into the LiveMetrics record shape the UI reads.
+// Null (unreported) stats are omitted rather than zeroed — a 0 is a claim.
+function toMetricMap(s: import("@/lib/liveStats").TeamLiveStats): Record<string, number> {
+  const pairs: [string, number | null][] = [
+    ["possession", s.possession],
+    ["shots_on", s.shotsOn],
+    ["shots_off", s.shotsOff],
+    ["total_shots", s.totalShots],
+    ["blocked_shots", s.blockedShots],
+    ["corners", s.corners],
+    ["fouls", s.fouls],
+    ["offsides", s.offsides],
+    ["yellow_cards", s.yellowCards],
+    ["red_cards", s.redCards],
+    ["saves", s.saves],
+    ["passes", s.passes],
+    ["pass_accuracy", s.passAccuracy],
+    ["xg", s.xg],
+  ];
+  return Object.fromEntries(pairs.filter(([, v]) => v !== null)) as Record<string, number>;
+}
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
   ET: "LIVE", BT: "HT", P: "LIVE",
@@ -84,11 +107,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const homeScore = afMatch?.homeScore ?? fdMatch?.homeScore ?? match.homeScore;
   const awayScore = afMatch?.awayScore ?? fdMatch?.awayScore ?? match.awayScore;
 
-  // Detailed stats — always simulated
-  const metrics: Record<string, Record<string, number>> = {
-    [homeCode]: simulateStats(homeCode, elapsed, match.fixture) as unknown as Record<string, number>,
-    [awayCode]: simulateStats(awayCode, elapsed, match.fixture) as unknown as Record<string, number>,
-  };
+  // Detailed team stats — REAL api-football /fixtures/statistics when the feed
+  // has them (live + finished games), otherwise the sim placeholder which the
+  // UI hides (dataSources.stats === "sim" gates every stats surface).
+  const liveStats = (status !== "NS")
+    ? await getFixtureStatistics(match.fixture, match.homeTeam.name, status === "LIVE" || status === "HT")
+    : null;
+
+  const metrics: Record<string, Record<string, number>> = liveStats
+    ? {
+        [homeCode]: toMetricMap(liveStats.home),
+        [awayCode]: toMetricMap(liveStats.away),
+      }
+    : {
+        [homeCode]: simulateStats(homeCode, elapsed, match.fixture) as unknown as Record<string, number>,
+        [awayCode]: simulateStats(awayCode, elapsed, match.fixture) as unknown as Record<string, number>,
+      };
 
   // Market prices: real Kalshi > simulation
   const simPrices = simulateMarkets(elapsed, match.fixture);
@@ -120,12 +154,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     metrics,
     markets: enrichedMarkets,
     kalshiTickers: kalshi ? kalshi.tickers : null,
+    kalshiLive: kalshi, // full live market snapshot (prices, per-outcome bid/ask, volume) — null when no market found
     liveProbs,
     tournamentOdds: { home: homeW, away: awayW },
     dataSources: {
       match:   afMatch ? "api-football" : fdMatch ? fdMatch.source : "sim",
       markets: kalshi  ? kalshi.source  : "sim",
-      stats:   "sim",
+      stats:   liveStats ? "api-football" : "sim",
       probs:   (homeW !== null && awayW !== null) ? "polymarket" : "unavailable",
     },
   }, {
