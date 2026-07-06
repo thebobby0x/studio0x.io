@@ -227,7 +227,7 @@ export default function LiveMatchBanner() {
       } catch { /* ignore */ }
     }
     loadLive();
-    const id = setInterval(loadLive, 15_000);
+    const id = setInterval(loadLive, 10_000);
     return () => clearInterval(id);
   }, []);
 
