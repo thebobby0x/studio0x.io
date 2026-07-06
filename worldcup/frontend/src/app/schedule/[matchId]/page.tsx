@@ -5,6 +5,7 @@ import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import { KNOCKOUT_START } from "@/lib/tournament";
 import GroupWinnerTickers from "@/components/sentiment/GroupWinnerTickers";
 import LiveWinMeter from "@/components/stats/LiveWinMeter";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
@@ -61,7 +62,9 @@ function buildGroupTable(matches: ScheduleMatch[], group: string): GroupEntry[] 
   };
 
   for (const m of matches) {
-    if (m.group !== group || m.status !== "FT") continue;
+    // Group-stage games only — knockout matches carry an inherited `group` from
+    // the home team and must never count toward a group table.
+    if (m.group !== group || m.status !== "FT" || new Date(m.utcDate) >= KNOCKOUT_START) continue;
     const h = ensure(m.homeTeam.tla, m.homeTeam.name);
     const a = ensure(m.awayTeam.tla, m.awayTeam.name);
     const hg = m.homeScore ?? 0;
@@ -73,9 +76,9 @@ function buildGroupTable(matches: ScheduleMatch[], group: string): GroupEntry[] 
     else              { h.d++; h.pts++; a.d++; a.pts++; }
   }
 
-  // Ensure all teams in group appear even with 0 games
+  // Ensure all teams in group appear even with 0 games (group-stage only)
   for (const m of matches) {
-    if (m.group !== group) continue;
+    if (m.group !== group || new Date(m.utcDate) >= KNOCKOUT_START) continue;
     ensure(m.homeTeam.tla, m.homeTeam.name);
     ensure(m.awayTeam.tla, m.awayTeam.name);
   }
@@ -104,13 +107,21 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
   const isLive = m.status === "LIVE" || m.status === "HT";
   const isDone = m.status === "FT";
-  const groupLabel = m.group ? `Group ${m.group}` : m.stageLabel;
 
-  // Group context
-  const groupMatches = m.group
-    ? allMatches.filter(x => x.group === m.group && x.id !== m.id)
+  // Knockout matches inherit a `group` from the home team, but they are NOT
+  // group matches: group standings are final, group-winner markets are settled,
+  // and filtering fixtures by that group would sweep in knockout results and
+  // drag non-group opponents into the table (wrong info). So: no group
+  // furniture on knockout pages — the round label tells the real story.
+  const isKnockout = new Date(m.utcDate) >= KNOCKOUT_START;
+  const showGroupContext = !!m.group && !isKnockout;
+  const groupLabel = showGroupContext ? `Group ${m.group}` : m.stageLabel;
+
+  // Group context (group-stage matches only)
+  const groupMatches = showGroupContext
+    ? allMatches.filter(x => x.group === m.group && x.id !== m.id && new Date(x.utcDate) < KNOCKOUT_START)
     : [];
-  const table = m.group ? buildGroupTable(allMatches, m.group) : [];
+  const table = showGroupContext ? buildGroupTable(allMatches, m.group!) : [];
 
   // Venue info from static lookup (football-data free tier has no venue data)
   const venueFromDB = await prisma.match.findFirst({ where: { fixture: m.id }, select: { venue: true } }).catch(() => null);
@@ -239,7 +250,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             {venueInfo && venueFromDB?.venue && (
               <HeroWeather venueName={venueFromDB.venue} />
             )}
-            {m.group && (
+            {showGroupContext && (
               <Link href={`/schedule?group=${m.group}`} className="flex items-center gap-1.5 text-brand-gold hover:text-amber-300 transition-colors">
                 <CalendarDays size={12} />
                 Group {m.group} fixtures
@@ -276,10 +287,10 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {/* Live win probability meter — DB match needed for matchId */}
         <MatchWinMeter fixtureId={m.id} />
 
-        {/* Group winner prediction markets */}
-        {m.group && (
+        {/* Group winner prediction markets — group stage only (settled once knockouts begin) */}
+        {showGroupContext && (
           <GroupWinnerTickers
-            group={m.group}
+            group={m.group!}
             highlightTeams={[m.homeTeam.name, m.awayTeam.name]}
           />
         )}
