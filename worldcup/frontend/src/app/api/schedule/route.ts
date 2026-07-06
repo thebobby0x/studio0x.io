@@ -34,7 +34,10 @@ const STAGE_LABELS: Record<string, string> = {
   FINAL:           "Final",
 };
 
-// Static group assignments for WC 2026
+// Static group assignments for WC 2026.
+// Group E lists both CUW and CUR — they are the SAME team (Curaçao); CUR is a
+// defensive alias for feeds that emit the non-FIFA code. Every group has
+// exactly four teams.
 const TEAM_GROUPS: Record<string, string> = {
   MEX: "A", RSA: "A", KOR: "A", CZE: "A",
   CAN: "B", BIH: "B", QAT: "B", SUI: "B",

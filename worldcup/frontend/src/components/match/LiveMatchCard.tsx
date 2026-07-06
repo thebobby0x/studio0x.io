@@ -187,8 +187,19 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
                 {match.awayScore}
               </div>
               <div className="mt-3 flex items-center justify-center gap-1.5">
-                <Wifi size={11} className="text-brand-green" />
-                <span className="text-[11px] text-brand-green font-semibold">Updating live</span>
+                {/* Honest badge: "sim" means the live feed is unreachable and the
+                    score is the last DB state — never claim it's updating. */}
+                {dataSources?.match !== "sim" ? (
+                  <>
+                    <Wifi size={11} className="text-brand-green" />
+                    <span className="text-[11px] text-brand-green font-semibold">Updating live</span>
+                  </>
+                ) : (
+                  <>
+                    <Wifi size={11} className="text-amber-500" />
+                    <span className="text-[11px] text-amber-500 font-semibold">Reconnecting — score may lag</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -263,7 +274,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
           {capacityStr && match.venue !== "World Cup Stadium" && (
             <div className="flex items-center gap-1.5 text-[10px] text-slate-600 ml-5">
               <Users size={10} />
-              <span>Capacity {capacityStr} · Est. sold out</span>
+              <span>Capacity {capacityStr}</span>
             </div>
           )}
           {venueInfo && (

@@ -162,7 +162,7 @@ ${resultsList}
 Return ONLY a JSON object, no other text:
 {
   "headline": "Punchy day round-up headline, max 12 words",
-  "body": "4-6 sentences summarising the day's storylines across these matches. Pick out the standout result, any upsets, and what it means for the tournament. Authoritative, engaging, The Athletic style. No fluff."
+  "body": "4-6 sentences summarising the day's storylines across these matches. Pick out the standout result, any upsets, and what it means for the tournament. Authoritative, engaging, The Athletic style. IMPORTANT: You only have the final scores listed above — do NOT invent player names, goal scorers, minutes, or any match events. Stick strictly to the results and their implications. No fluff."
 }`;
     try {
       const msg = await client.messages.create({

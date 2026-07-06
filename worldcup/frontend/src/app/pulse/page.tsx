@@ -122,7 +122,7 @@ function CityCard({
         <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-slate-900/60 px-2.5 py-2">
             <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">
-              Arrivals/day
+              Est. arrivals/day
             </div>
             <div className="text-sm font-black text-white">{fmtNum(city.peakArrivals)}</div>
           </div>
@@ -163,7 +163,7 @@ function CityCard({
             <div className="flex items-center gap-2">
               <Plane size={12} className="text-slate-500 shrink-0" />
               <div>
-                <div className="text-[9px] text-slate-600">Intl flights/day</div>
+                <div className="text-[9px] text-slate-600">Est. intl flights/day</div>
                 <div className="text-xs font-semibold text-white">
                   {city.intlFlightsPerDay.toLocaleString()}
                 </div>
@@ -174,15 +174,15 @@ function CityCard({
               <div>
                 <div className="text-[9px] text-slate-600">International fans</div>
                 <div className="text-xs font-semibold text-white">
-                  {city.intlSharePct}% of arrivals
+                  ~{city.intlSharePct}% of arrivals
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <DollarSign size={12} className="text-slate-500 shrink-0" />
               <div>
-                <div className="text-[9px] text-slate-600">Avg hotel/night</div>
-                <div className="text-xs font-semibold text-white">${city.hotelRateUsd}</div>
+                <div className="text-[9px] text-slate-600">Est. hotel/night</div>
+                <div className="text-xs font-semibold text-white">~${city.hotelRateUsd}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export default function PulsePage() {
             World Cup <span className="text-brand-gold">2026</span> Travel Pulse
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            32 nations · 16 host cities · real-time fan arrivals and team movements
+            32 nations · 16 host cities · live flight tracking + modelled fan-travel estimates
           </p>
         </div>
 
@@ -679,8 +679,9 @@ export default function PulsePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · FIFA World Cup 2026 · Flight paths refresh every 60s · Revenue figures are
-        estimates
+        studio0x.io · FIFA World Cup 2026 · Flight paths refresh every 60s · Arrivals, flights,
+        hotel rates and revenue are modelled estimates from stadium capacity + travel baselines,
+        not measured data
       </footer>
     </div>
   );

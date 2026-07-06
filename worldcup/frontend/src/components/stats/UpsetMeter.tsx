@@ -43,10 +43,12 @@ function computeUpsetFactor(data: LiveData): UpsetStats | null {
     factor >= 35 ? "Expected" :
     "Dominant Win";
 
+  // Probabilities are OUR model (derived from Polymarket tournament odds),
+  // not a quoted market price — say "modelled" so it never reads as one.
   const description = isUpset && winner
-    ? `${winner} upset ${favorite} (${Math.round(favoriteProb * 100)}% pre-match favorite)`
+    ? `${winner} upset ${favorite} (modelled ${Math.round(favoriteProb * 100)}% pre-match favorite)`
     : result === "draw"
-    ? `Draw — ${Math.round(drawProb * 100)}% likely pre-match`
+    ? `Draw — modelled at ${Math.round(drawProb * 100)}% pre-match`
     : `${favorite} won as expected`;
 
   return { factor, label, description, isUpset, favoriteProb, winner };
@@ -81,7 +83,7 @@ export default function UpsetMeter({ matchId }: { matchId: string }) {
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Upset Factor™</span>
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
-        <span className="text-[9px] text-slate-700 uppercase tracking-wider">vs pre-match tournament odds</span>
+        <span className="text-[9px] text-slate-700 uppercase tracking-wider">modelled from Polymarket tournament odds</span>
       </div>
 
       <div className="px-4 py-4 space-y-3">

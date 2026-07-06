@@ -47,18 +47,21 @@ function goalGravityPeak(homeScore: number, awayScore: number, total: number): s
   return "Moderate";
 }
 
+// Labels below are derived from the FINAL SCORE ONLY — never claim data we
+// don't have (possession, exact goal gaps). The AI cites these verbatim as
+// "Studio0x readings", so a fabricated stat here becomes a published lie.
 function strikeClock(total: number): string {
-  if (total === 0) return "Goalless — high pressure, low conversion";
-  if (total >= 5) return "High-Scoring rhythm (avg gap ~18 min)";
-  if (total >= 3) return "Active (avg gap ~27 min)";
+  if (total === 0) return "Goalless";
+  if (total >= 5) return `High-scoring rhythm — ${total} goals`;
+  if (total >= 3) return `Active — ${total} goals`;
   if (total === 1) return "Single decisive strike";
-  return "Measured (avg gap ~38 min)";
+  return "Measured — 2 goals";
 }
 
 function momentumLabel(homeScore: number, awayScore: number, homeName: string, awayName: string): string {
-  if (homeScore > awayScore) return `${homeName} controlled — won possession battle`;
-  if (awayScore > homeScore) return `${awayName} momentum — away team outperformed`;
-  return "Evenly contested — neither side gained sustained advantage";
+  if (homeScore > awayScore) return `${homeName} finished on top on the scoreboard`;
+  if (awayScore > homeScore) return `${awayName} took it on the road`;
+  return "Level on the scoreboard — spoils shared";
 }
 
 function buildMatchMetrics(
@@ -89,7 +92,7 @@ Our proprietary stats:
 - Clutch Index™: Weighted scorer rating — lead-changing goals score 3x, equalisers 2.5x, late goals (80'+) get a 1.5x multiplier
 - Strike Clock™: Goal timing rhythm (first strike minute, average gap between goals, rhythm label)
 - Score Volatility™: Drama index — counts lead changes and equalisers
-- Momentum Pulse™: Which team held momentum across the 45/90 minute window
+- Momentum Pulse™: Scoreboard momentum reading (derived from the final result)
 - Goal Gravity™: Most impactful goal in a match, ranked by score context and timing
 
 GROUP STANDINGS SNAPSHOT:
