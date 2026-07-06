@@ -1,5 +1,11 @@
 // Deterministic, serverless-compatible match simulation.
 // No background process needed — state is computed from elapsed time + seeded RNG.
+//
+// ⚠️ QUARANTINE: everything in this file is FABRICATED data (simulateStats
+// gives every unknown team Mexico's baseline numbers). It exists only as a
+// dev/demo fallback and MUST stay behind a dataSources gate: any route using
+// these values must tag them "sim", and no UI may render values tagged "sim"
+// as if they were real. Real team stats come from lib/liveStats.ts.
 
 function seededRand(seed: number): () => number {
   let s = seed;

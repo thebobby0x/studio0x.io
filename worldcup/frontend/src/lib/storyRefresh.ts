@@ -108,7 +108,7 @@ ${prevContext}
 Return ONLY valid JSON, no other text:
 {
   "headline": "Pre-match headline, max 12 words, build anticipation",
-  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference the group context and what is at stake. Only cite results visible above — do not invent stats."
+  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference the group context and what is at stake. STRICT: only cite the results visible above — do not invent stats, player names, injuries, suspensions, or historical results/anecdotes not shown. General, well-known context (e.g. a nation's footballing pedigree) is fine; specific invented facts are not."
 }`;
 
       try {

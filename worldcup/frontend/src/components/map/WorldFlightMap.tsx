@@ -225,8 +225,11 @@ export default function WorldFlightMap() {
 
   // Derived state
   const densityByName  = Object.fromEntries(density.map(d => [d.name, d.count]));
+  const estimatedByName = Object.fromEntries(density.map(d => [d.name, d.estimated ?? false]));
   const maxDensity     = Math.max(1, ...density.map(d => d.count));
   const totalAircraft  = density.reduce((s, d) => s + d.count, 0);
+  // Any estimated venue → counts are schedule-based estimates, not live OpenSky
+  const densityEstimated = density.some(d => d.estimated);
   const offset         = -((dashOffset % 10));
   const followedArc    = followTla ? arcs.find(a => a.tla === followTla) ?? null : null;
   const venueInfo      = selectedVenue ? getVenueInfo(selectedVenue) : null;
@@ -287,7 +290,7 @@ export default function WorldFlightMap() {
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? color : "#334155" }} />
                 {label}
-                {id === "density"    && on && totalAircraft > 0  && <span className="ml-0.5 opacity-60">{totalAircraft}</span>}
+                {id === "density"    && on && totalAircraft > 0  && <span className="ml-0.5 opacity-60">{densityEstimated ? `~${totalAircraft} est.` : totalAircraft}</span>}
                 {id === "home-arcs" && on && homeArcCount > 0   && <span className="ml-0.5 opacity-60">{homeArcCount} teams</span>}
                 {id === "venue-hops"&& on && venueHopCount > 0  && <span className="ml-0.5 opacity-60">{venueHopCount} teams</span>}
               </button>
@@ -353,13 +356,16 @@ export default function WorldFlightMap() {
           const pt      = dot(venue.lng, venue.lat);
           if (!pt) return null;
           const count     = densityByName[venue.name] ?? 0;
+          const isEst     = estimatedByName[venue.name] ?? false;
           const intensity = count > 0 ? count / maxDensity : 0;
           return (
             <g key={`heat-${venue.name}`}>
               <circle cx={pt[0]} cy={pt[1]} r={6} fill="none" stroke={BLUE} strokeWidth={0.8} strokeOpacity={0.2} />
               {count > 0 && (
+                // Estimated counts render dashed + fainter so they never pass as live radar
                 <circle cx={pt[0]} cy={pt[1]} r={10 + intensity * 30} fill="none" stroke={BLUE}
-                  strokeWidth={1.5} strokeOpacity={0.15 + intensity * 0.4} />
+                  strokeWidth={1.5} strokeOpacity={isEst ? 0.1 + intensity * 0.25 : 0.15 + intensity * 0.4}
+                  strokeDasharray={isEst ? "3 3" : undefined} />
               )}
             </g>
           );
@@ -510,7 +516,7 @@ export default function WorldFlightMap() {
         <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
           <svg width="10" height="10" viewBox="0 0 10 10">
             <circle cx="5" cy="5" r="4" fill="none" stroke={BLUE} strokeWidth="1.5" strokeOpacity="0.6" />
-          </svg>Fan flights
+          </svg>Fan flights{densityEstimated ? " (dashed = est.)" : " (live)"}
         </div>
       </div>
     </div>

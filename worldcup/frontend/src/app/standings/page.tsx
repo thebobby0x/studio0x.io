@@ -313,7 +313,7 @@ function GroupCard({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-amber-500/10 border-l-2 border-amber-500/50" />
-            Potential play-off
+            3rd place — best 8 advance
           </span>
         </div>
       )}

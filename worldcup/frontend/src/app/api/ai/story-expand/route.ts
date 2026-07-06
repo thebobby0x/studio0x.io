@@ -72,15 +72,15 @@ SUMMARY: ${body}
 Write a deep-dive editorial expanding on this story. Structure it with these three sections, each with a bold heading:
 
 **The Full Picture**
-3-4 sentences expanding the tactical, statistical, or narrative context behind the story. Be specific — reference formations, player roles, match minutes, xG-style analysis, or group stage implications.
+3-4 sentences expanding the context behind the story. Ground every claim in the facts stated in the HEADLINE and SUMMARY above — you may interpret and analyse them, but do NOT invent specifics that are not given: no made-up formations, player names, match minutes, statistics, or xG figures. If the summary lacks a detail, discuss the situation in general terms instead of fabricating it.
 
 **Historical Context**
-2-3 sentences placing this in the broader history of these teams or the World Cup. Reference past tournaments, rivalries, or comparable moments when relevant.
+2-3 sentences placing this in the broader history of these teams or the World Cup. Speak in general, well-known terms (e.g. a nation's pedigree or past deep runs) — do NOT cite specific historical scorelines, years, match incidents, or statistics unless they appear in the summary above, and never invent a historical anecdote.
 
 **What to Watch Next**
-2-3 sentences on the direct consequences — upcoming fixtures, player situations to monitor, group stage mathematics, or tactical adjustments to expect.
+2-3 sentences on the direct consequences — what a result like this typically means for a side's path, situations to monitor, or tactical questions it raises. Only reference specific upcoming fixtures or standings if they are stated above.
 
-Write in the authoritative-but-engaging style of The Athletic. No fluff, no filler. 350-450 words total. Do not add any intro or outro beyond the three sections.`,
+Write in the authoritative-but-engaging style of The Athletic. No fluff, no filler. 350-450 words total. Accuracy beats specificity: a general true statement always beats an invented specific one. Do not add any intro or outro beyond the three sections.`,
     }],
   });
 
