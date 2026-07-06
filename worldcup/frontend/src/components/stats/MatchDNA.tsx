@@ -1,6 +1,42 @@
 "use client";
 
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
+import type { TeamLiveStats } from "@/lib/liveStats";
+
+// ── Live Pressure (from real team stats) ──────────────────────────────────────
+// Momentum share derived from api-football live statistics so the panel moves
+// even at 0-0. Weights: possession 35%, total shots 25%, on target 25%,
+// corners 15% — each component only counts when the feed reports it.
+function computeLivePressure(home: TeamLiveStats, away: TeamLiveStats) {
+  const parts: { w: number; h: number; a: number }[] = [];
+  if (home.possession !== null && away.possession !== null && home.possession + away.possession > 0)
+    parts.push({ w: 0.35, h: home.possession, a: away.possession });
+  if (home.totalShots !== null && away.totalShots !== null && home.totalShots + away.totalShots > 0)
+    parts.push({ w: 0.25, h: home.totalShots, a: away.totalShots });
+  if (home.shotsOn !== null && away.shotsOn !== null && home.shotsOn + away.shotsOn > 0)
+    parts.push({ w: 0.25, h: home.shotsOn, a: away.shotsOn });
+  if (home.corners !== null && away.corners !== null && home.corners + away.corners > 0)
+    parts.push({ w: 0.15, h: home.corners, a: away.corners });
+
+  if (parts.length === 0) return null;
+
+  const totalW = parts.reduce((s, p) => s + p.w, 0);
+  const homeShare = parts.reduce((s, p) => s + (p.h / (p.h + p.a)) * (p.w / totalW), 0);
+  return Math.round(homeShare * 100);
+}
+
+function StatDuel({ label, home, away, suffix = "" }: { label: string; home: number | null; away: number | null; suffix?: string }) {
+  if (home === null && away === null) return null;
+  return (
+    <div className="bg-slate-900/40 rounded-lg px-2.5 py-1.5 text-center">
+      <div className="flex items-center justify-between gap-1 text-xs font-black tabular-nums">
+        <span className="text-brand-green">{home ?? "—"}{home !== null ? suffix : ""}</span>
+        <span className="text-amber-400">{away ?? "—"}{away !== null ? suffix : ""}</span>
+      </div>
+      <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-0.5">{label}</div>
+    </div>
+  );
+}
 
 // ── Clutch Index™ ─────────────────────────────────────────────────────────────
 // Weight per goal: lead-changing = 3, equalising = 2.5, extending = 1, OG = 0.5
@@ -270,23 +306,37 @@ interface Props {
   homeTeamName: string;
   awayTeamName: string;
   homeTeamCode: string;
+  awayTeamCode?: string;
   matchStatus?: string;
   currentMinute?: number;
+  // Real live team stats (api-football /fixtures/statistics). When present the
+  // panel moves even at 0-0 — possession, shots, corners drive Live Pressure.
+  stats?: { home: TeamLiveStats; away: TeamLiveStats } | null;
 }
 
-export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCode, matchStatus, currentMinute }: Props) {
+export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCode, awayTeamCode, matchStatus, currentMinute, stats }: Props) {
   const homeGoals = goals.filter(g => !g.isOwnGoal ? g.team === homeTeamName : g.team !== homeTeamName);
   const awayGoals = goals.filter(g => !g.isOwnGoal ? g.team !== homeTeamName : g.team === homeTeamName);
-  const ci  = computeClutchIndex(goals, homeTeamName);
+  // Clutch Index credits named scorers — reconstructed (pending) goals have no
+  // confirmed scorer and must never appear as a player row.
+  const ci  = computeClutchIndex(goals.filter(g => !g.pending), homeTeamName);
   const maxCI = Math.max(...ci.map(p => p.ci), 3);
   const sc  = computeStrikeClock(goals);
   const sv  = computeScoreVolatility(goals, homeTeamName);
   const mp  = computeMomentumPulse(goals, homeTeamName, matchStatus, currentMinute);
   const noGoals = goals.length === 0;
+  const hasPending = goals.some(g => g.pending);
   const svLabel = noGoals ? "Level" : sv.dramaLabel;
   const svEmoji = noGoals ? "⚖️" : sv.dramaEmoji;
 
-  void homeTeamCode;
+  const isLive = matchStatus === "LIVE" || matchStatus === "HT";
+  const pressure = stats ? computeLivePressure(stats.home, stats.away) : null;
+  const combinedSOG = stats && (stats.home.shotsOn !== null || stats.away.shotsOn !== null)
+    ? (stats.home.shotsOn ?? 0) + (stats.away.shotsOn ?? 0)
+    : null;
+  const combinedShots = stats && (stats.home.totalShots !== null || stats.away.totalShots !== null)
+    ? (stats.home.totalShots ?? 0) + (stats.away.totalShots ?? 0)
+    : null;
 
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
@@ -298,6 +348,13 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         </div>
         <span className="text-[9px] text-slate-700 uppercase tracking-wider">Goal timeline · 0–95&apos;</span>
       </div>
+
+      {/* Reconstructed-timeline disclosure — events feed lagging the score */}
+      {hasPending && (
+        <div className="px-4 py-1.5 bg-amber-500/5 border-b border-amber-500/10 text-[9px] text-amber-500/80">
+          ⏳ Goal times approximate — timeline reconstructed from the scoreline while the events feed catches up. Scorers to be confirmed.
+        </div>
+      )}
 
       <div className="px-4 py-4 space-y-4">
 
@@ -318,9 +375,35 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         <div className="border-t border-brand-border/50 pt-3">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
-            <span className="text-[8px] text-slate-600">Live goal timeline</span>
+            <span className="text-[8px] text-slate-600">{stats ? "Goals + live pressure" : "Live goal timeline"}</span>
           </div>
           <MomentumTimeline pulse={mp} matchStatus={matchStatus} currentMinute={currentMinute} />
+
+          {/* Live Pressure — real team stats, moves every refresh even at 0-0 */}
+          {stats && pressure !== null && (
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-bold">
+                <span className="text-brand-green">{homeTeamCode} {pressure}%</span>
+                <span className="text-[8px] text-slate-600 uppercase tracking-wider">Live pressure</span>
+                <span className="text-amber-400">{100 - pressure}% {awayTeamCode ?? ""}</span>
+              </div>
+              <div className="flex h-2 rounded-full overflow-hidden bg-slate-800">
+                <div className="bg-brand-green/80 transition-all duration-700" style={{ width: `${pressure}%` }} />
+                <div className="bg-amber-500/80 transition-all duration-700" style={{ width: `${100 - pressure}%` }} />
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                <StatDuel label="Possession" home={stats.home.possession} away={stats.away.possession} suffix="%" />
+                <StatDuel label="Shots" home={stats.home.totalShots} away={stats.away.totalShots} />
+                <StatDuel label="On Target" home={stats.home.shotsOn} away={stats.away.shotsOn} />
+                <StatDuel label="Corners" home={stats.home.corners} away={stats.away.corners} />
+                <StatDuel label="Passes" home={stats.home.passes} away={stats.away.passes} />
+                <StatDuel label="xG" home={stats.home.xg} away={stats.away.xg} />
+              </div>
+              <div className="text-[8px] text-slate-700">
+                Pressure = possession · shots · on-target · corners, weighted — live team stats via api-football
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Strike Clock™ */}
@@ -336,15 +419,19 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
             </div>
             <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
               <div className="text-xl font-black text-white tabular-nums leading-none">
-                {sc ? (sc.avgGap !== null ? `${sc.avgGap}m` : `${sc.total}G`) : "—"}
+                {sc ? (sc.avgGap !== null ? `${sc.avgGap}m` : `${sc.total}G`) : combinedShots !== null ? combinedShots : "—"}
               </div>
               <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">
-                {sc && sc.avgGap !== null ? "Avg Gap" : "Goals"}
+                {sc ? (sc.avgGap !== null ? "Avg Gap" : "Goals") : combinedShots !== null ? "Total Shots" : "Goals"}
               </div>
             </div>
             <div className="bg-slate-900/60 rounded-xl p-2.5 text-center">
-              <div className="text-xl leading-none">{sc ? sc.rhythmEmoji : "⏱"}</div>
-              <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">{sc ? sc.rhythm : "Awaiting"}</div>
+              <div className="text-xl leading-none">
+                {sc ? sc.rhythmEmoji : combinedSOG !== null ? (combinedSOG >= 5 ? "🧨" : "🔒") : "⏱"}
+              </div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-1">
+                {sc ? sc.rhythm : combinedSOG !== null ? (combinedSOG >= 5 ? "Brewing" : "Cagey") : "Awaiting"}
+              </div>
             </div>
           </div>
         </div>
@@ -365,6 +452,11 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
               <span className="text-sm font-black text-white tabular-nums">{sv.equalisers}</span>
             </div>
           </div>
+          {noGoals && isLive && combinedSOG !== null && (
+            <div className="mt-2 text-[10px] text-slate-500">
+              Scoreboard level — but {combinedSOG} shot{combinedSOG === 1 ? "" : "s"} on target say the breakthrough is coming.
+            </div>
+          )}
         </div>
 
         {/* Clutch Index™ */}
@@ -390,6 +482,12 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
                   <span className="text-[8px] text-slate-700 w-8 shrink-0">{p.goals}G</span>
                 </div>
               ))}
+            </div>
+          ) : hasPending ? (
+            <div className="text-[10px] text-slate-600 italic py-1">Scorer confirmation pending — Clutch Index resumes once the events feed names the scorer.</div>
+          ) : isLive && combinedSOG !== null ? (
+            <div className="text-[10px] text-slate-600 italic py-1">
+              Awaiting first goal — {combinedSOG} shot{combinedSOG === 1 ? "" : "s"} on target so far. Someone is warming up.
             </div>
           ) : (
             <div className="text-[10px] text-slate-600 italic py-1">Awaiting first goal…</div>

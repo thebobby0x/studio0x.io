@@ -25,10 +25,17 @@ export interface LiveMetrics {
     possession?: number
     shots_on?: number
     shots_off?: number
+    total_shots?: number
+    blocked_shots?: number
     corners?: number
     fouls?: number
+    offsides?: number
     yellow_cards?: number
     red_cards?: number
+    saves?: number
+    passes?: number
+    pass_accuracy?: number
+    xg?: number
   }
 }
 
@@ -57,9 +64,26 @@ export interface AudioStream {
 }
 
 export interface DataSources {
-  match:   "live" | "cache" | "sim"
+  match:   "live" | "cache" | "sim" | "api-football"
   markets: "live" | "cache" | "sim"
-  stats:   "sim"
+  stats:   "api-football" | "sim"
+}
+
+export interface KalshiOutcomeDetail {
+  bid: number | null
+  ask: number | null
+  last: number | null
+  volume: number
+}
+
+export interface KalshiLiveSnapshot {
+  home_win: number
+  draw: number
+  away_win: number
+  volume: number
+  tickers: { home_win: string; draw: string; away_win: string }
+  detail: { home_win: KalshiOutcomeDetail; draw: KalshiOutcomeDetail; away_win: KalshiOutcomeDetail }
+  source: "live" | "cache"
 }
 
 export interface LiveData {
@@ -68,6 +92,7 @@ export interface LiveData {
   markets: KalshiMarket[]
   dataSources?: DataSources
   kalshiTickers?: { home_win: string; draw: string; away_win: string } | null
+  kalshiLive?: KalshiLiveSnapshot | null
   liveProbs?: { home: number; draw: number; away: number } | null
   tournamentOdds?: { home: number | null; away: number | null } | null
 }
