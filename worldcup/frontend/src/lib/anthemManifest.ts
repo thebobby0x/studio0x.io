@@ -76,6 +76,11 @@ export const ANTHEM_MANIFEST: AnthemSource[] = [
   { driveFileId: "14jd6YGxeDkvl8XA_snEBkKbtsCeXvB4W", teamCode: "JOR", title: "Suqur al'urdun" },
   { driveFileId: "1xW4iFpGPV1ilZYp2iEapBvlN6HGTff6j", teamCode: "NOR", title: "Norge! Løvene våkner!" },
 
+  // ── Team anthems (final 3 — FULL 48-team coverage 🎉) ──
+  { driveFileId: "1JlvL18iYFVztx1onYghjmnXBJt9sIN9W", teamCode: "SUI", title: "Hopp Schwiiz, Allez!" },
+  { driveFileId: "1dg0vCwDgXAChHKAKCEFGv9QiG44xPE-A", teamCode: "SWE", title: "Ge allt för Sverige" },
+  { driveFileId: "1ycd5S-VoiQeuLKSz-optieuQJQz00oxV", teamCode: "TUR", title: "Kırmızı-Beyaz Geliyor!" },
+
   // ── FIFA universal tracks (no team) ──
   { driveFileId: "1ghtOnRMhDf4mWLjYDeJNx5SMKSpXb28l", title: "We Already Won", durationSecs: 293 },
   { driveFileId: "1LYcYGLwU-H3P3CNrcfEKdGkhgkPRAKdh", title: "One Champion Above All Champions", durationSecs: 250 },
