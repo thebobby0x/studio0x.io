@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { maybeScheduleRefresh } from "@/lib/storyRefresh";
+import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -78,10 +79,10 @@ function buildMatchMetrics(
   ].join("\n");
 }
 
-function buildPrompt(matchData: string, metricsData: string, standingsData: string): string {
+function buildPrompt(matchData: string, metricsData: string, standingsData: string, knockoutStarted: boolean): string {
   return `You are Studio0x's AI sports analyst covering the 2026 FIFA World Cup. Write 5 original editorial news stories based on the tournament data below.
-
-RECENT MATCHES (last 14 days):
+${knockoutStarted ? "\nIMPORTANT: The group stage is OVER — the tournament is in the knockout rounds. Each match below is labeled with its stage. Never describe a knockout match (Round of 32/16, Quarter-final, Semi-final, Final) as a group game or say a knockout result affects a group table.\n" : ""}
+RECENT MATCHES (last 14 days, each labeled with its stage):
 ${matchData}
 
 STUDIO0X PROPRIETARY METRIC READINGS (per-match data):
@@ -95,7 +96,7 @@ Our proprietary stats:
 - Momentum Pulse™: Scoreboard momentum reading (derived from the final result)
 - Goal Gravity™: Most impactful goal in a match, ranked by score context and timing
 
-GROUP STANDINGS SNAPSHOT:
+GROUP STANDINGS SNAPSHOT (group-stage games only${knockoutStarted ? " — these are FINAL, settled tables" : ""}):
 ${standingsData}
 
 Write exactly 5 stories in JSON format:
@@ -139,17 +140,22 @@ async function generateStories(): Promise<Story[]> {
   for (const m of matches) {
     const date = new Date(m.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const result = m.homeScore > m.awayScore ? "W" : m.homeScore < m.awayScore ? "L" : "D";
+    // Stage label so the model never frames a knockout tie as a group game
+    const stage = new Date(m.date) >= KNOCKOUT_START
+      ? (classifyRound(new Date(m.date)) ?? "Knockout")
+      : `Group ${m.homeTeam.groupStage}`;
     matchLines.push(
-      `${date}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} [${result} for ${m.homeTeam.name}]`
+      `${date} [${stage}]: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} [${result} for ${m.homeTeam.name}]`
     );
     metricsLines.push(
       `${m.homeTeam.name} vs ${m.awayTeam.name} (${m.homeScore}-${m.awayScore}):\n${buildMatchMetrics(m.homeTeam.name, m.awayTeam.name, m.homeScore, m.awayScore)}`
     );
   }
 
-  // Build standings from all FT matches
+  // Build standings from GROUP-STAGE FT matches only — knockout results must
+  // never inflate a group table (groups are frozen after KNOCKOUT_START).
   const table: Record<string, { p: number; w: number; d: number; l: number; gf: number; ga: number; group: string }> = {};
-  for (const m of allMatches) {
+  for (const m of allMatches.filter(m => new Date(m.date) < KNOCKOUT_START)) {
     const hCode = m.homeTeam.code;
     const aCode = m.awayTeam.code;
     const hGroup = m.homeTeam.groupStage;
@@ -175,7 +181,7 @@ async function generateStories(): Promise<Story[]> {
     max_tokens: 2048,
     messages: [{
       role: "user",
-      content: buildPrompt(matchLines.join("\n"), metricsLines.join("\n\n"), standingsLines.join("\n")),
+      content: buildPrompt(matchLines.join("\n"), metricsLines.join("\n\n"), standingsLines.join("\n"), new Date() >= KNOCKOUT_START),
     }],
   });
 

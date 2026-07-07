@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -39,6 +40,25 @@ function dramaLabel(home: number, away: number): string {
   if (margin === 1) return "narrow win";
   if (margin >= 3) return "dominant win";
   return "controlled win";
+}
+
+// Stage context for prompts. Knockout matches must NEVER be framed as group
+// games — teams carry a residual groupStage field, but after KNOCKOUT_START
+// the group is history and "Group D performance" on an R16 story is wrong info.
+function stageContext(date: Date, groupStage: string): { label: string; stakes: string; isKnockout: boolean } {
+  if (date < KNOCKOUT_START) {
+    return {
+      label: `Group ${groupStage}`,
+      stakes: `the group context and what is at stake in Group ${groupStage}`,
+      isKnockout: false,
+    };
+  }
+  const round = classifyRound(date) ?? "Knockout round";
+  return {
+    label: round,
+    stakes: `what is at stake in this ${round} knockout tie — winner advances, loser goes home; do NOT mention any group`,
+    isKnockout: true,
+  };
 }
 
 /**
@@ -99,16 +119,17 @@ export async function runStoryRefresh(): Promise<{ ok: boolean; previewsWritten:
         ? `PREVIOUS RESULTS THIS TOURNAMENT FOR THESE TEAMS:\n${prevMatches.map(pm => `${pm.homeTeam.name} ${pm.homeScore}-${pm.awayScore} ${pm.awayTeam.name}`).join("\n")}`
         : "(First match of the tournament for both teams)";
 
+      const stage = stageContext(m.date, m.homeTeam.groupStage);
       const prompt = `You are Studio0x's AI football analyst. Write a pre-match preview for this upcoming World Cup 2026 match, kicking off in ${kickoffIn} minutes.
 
 MATCH: ${m.homeTeam.name} vs ${m.awayTeam.name}
-GROUP: ${m.homeTeam.groupStage}
+STAGE: ${stage.label}${stage.isKnockout ? " (knockout — the group stage is over; do NOT mention any group)" : ""}
 ${prevContext}
 
 Return ONLY valid JSON, no other text:
 {
   "headline": "Pre-match headline, max 12 words, build anticipation",
-  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference the group context and what is at stake. STRICT: only cite the results visible above — do not invent stats, player names, injuries, suspensions, or historical results/anecdotes not shown. General, well-known context (e.g. a nation's footballing pedigree) is fine; specific invented facts are not."
+  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference ${stage.stakes}. STRICT: only cite the results visible above — do not invent stats, player names, injuries, suspensions, or historical results/anecdotes not shown. General, well-known context (e.g. a nation's footballing pedigree) is fine; specific invented facts are not."
 }`;
 
       try {
@@ -157,16 +178,17 @@ Return ONLY valid JSON, no other text:
     const haveRecap = new Set(existingRecaps.map(s => s.fixture));
 
     for (const m of recentFT.filter(m => !haveRecap.has(m.fixture))) {
+      const stage = stageContext(m.date, m.homeTeam.groupStage);
       const prompt = `You are Studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a match recap.
 
 RESULT: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
 TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
-GROUP: ${m.homeTeam.groupStage}
+STAGE: ${stage.label}${stage.isKnockout ? " (knockout — the group stage is over; do NOT mention any group)" : ""}
 
 Return ONLY valid JSON:
 {
   "headline": "Match recap headline, max 11 words, reference both teams and the result",
-  "body": "2-3 sentences of authoritative match recap in The Athletic style. Reference the score and what it means for Group ${m.homeTeam.groupStage}. Do NOT invent player names, scorers, or match events."
+  "body": "2-3 sentences of authoritative match recap in The Athletic style. Reference the score and ${stage.stakes}. Do NOT invent player names, scorers, or match events."
 }`;
 
       try {
