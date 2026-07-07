@@ -63,21 +63,27 @@ export const ANTHEM_MANIFEST: AnthemSource[] = [
   { driveFileId: "1nM6BtJ_25_vuvdrbN--paaVbrpTwSmQD", teamCode: "SCO", title: "The Scottish Machine" },
   { driveFileId: "1jmVCyJoqzv6Q2JOOA5wsbKCBAvkeelEa", teamCode: "SEN", title: "Lions of Teranga (2026)" },
   { driveFileId: "1d25a8sujV6hLir8f5u21bTJryuDAyLWB", teamCode: "TUN", title: "Tunis Lelyom" },
+  // AUS/IRN audition rounds settled Jul 7: "The Socceroos" and Ghadamgari V2 won;
+  // the V1 audition copies were removed from this manifest (prune deletes their rows).
 
-  // ── Audition copies (owner is choosing between two versions) ──
-  // Schema allows ONE anthem per team, so the second version of each pair is
-  // imported UNLINKED (no teamCode) with its full filename as the title so both
-  // are playable side-by-side in the hub. Once the owner picks: move the winner's
-  // teamCode here if needed, delete the loser's entry, re-run finalize prune.
-  { driveFileId: "12qYSPEBj0hfvMtUHFpTfGfmvREETQkrS", title: "AUS - Socceroos 2026 V1" },
-  { driveFileId: "1uny3oG0-uOP0sEH2O0P4eS1GKQCAWkGb", title: "IRN - Ghadamgari (The Roaring Cheetah's) V1" },
+  // ── Team anthems (8 added Jul 7 evening) ──
+  { driveFileId: "1UhRSY-WgvpiYXvFkRKdzzs6Q_BdB8kgX", teamCode: "AUT", title: "Immer Wieder Österreich!" },
+  { driveFileId: "1Z6ojDd9Rsas0aUXe2zv70Tm-HFZfOTVx", teamCode: "COD", title: "C'est le Congo, Mon Pote.Les Léopards 2026. Fini!" },
+  { driveFileId: "15dI5BWOl1CfmupBIAmC9wa-PYAGv3LUO", teamCode: "CPV", title: "Tubarões Azuis in The House!" },
+  { driveFileId: "1gCXaBoqAKHDqlEinm4uPCVYbvT_a7o4o", teamCode: "CUW", title: "Esa es Curaçao, Dushi. ¡Sólido!" },
+  { driveFileId: "1xptAVSY1ir90bzLyUWr6T0WD7pkk0hbu", teamCode: "CZE", title: "Srdce Bojuje, Stadion Bouří" },
+  { driveFileId: "1RasbkvtYvEEhxgV3meynthr0WVaL8Fku", teamCode: "GER", title: "Der Fünfte  Sterne Auf der Brust" },
+  { driveFileId: "14jd6YGxeDkvl8XA_snEBkKbtsCeXvB4W", teamCode: "JOR", title: "Suqur al'urdun" },
+  { driveFileId: "1xW4iFpGPV1ilZYp2iEapBvlN6HGTff6j", teamCode: "NOR", title: "Norge! Løvene våkner!" },
 
   // ── FIFA universal tracks (no team) ──
   { driveFileId: "1ghtOnRMhDf4mWLjYDeJNx5SMKSpXb28l", title: "We Already Won", durationSecs: 293 },
   { driveFileId: "1LYcYGLwU-H3P3CNrcfEKdGkhgkPRAKdh", title: "One Champion Above All Champions", durationSecs: 250 },
   { driveFileId: "1qCkEY0HwxKah8awyJrX6jIRkjKX92iN9", title: "There Can Only Be One Number One", durationSecs: 151 },
   { driveFileId: "1pCgCapwESphxhdhgo99_zT7G4UHsWWX5", title: "World Cup Kings - We Ballin", durationSecs: 293 },
-  { driveFileId: "1YDettNc0_eiR-gxFAxyEVSx78CY2_Yk5", title: "Winners Get To Toast" },
+  // Re-uploaded Jul 7 under the "FIFA -" filename (same audio, new file ID) —
+  // this entry replaced the original "World Cup 26 - Winners Get To Toast" copy.
+  { driveFileId: "1W-HuiV6G37DnXtiPw62ISkc6gUnLRGih", title: "World Cup Winners Get To Toast" },
 ];
 
 // Derived map of team code → canonical title, for the relink/title-repair route.
