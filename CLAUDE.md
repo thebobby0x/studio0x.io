@@ -264,8 +264,11 @@ Score Volatility™, Clutch Index™, Goal Gravity™ Peak, Strike Clock™, Mom
 |---|---|---|
 | `/` | `app/page.tsx` | Dashboard: live match card, stories, standings, odds, predictions |
 | `/schedule` | `app/schedule/page.tsx` | All fixtures grouped by date |
-| `/schedule/[matchId]` | `app/schedule/[matchId]/page.tsx` | Match detail with all metrics |
+| `/schedule/[matchId]` | `app/schedule/[matchId]/page.tsx` | Match detail: all metrics + Live Match Market (Kalshi) + MatchPulse live polling |
 | `/standings` | `app/standings/page.tsx` | Group tables + Group Intensity™ + Elimination Proximity™ |
+| `/news` | `app/news/page.tsx` | AI news: previews, recaps, daily round-ups (15-min pinger keeps fresh) |
+| `/bracket` | `app/bracket/page.tsx` | Knockout bracket R32→Final |
+| `/officials` | `app/officials/page.tsx` | Referee profiles + Whistle Index™/Card Threshold™/Let It Flow™ + Officials on the Move |
 | `/leagues` | `app/leagues/page.tsx` | Club/league breakdown + CCI™ + PPI™ |
 | `/team/[tla]` | `app/team/[tla]/page.tsx` | Team detail (exists but sparse) |
 | `/pulse` | `app/pulse/page.tsx` | Travel pulse / fan origin map |
@@ -417,9 +420,30 @@ Never push directly to main.
     was silently dropped TWICE when relayed as a URL. Put destructive/multi-param actions behind
     **admin buttons** (URL baked into the fetch), not hand-typed URLs.
 
+20. **`dataSources` tags are load-bearing truth gates** — `/api/matches/[id]/live` tags every
+    payload section (`match`/`markets`/`stats`/`probs`) with its real source, and the UI HIDES
+    anything tagged `"sim"`. Real team stats come from `lib/liveStats.ts` (api-football
+    `/fixtures/statistics`); `lib/simulation.ts` is QUARANTINED fabricated data (every unknown
+    team gets Mexico's numbers). Never surface sim-tagged values as real, and never fabricate
+    scorer names — reconstructed goals use `scorer: "Scorer TBC"` + `pending: true` (goals route).
+
+21. **AI prompts must be grounded in provided data only** — every Claude prompt (commentary,
+    stories, previews, recaps, Go Deeper) carries explicit invent-bans: no player names,
+    formations, minutes, stats, injuries, or historical anecdotes not present in the prompt data.
+    When adding a new AI surface, copy the grounding rules; a missing guardrail = published
+    hallucinations (see docs/eod-2026-07-06.md, PR #108).
+
 ---
 
-## Current Production State (as of 2026-06-30)
+## Current Production State (as of 2026-07-06)
+
+**Jul 6 shipped (see `docs/eod-2026-07-06.md`, PRs #106–#110):** knockout pages no longer leak
+group panels/tables; **Live Match Market** (real Kalshi, bid/ask/volume/ticks) on every match
+page; **real live team stats** via `lib/liveStats.ts` drive Match DNA™/Momentum Pulse™ (Live
+Pressure bar) so metrics move even at 0-0; truth audit fixes (grounded prompts, labeled models,
+honest failure badges, no fabricated scorers); **ShareButton** on every content surface (native
+share sheet on mobile → IG stories/reels; X/LinkedIn/WhatsApp/FB/copy popover on desktop);
+CI build-check guardrail live on every worldcup PR; news pinger active (15-min).
 
 **Jun 30 resolved (see `docs/eod-2026-06-30.md`):** TTS audio now plays (root cause was a full
 1 GB Blob store rejecting every write, not missing keys); anthems rebuilt to 19 team + 4 FIFA with
