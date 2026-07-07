@@ -68,9 +68,11 @@ export const ANTHEM_MANIFEST: AnthemSource[] = [
 
   // ── Team anthems (8 added Jul 7 evening) ──
   { driveFileId: "1UhRSY-WgvpiYXvFkRKdzzs6Q_BdB8kgX", teamCode: "AUT", title: "Immer Wieder Österreich!" },
-  { driveFileId: "1Z6ojDd9Rsas0aUXe2zv70Tm-HFZfOTVx", teamCode: "COD", title: "C'est le Congo, Mon Pote.Les Léopards 2026. Fini!" },
+  // NB: teamCode must match the DB (api-football) code, not FIFA's — the DB
+  // stores Congo DR as CGO (not COD) and Curaçao as CUR (not CUW).
+  { driveFileId: "1Z6ojDd9Rsas0aUXe2zv70Tm-HFZfOTVx", teamCode: "CGO", title: "C'est le Congo, Mon Pote.Les Léopards 2026. Fini!" },
   { driveFileId: "15dI5BWOl1CfmupBIAmC9wa-PYAGv3LUO", teamCode: "CPV", title: "Tubarões Azuis in The House!" },
-  { driveFileId: "1gCXaBoqAKHDqlEinm4uPCVYbvT_a7o4o", teamCode: "CUW", title: "Esa es Curaçao, Dushi. ¡Sólido!" },
+  { driveFileId: "1gCXaBoqAKHDqlEinm4uPCVYbvT_a7o4o", teamCode: "CUR", title: "Esa es Curaçao, Dushi. ¡Sólido!" },
   { driveFileId: "1xptAVSY1ir90bzLyUWr6T0WD7pkk0hbu", teamCode: "CZE", title: "Srdce Bojuje, Stadion Bouří" },
   { driveFileId: "1RasbkvtYvEEhxgV3meynthr0WVaL8Fku", teamCode: "GER", title: "Der Fünfte  Sterne Auf der Brust" },
   { driveFileId: "14jd6YGxeDkvl8XA_snEBkKbtsCeXvB4W", teamCode: "JOR", title: "Suqur al'urdun" },

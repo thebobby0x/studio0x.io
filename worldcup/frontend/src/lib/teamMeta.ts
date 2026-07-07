@@ -15,7 +15,8 @@ const ISO2: Record<string, string> = {
   POR: "pt", ROU: "ro", SCO: "gb-sct", SRB: "rs", SUI: "ch",
   SVK: "sk", SWE: "se", TUR: "tr", UKR: "ua", WAL: "gb-wls",
   // Africa
-  ALG: "dz", CIV: "ci", CMR: "cm", COD: "cd", CGO: "cg",
+  // CGO → "cd": api-football uses CGO for DR CONGO (our WC26 team), not Rep. of Congo
+  ALG: "dz", CIV: "ci", CMR: "cm", COD: "cd", CGO: "cd",
   EGY: "eg", ETH: "et", GAB: "ga", GAM: "gm", GHA: "gh",
   GUI: "gn", KEN: "ke", MAR: "ma", MLI: "ml", MOZ: "mz",
   MTN: "mr", NAM: "na", NGA: "ng", RSA: "za", RWA: "rw",
