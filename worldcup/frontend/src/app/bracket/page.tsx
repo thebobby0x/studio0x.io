@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
 import BracketView from "@/components/bracket/BracketView";
+import ShareButton from "@/components/ui/ShareButton";
 import { prisma } from "@/lib/prisma";
 import { GitBranch } from "lucide-react";
 import {
@@ -119,6 +120,12 @@ export default async function BracketPage() {
             <h1 className="text-3xl font-black text-white tracking-tight">
               Knockout <span className="text-brand-gold">Bracket</span>
             </h1>
+            <ShareButton
+              text="World Cup 2026 Knockout Bracket — every round, live scores and prediction markets · studio0x.io"
+              url="/bracket"
+              title="World Cup 2026 Knockout Bracket"
+              className="ml-1"
+            />
           </div>
           <p className="text-slate-500 text-sm">
             FIFA World Cup 2026 · Round of 32 through the Final · July 3–19

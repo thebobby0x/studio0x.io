@@ -18,6 +18,7 @@ import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
 import MatchPulse from "@/components/match/MatchPulse";
 import MatchMarkets from "@/components/match/MatchMarkets";
+import ShareButton from "@/components/ui/ShareButton";
 import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
@@ -172,9 +173,20 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           "border-brand-border"
         }`}>
           {/* Header gradient */}
-          <div className="bg-gradient-to-r from-brand-green/10 via-transparent to-amber-500/10 px-6 py-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-brand-green/10 via-transparent to-amber-500/10 px-6 py-4 flex items-center justify-between gap-3">
             <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{groupLabel}</span>
-            {statusBadge(m)}
+            <div className="flex items-center gap-3">
+              {statusBadge(m)}
+              <ShareButton
+                text={
+                  isLive ? `LIVE: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} (${m.status === "HT" ? "HT" : `${m.minute}'`}) · ${groupLabel} · studio0x.io` :
+                  isDone ? `FT: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} · ${groupLabel} · studio0x.io` :
+                  `${m.homeTeam.name} vs ${m.awayTeam.name} · ${groupLabel} · World Cup 2026 · studio0x.io`
+                }
+                url={`/schedule/${m.id}`}
+                title={`${m.homeTeam.name} vs ${m.awayTeam.name}`}
+              />
+            </div>
           </div>
 
           {/* Teams and score */}

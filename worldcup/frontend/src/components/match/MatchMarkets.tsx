@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus, Wifi } from "lucide-react";
+import ShareButton from "@/components/ui/ShareButton";
 import type { LiveData, KalshiLiveSnapshot, KalshiOutcomeDetail } from "@/lib/types";
 
 type OutcomeKey = "home_win" | "draw" | "away_win";
@@ -120,11 +121,17 @@ export default function MatchMarkets({ matchId }: { matchId: string }) {
           </span>
           <span className="text-[9px] text-slate-700 font-mono">kalshi</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Wifi size={11} className={isDone ? "text-slate-600" : "text-brand-green"} />
-          <span className={`text-[9px] font-semibold ${isDone ? "text-slate-600" : "text-brand-green"}`}>
-            {isDone ? "final prices" : "live prices"}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Wifi size={11} className={isDone ? "text-slate-600" : "text-brand-green"} />
+            <span className={`text-[9px] font-semibold ${isDone ? "text-slate-600" : "text-brand-green"}`}>
+              {isDone ? "final prices" : "live prices"}
+            </span>
+          </div>
+          <ShareButton
+            text={`Market check — ${homeTeam.name} ${Math.round(snapshot.home_win * 100)}% · Draw ${Math.round(snapshot.draw * 100)}% · ${awayTeam.name} ${Math.round(snapshot.away_win * 100)}% (live Kalshi) · studio0x.io`}
+            title={`${homeTeam.name} vs ${awayTeam.name} — live market`}
+          />
         </div>
       </div>
 
