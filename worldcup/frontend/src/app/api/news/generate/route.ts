@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { isAdminAuthed as authed } from "@/lib/adminAuth";
+import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -17,6 +18,21 @@ const MODEL = "claude-haiku-4-5-20251001";
 
 function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+// Stage context for prompts. Knockout matches must NEVER be described as group
+// games — the group stage ended July 2 and "Group D performance" on an R16
+// recap is wrong info (same bug class as the match-page group leak, PR #106).
+function stageContext(date: Date): { label: string; stakes: string; isKnockout: boolean } {
+  if (date < KNOCKOUT_START) {
+    return { label: "Group stage", stakes: "what the result means for the group table", isKnockout: false };
+  }
+  const round = classifyRound(date) ?? "Knockout round";
+  return {
+    label: round,
+    stakes: "what the result means for the winner's path and the loser's exit — this is a knockout game, NOT a group game",
+    isKnockout: true,
+  };
 }
 
 function dramaLabel(home: number, away: number): string {
@@ -89,6 +105,27 @@ async function handler(req: Request) {
     return NextResponse.json({ error: "No finished matches to recap yet" }, { status: 400 });
   }
 
+  // ── Self-heal: purge knockout stories that claim a group ─────────────────
+  // Recaps generated before the stage-aware prompt could describe an R16 game
+  // as a "Group D performance" (wrong info). Delete any knockout-dated recap
+  // that names a specific group; this run regenerates it with the fixed
+  // prompt. Idempotent: regenerated copy is banned from mentioning groups, so
+  // this matches nothing on subsequent runs.
+  const groupClaim = /\bGroup [A-L]\b/;
+  const knockoutStories = await prisma.newsStory.findMany({
+    where: {
+      category: { in: ["GAME RECAP", "DAILY RECAP", "MATCH PREVIEW"] },
+      date: { gte: KNOCKOUT_START },
+    },
+    select: { id: true, headline: true, body: true },
+  });
+  const badIds = knockoutStories
+    .filter(s => groupClaim.test(s.headline) || groupClaim.test(s.body))
+    .map(s => s.id);
+  if (badIds.length > 0) {
+    await prisma.newsStory.deleteMany({ where: { id: { in: badIds } } });
+  }
+
   // ── Existing recaps (for idempotent skipping) ────────────────────────────
   const existing = await prisma.newsStory.findMany({
     where: { category: { in: ["GAME RECAP", "DAILY RECAP"] } },
@@ -101,15 +138,17 @@ async function handler(req: Request) {
   const missingGames = matches.filter(m => !haveGame.has(m.fixture)).slice(0, MAX_GAMES_PER_RUN);
 
   const gameResults = await mapPool(missingGames, CONCURRENCY, async (m) => {
+    const stage = stageContext(m.date);
     const prompt = `You are Studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a concise match recap.
 
 MATCH: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
+STAGE: ${stage.label}${stage.isKnockout ? " (knockout — group stage is over; do NOT mention any group)" : ""}
 RESULT TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
 
 Return ONLY a JSON object, no other text:
 {
   "headline": "Punchy headline, max 11 words, references the teams or scoreline",
-  "body": "2-3 sentences of authoritative match-report copy in the style of The Athletic. Reference the score and what it means for the group. IMPORTANT: You only have the final score — do NOT invent player names, goal scorers, minutes, or any match events. Stick strictly to the result and its implications. No fluff."
+  "body": "2-3 sentences of authoritative match-report copy in the style of The Athletic. Reference the score and ${stage.stakes}. IMPORTANT: You only have the final score — do NOT invent player names, goal scorers, minutes, or any match events. Stick strictly to the result and its implications. No fluff."
 }`;
     try {
       const msg = await client.messages.create({
@@ -151,8 +190,9 @@ Return ONLY a JSON object, no other text:
   const dayResults = await mapPool(missingDays, CONCURRENCY, async (k) => {
     const dayMatches = byDay.get(k)!;
     const resultsList = dayMatches
-      .map(m => `${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} (${dramaLabel(m.homeScore, m.awayScore)})`)
+      .map(m => `${stageContext(m.date).label}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} (${dramaLabel(m.homeScore, m.awayScore)})`)
       .join("\n");
+    const dayIsKnockout = dayMatches.every(m => stageContext(m.date).isKnockout);
     const prettyDate = new Date(k).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
     const prompt = `You are Studio0x's AI football editor covering the 2026 FIFA World Cup. Write an end-of-day round-up for all matches played on ${prettyDate}.
 
@@ -162,7 +202,7 @@ ${resultsList}
 Return ONLY a JSON object, no other text:
 {
   "headline": "Punchy day round-up headline, max 12 words",
-  "body": "4-6 sentences summarising the day's storylines across these matches. Pick out the standout result, any upsets, and what it means for the tournament. Authoritative, engaging, The Athletic style. IMPORTANT: You only have the final scores listed above — do NOT invent player names, goal scorers, minutes, or any match events. Stick strictly to the results and their implications. No fluff."
+  "body": "4-6 sentences summarising the day's storylines across these matches. Pick out the standout result, any upsets, and what it means for the tournament. Authoritative, engaging, The Athletic style. IMPORTANT: You only have the final scores listed above — do NOT invent player names, goal scorers, minutes, or any match events. Describe each match by the STAGE shown next to it${dayIsKnockout ? " — these are all knockout games; do NOT mention any group" : ""}. Stick strictly to the results and their implications. No fluff."
 }`;
     try {
       const msg = await client.messages.create({
