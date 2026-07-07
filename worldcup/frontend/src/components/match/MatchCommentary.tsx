@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Radio, RefreshCw, Play, Pause, Loader2, AlertCircle } from "lucide-react";
+import ShareButton from "@/components/ui/ShareButton";
 
 type Persona = "analyst" | "fan" | "comedian";
 
@@ -121,16 +122,19 @@ function LineItem({
       <div className="flex-1 min-w-0">
         <p className="text-sm text-slate-300 leading-relaxed">{entry.text}</p>
       </div>
-      <button
-        onClick={handlePlay}
-        disabled={audioLoading}
-        title={audioError ? "Audio unavailable" : "Listen"}
-        className={`shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center w-6 h-6 rounded-full disabled:opacity-40 ${
-          audioError ? "bg-red-500/10 text-red-400" : "bg-brand-gold/10 text-amber-400 hover:bg-brand-gold/20"
-        }`}
-      >
-        {audioLoading ? <Loader2 size={10} className="animate-spin" /> : audioError ? <AlertCircle size={10} /> : playing ? <Pause size={10} /> : <Play size={10} />}
-      </button>
+      <div className="shrink-0 mt-0.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <ShareButton text={`${eventEmoji ? `${eventEmoji} ` : ""}${entry.text} · Live AI commentary on studio0x.io`} />
+        <button
+          onClick={handlePlay}
+          disabled={audioLoading}
+          title={audioError ? "Audio unavailable" : "Listen"}
+          className={`flex items-center justify-center w-6 h-6 rounded-full disabled:opacity-40 ${
+            audioError ? "bg-red-500/10 text-red-400" : "bg-brand-gold/10 text-amber-400 hover:bg-brand-gold/20"
+          }`}
+        >
+          {audioLoading ? <Loader2 size={10} className="animate-spin" /> : audioError ? <AlertCircle size={10} /> : playing ? <Pause size={10} /> : <Play size={10} />}
+        </button>
+      </div>
     </div>
   );
 }

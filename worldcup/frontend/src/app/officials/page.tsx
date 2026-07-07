@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
+import ShareButton from "@/components/ui/ShareButton";
 import { Shield, Plane, MapPin } from "lucide-react";
 import type { OfficialProfile } from "@/app/api/officials/route";
 import { GET as officialsGET } from "@/app/api/officials/route";
@@ -64,6 +65,11 @@ export default async function OfficialsPage() {
             <h1 className="text-3xl font-black text-white tracking-tight">
               The <span className="text-brand-gold">Officials</span>
             </h1>
+            <ShareButton
+              text="The Officials — WC 2026 referee profiles with Whistle Index™, Card Threshold™ and Let It Flow™ ratings · studio0x.io"
+              url="/officials"
+              title="World Cup 2026 — The Officials"
+            />
           </div>
           <p className="text-slate-500 text-sm">
             Referee profiles & movements · built from real WC 2026 assignments and match data ·{" "}

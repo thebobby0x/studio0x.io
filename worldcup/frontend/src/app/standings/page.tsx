@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
+import ShareButton from "@/components/ui/ShareButton";
 import TournamentRecords from "@/components/stats/TournamentRecords";
 import EliminationProximity from "@/components/stats/EliminationProximity";
 import { BarChart2 } from "lucide-react";
@@ -366,9 +367,16 @@ export default async function StandingsPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Page header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-black text-white tracking-tight">
-            FIFA World Cup 2026 <span className="text-brand-gold">Standings</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-black text-white tracking-tight">
+              FIFA World Cup 2026 <span className="text-brand-gold">Standings</span>
+            </h1>
+            <ShareButton
+              text="World Cup 2026 group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io"
+              url="/standings"
+              title="World Cup 2026 Standings"
+            />
+          </div>
           <p className="text-slate-500 mt-1 text-sm">
             Live group standings computed from finished matches
           </p>

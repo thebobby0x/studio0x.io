@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp, Play, Pause, Loader2, Telescope } from "lucide-react";
 import FlagImg from "@/components/ui/FlagImg";
+import ShareButton from "@/components/ui/ShareButton";
 import { registerStoryStop, stopAllStories, startAmbient, stopAmbient } from "@/lib/storyAudio";
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -223,6 +224,11 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         </button>
 
         <div className="flex items-center gap-2">
+          <ShareButton
+            text={`${story.headline} — ${story.body.slice(0, 120)}${story.body.length > 120 ? "…" : ""} · studio0x.io`}
+            url="/news"
+            title={story.headline}
+          />
           <button
             onClick={handleDeepDive}
             disabled={deepDiveLoading}
