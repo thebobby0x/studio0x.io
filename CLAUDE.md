@@ -435,7 +435,18 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-07-06)
+## Current Production State (as of 2026-07-07)
+
+**Jul 7 shipped (see `docs/eod-2026-07-07.md`, PRs #112–#118):** **ANTHEM HUB COMPLETE —
+53 tracks: all 48 teams + 5 FIFA** (manifest-driven; NB: manifest teamCodes must match the
+DB's api-football codes — Curaçao=CUR, DR Congo=CGO, NOT FIFA's CUW/COD); news prompts made
+stage-aware + self-heal purge for knockout stories naming a group; bracket overlays the live
+schedule feed (never staler than the DB sync); standings page declares group tables FINAL
+once knockouts start; predict page newest-first with filter chips; Travel Pulse totals are
+progress-aware ("to date" grows per completed match). Squads/Clubs seeded by owner (412
+players with club data; full-squad count verification is tomorrow's first task).
+
+## Previous Production State (2026-07-06)
 
 **Jul 6 shipped (see `docs/eod-2026-07-06.md`, PRs #106–#110):** knockout pages no longer leak
 group panels/tables; **Live Match Market** (real Kalshi, bid/ask/volume/ticks) on every match
