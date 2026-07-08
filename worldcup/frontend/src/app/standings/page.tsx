@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import AppNav from "@/components/ui/AppNav";
 import ShareButton from "@/components/ui/ShareButton";
+import { KNOCKOUT_START } from "@/lib/tournament";
 import TournamentRecords from "@/components/stats/TournamentRecords";
 import EliminationProximity from "@/components/stats/EliminationProximity";
 import { BarChart2 } from "lucide-react";
@@ -360,6 +362,11 @@ export default async function StandingsPage() {
   );
   const avgGoals = totalPlayed > 0 ? (totalGoals / totalPlayed).toFixed(2) : "—";
 
+  // These tables count GROUP-STAGE games only (72 of the 104 total matches).
+  // Once knockouts begin the groups are settled — say so explicitly instead of
+  // letting "72 matches" read like a stale total.
+  const knockoutStarted = new Date() >= KNOCKOUT_START;
+
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
@@ -378,9 +385,27 @@ export default async function StandingsPage() {
             />
           </div>
           <p className="text-slate-500 mt-1 text-sm">
-            Live group standings computed from finished matches
+            {knockoutStarted
+              ? "Final group-stage tables — group play is complete"
+              : "Live group standings computed from finished matches"}
           </p>
         </div>
+
+        {/* Knockout-era banner: make it unmissable that these tables are settled */}
+        {knockoutStarted && (
+          <div className="rounded-2xl bg-brand-gold/5 border border-brand-gold/20 px-5 py-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-slate-300">
+              <span className="font-black text-brand-gold">Group stage complete.</span>{" "}
+              These tables are final — the tournament has moved to the knockout rounds.
+            </div>
+            <Link
+              href="/bracket"
+              className="shrink-0 inline-flex items-center gap-1.5 bg-brand-gold text-brand-dark font-bold text-xs px-4 py-2 rounded-full hover:bg-amber-300 transition-colors"
+            >
+              View Knockout Bracket →
+            </Link>
+          </div>
+        )}
 
         {/* Tournament Entropy™ strip */}
         {totalPlayed > 0 && (
@@ -398,12 +423,12 @@ export default async function StandingsPage() {
             </div>
             <div className="flex gap-6 text-center">
               <div>
-                <div className="text-xl font-black text-white tabular-nums">{totalPlayed}</div>
-                <div className="text-[9px] text-slate-600 uppercase tracking-wider">Matches</div>
+                <div className="text-xl font-black text-white tabular-nums">{totalPlayed}<span className="text-slate-600 text-sm">/72</span></div>
+                <div className="text-[9px] text-slate-600 uppercase tracking-wider">Group Matches{knockoutStarted ? " · Done" : ""}</div>
               </div>
               <div>
                 <div className="text-xl font-black text-white tabular-nums">{totalGoals}</div>
-                <div className="text-[9px] text-slate-600 uppercase tracking-wider">Goals</div>
+                <div className="text-[9px] text-slate-600 uppercase tracking-wider">Group Goals</div>
               </div>
               <div>
                 <div className="text-xl font-black text-white tabular-nums">{avgGoals}</div>

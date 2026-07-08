@@ -115,6 +115,8 @@ export interface CityTravelStats {
   intlFlightsPerDay: number;
   estimatedRevenuePerMatch: number;
   totalEstimatedRevenue: number;
+  /** Modelled revenue for matches ALREADY PLAYED in this city — grows as the tournament progresses */
+  revenueToDate: number;
   travelFact: string;
 }
 
@@ -194,6 +196,7 @@ export async function GET() {
       intlFlightsPerDay: flights,
       estimatedRevenuePerMatch: revPerMatch,
       totalEstimatedRevenue: revPerMatch * cityMatches.length,
+      revenueToDate: revPerMatch * completed,
       travelFact: TRAVEL_FACT[city] ?? `${city} is one of ${cityMatches.length} match cities in the 2026 World Cup.`,
     });
   }
@@ -211,14 +214,25 @@ export async function GET() {
     .filter(c => c.hasMatchToday)
     .reduce((s, c) => s + c.peakArrivals, 0);
 
+  // Progress-aware totals — these MOVE as the tournament plays out instead of
+  // sitting on the same full-tournament projection for six weeks.
+  const completedMatches = matches.filter(m => m.status === "FT").length;
+  const progress = Math.min(1, completedMatches / totalMatches);
+  const revenueToDate = cities.reduce((s, c) => s + c.revenueToDate, 0);
+
   return NextResponse.json({
     cities,
     totals: {
       cities: cities.length,
       matches: totalMatches,
+      completedMatches,
       estimatedRevenue: totalRevenue,
+      revenueToDate,
       fansArrivingToday: totalFansPerDay,
+      // Projections scaled by tournament progress (modelled, labeled est. in UI)
+      intlVisitorsToDate: Math.round(1_500_000 * progress),
       intlVisitors: 1_500_000,
+      economicImpactToDate: Math.round(5_400_000_000 * progress),
       economicImpact: 5_400_000_000,
     },
   });

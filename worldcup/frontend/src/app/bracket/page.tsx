@@ -4,6 +4,8 @@ import AppNav from "@/components/ui/AppNav";
 import BracketView from "@/components/bracket/BracketView";
 import ShareButton from "@/components/ui/ShareButton";
 import { prisma } from "@/lib/prisma";
+import { getFlag } from "@/lib/flags";
+import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { GitBranch } from "lucide-react";
 import {
   type KnockoutRound,
@@ -65,6 +67,53 @@ async function fetchKnockoutMatches(): Promise<Record<KnockoutRound, BracketMatc
     });
   } catch {
     // DB unavailable — will show all TBD
+  }
+
+  // Overlay the LIVE schedule feed so the bracket is never staler than the
+  // nightly DB sync: fresh scores/statuses win, and fixtures api-football has
+  // announced but the DB hasn't ingested yet (new QF/SF pairings) are added.
+  try {
+    const { GET } = await import("@/app/api/schedule/route");
+    const res = await GET();
+    const all = (await res.json()) as ScheduleMatch[];
+    const liveKnockouts = all.filter((s) => new Date(s.utcDate) >= KNOCKOUT_START);
+    const byFixture = new Map(dbMatches.map((m) => [m.fixture, m]));
+
+    for (const s of liveKnockouts) {
+      const round = classifyRound(new Date(s.utcDate));
+      if (!round) continue;
+      const toTeam = (t: { name: string; tla: string }) =>
+        !t.tla || t.tla === "TBD" ? null : { name: t.name, code: t.tla, flagEmoji: getFlag(t.tla) };
+
+      const existing = byFixture.get(s.id);
+      if (existing) {
+        existing.status = s.status;
+        existing.elapsed = s.minute ?? existing.elapsed;
+        existing.homeScore = s.homeScore ?? existing.homeScore;
+        existing.awayScore = s.awayScore ?? existing.awayScore;
+        // Upgrade TBD slots the moment the feed names real teams
+        existing.homeTeam = existing.homeTeam ?? toTeam(s.homeTeam);
+        existing.awayTeam = existing.awayTeam ?? toTeam(s.awayTeam);
+      } else {
+        dbMatches.push({
+          id: `live-${s.id}`,
+          fixture: s.id,
+          date: s.utcDate,
+          status: s.status,
+          elapsed: s.minute ?? 0,
+          homeTeam: toTeam(s.homeTeam),
+          awayTeam: toTeam(s.awayTeam),
+          homeScore: s.homeScore ?? 0,
+          awayScore: s.awayScore ?? 0,
+          venue: "TBD",
+          city: "",
+          round,
+        });
+      }
+    }
+    dbMatches.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  } catch {
+    // live feed unavailable — DB view still renders
   }
 
   // Group by round, filling up to expected size with TBD placeholder entries
