@@ -7,10 +7,23 @@ import type { PredictMatch } from "@/app/api/matches/route";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import type { GroupStanding } from "@/app/api/standings/route";
 import { getFlag } from "@/lib/flags";
+import { KNOCKOUT_START } from "@/lib/tournament";
 import AppNav from "@/components/ui/AppNav";
 
 interface Prediction { home: number; away: number }
 type Preds = Record<number, Prediction>;
+
+// Filter chips — newest games sit at the top; these slice the list for fun.
+type MatchFilter = "all" | "upcoming" | "live" | "finished" | "picked" | "knockout" | "group";
+const FILTER_CHIPS: { key: MatchFilter; label: string }[] = [
+  { key: "all",      label: "All" },
+  { key: "upcoming", label: "⏳ Upcoming" },
+  { key: "live",     label: "🔴 Live" },
+  { key: "finished", label: "🏁 Finished" },
+  { key: "picked",   label: "🎯 My Picks" },
+  { key: "knockout", label: "⚔️ Knockout" },
+  { key: "group",    label: "🏟 Groups" },
+];
 
 interface ScoreResult {
   total: number;
@@ -216,6 +229,7 @@ export default function PredictPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [showStandings, setShowStandings] = useState(false);
+  const [filter, setFilter] = useState<MatchFilter>("all");
 
   useEffect(() => {
     Promise.all([
@@ -393,11 +407,27 @@ export default function PredictPage() {
     return { groupPositions: positions, groupPts: pts, groupGD: gd };
   }, [schedule]);
 
-  const byDay = liveMatches.reduce<Record<string, typeof liveMatches>>((acc, m) => {
+  // Apply the active filter chip, then group by day NEWEST-FIRST — the games
+  // people care about (today's, tonight's) should never be a scroll away.
+  const filteredMatches = useMemo(() => liveMatches.filter((m) => {
+    const isKO = new Date(m.date) >= KNOCKOUT_START;
+    switch (filter) {
+      case "upcoming": return m.status === "NS";
+      case "live":     return m.status === "LIVE" || m.status === "HT";
+      case "finished": return m.status === "FT";
+      case "picked":   return !!preds[m.fixture];
+      case "knockout": return isKO;
+      case "group":    return !isKO;
+      default:         return true;
+    }
+  }), [liveMatches, filter, preds]);
+
+  const byDay = filteredMatches.reduce<Record<string, typeof liveMatches>>((acc, m) => {
     const day = new Date(m.date).toISOString().slice(0, 10);
     (acc[day] ??= []).push(m);
     return acc;
   }, {});
+  const dayEntries = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0]));
 
   const ftWithPred = liveMatches.filter((m) => m.status === "FT" && preds[m.fixture]);
   const totalPts = ftWithPred.reduce(
@@ -517,6 +547,26 @@ export default function PredictPage() {
 
           {/* Predictions column */}
           <div className="space-y-5">
+
+            {/* Filter chips */}
+            {!loading && matches.length > 0 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                {FILTER_CHIPS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                      filter === key
+                        ? "bg-brand-gold/15 border-brand-gold/40 text-brand-gold"
+                        : "border-brand-border text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center text-slate-500 text-sm py-12 animate-pulse">
                 Loading matches…
@@ -526,8 +576,12 @@ export default function PredictPage() {
                 No matches found — an admin can load them from{" "}
                 <code className="text-brand-gold">/admin</code> → Re-seed Matches
               </div>
+            ) : filteredMatches.length === 0 ? (
+              <div className="text-center text-slate-500 text-sm py-12">
+                No matches in this filter yet.
+              </div>
             ) : (
-              Object.entries(byDay).map(([day, dayMatches]) => (
+              dayEntries.map(([day, dayMatches]) => (
                 <div key={day} className="space-y-3">
                   <div className="flex items-center gap-3 pt-1">
                     <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 shrink-0">
@@ -541,7 +595,11 @@ export default function PredictPage() {
                     const isFT = m.status === "FT";
                     const isLive = m.status === "LIVE" || m.status === "HT";
                     const isExp = expanded === m.fixture;
-                    const groupLabel = `Group ${m.group}`;
+                    // Knockout matches carry a residual group from seeding —
+                    // label them by round, never "Group X" (wrong info).
+                    const groupLabel = new Date(m.date) >= KNOCKOUT_START
+                      ? (scheduleMap.get(m.fixture)?.stageLabel ?? "Knockout")
+                      : `Group ${m.group}`;
                     const homeForm = (teamForm[m.homeTeam.tla.toUpperCase()] ?? []).slice(-3);
                     const awayForm = (teamForm[m.awayTeam.tla.toUpperCase()] ?? []).slice(-3);
                     const homePos = groupPositions[m.homeTeam.tla.toUpperCase()];

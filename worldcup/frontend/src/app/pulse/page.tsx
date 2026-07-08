@@ -226,9 +226,13 @@ interface TravelData {
     cities: number;
     matches: number;
     estimatedRevenue: number;
+    revenueToDate?: number;
+    completedMatches?: number;
     fansArrivingToday: number;
     intlVisitors: number;
+    intlVisitorsToDate?: number;
     economicImpact: number;
+    economicImpactToDate?: number;
   };
 }
 
@@ -543,29 +547,41 @@ export default function PulsePage() {
 
               <div className="rounded-2xl bg-brand-card border border-brand-border p-4 mt-4">
                 <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">
-                  Tournament totals (estimated)
+                  Tournament running totals (modelled estimates)
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
-                    <div className="text-xs text-slate-600">Total ticket revenue</div>
+                    <div className="text-xs text-slate-600">Est. revenue to date</div>
                     <div className="text-base font-black text-white">
                       {fmtRevenue(
-                        travel.cities.reduce((s, c) => s + c.totalEstimatedRevenue, 0)
+                        travel.totals.revenueToDate ??
+                          travel.cities.reduce((s, c) => s + (c.revenueToDate ?? 0), 0)
                       )}
+                    </div>
+                    <div className="text-[10px] text-slate-600">
+                      of {fmtRevenue(travel.cities.reduce((s, c) => s + c.totalEstimatedRevenue, 0))} projected
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-600">International visitors</div>
-                    <div className="text-base font-black text-white">1.5M</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-600">Total matches</div>
-                    <div className="text-base font-black text-white">{travel.totals.matches}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-600">Avg hotel/night</div>
+                    <div className="text-xs text-slate-600">Est. intl visitors to date</div>
                     <div className="text-base font-black text-white">
-                      $
+                      {travel.totals.intlVisitorsToDate
+                        ? `~${fmtNum(travel.totals.intlVisitorsToDate)}`
+                        : "~1.5M"}
+                    </div>
+                    <div className="text-[10px] text-slate-600">of ~1.5M projected</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-600">Matches played</div>
+                    <div className="text-base font-black text-white">
+                      {travel.totals.completedMatches ?? "—"}
+                      <span className="text-slate-600 text-sm">/{travel.totals.matches}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-600">Est. hotel/night</div>
+                    <div className="text-base font-black text-white">
+                      ~$
                       {Math.round(
                         travel.cities.reduce((s, c) => s + c.hotelRateUsd, 0) /
                           travel.cities.length
