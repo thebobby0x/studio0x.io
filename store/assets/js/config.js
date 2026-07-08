@@ -17,7 +17,7 @@ window.STORE_CONFIG = {
 
   currency: "usd",
   // Support / from email shown on pages
-  supportEmail: "b@studio0x.io",
+  supportEmail: "yo@studio0x.io",
 
   // Launch pricing window. While now < this date, product pages reframe each
   // product's compare-at price as where the price is HEADING, with a live day
