@@ -62,9 +62,18 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
     .filter((v) => /penalty/i.test(v.detail))
     .map((v) => {
       const pen = penMoments.find((pm) => pm.minute >= v.minute && pm.minute - v.minute <= 6);
-      return pen ? { gap: pen.minute - v.minute, outcome: pen.outcome, minute: v.minute } : null;
+      if (!pen) return null;
+      // Prefer REAL wall-clock delta when we captured both events live
+      // (Studio0x first-seen timestamps); fall back to match-minute gap.
+      let capturedSecs: number | null = null;
+      const penTs = missedPens.find((mp) => mp.minute === pen.minute)?.firstSeenAt;
+      if (v.firstSeenAt && penTs) {
+        const d = Math.round((new Date(penTs).getTime() - new Date(v.firstSeenAt).getTime()) / 1000);
+        if (d > 0 && d < 15 * 60) capturedSecs = d;
+      }
+      return { gap: pen.minute - v.minute, outcome: pen.outcome, minute: v.minute, capturedSecs };
     })
-    .filter(Boolean) as { gap: number; outcome: "scored" | "missed"; minute: number }[];
+    .filter(Boolean) as { gap: number; outcome: "scored" | "missed"; minute: number; capturedSecs: number | null }[];
 
   const homeGoals = goals.filter((g) => !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam);
   const awayGoals = goals.filter((g) => !g.isOwnGoal ? g.team === awayTeam : g.team !== awayTeam);
@@ -95,7 +104,9 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
           ))}
           {varDelayNotes.map((n, i) => (
             <span key={`d${i}`} className="text-slate-600">
-              ⏱ {n.gap <= 1 ? "under a minute" : `~${n.gap} match min`} from VAR call to the kick — {n.outcome}
+              ⏱ {n.capturedSecs
+                ? `≈${Math.floor(n.capturedSecs / 60)}m ${n.capturedSecs % 60}s whistle to kick (Studio0x live capture)`
+                : `${n.gap <= 1 ? "under a minute" : `~${n.gap} match min`} from VAR call to the kick`} — {n.outcome}
             </span>
           ))}
         </div>
