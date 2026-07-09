@@ -23,6 +23,18 @@ import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 
+// Cooldown so a sync that FAILS to create the missing rows (api-football
+// hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
+// Module state is per serverless instance — imperfect, but the sync is
+// idempotent and diff-aware, so overlapping runs are safe, just wasteful.
+let lastFixtureHealAt = 0;
+function shouldAttemptFixtureHeal(): boolean {
+  const now = Date.now();
+  if (now - lastFixtureHealAt < 5 * 60 * 1000) return false;
+  lastFixtureHealAt = now;
+  return true;
+}
+
 async function getInitialData() {
   try {
     const [dbMatches, scheduleRes] = await Promise.all([
@@ -37,6 +49,25 @@ async function getInitialData() {
     if (scheduleRes) {
       const live = (await scheduleRes.json()) as ScheduleMatch[];
       liveByFixture = new Map(live.map((m) => [m.id, m]));
+
+      // Self-heal: api-football creates knockout fixtures BETWEEN our nightly
+      // syncs (new QF/SF pairings minted mid-day), so the DB can lag the feed
+      // by up to a day — the dashboard then showed TBD slots while the feed
+      // already knew "Spain vs Belgium" (owner report 7/9). When the feed has
+      // fixtures the DB doesn't, run the non-destructive sync NOW and re-read:
+      // real rows mean real match pages and links, not a display patch.
+      const known = new Set(dbMatches.map((m) => m.fixture));
+      const missing = live.filter((s) => !known.has(s.id));
+      if (missing.length > 0 && shouldAttemptFixtureHeal()) {
+        const { syncFixtures } = await import("@/lib/fixtureSync");
+        await syncFixtures().catch(() => null);
+        const fresh = await prisma.match.findMany({
+          where: { fixture: { in: missing.map((s) => s.id) } },
+          include: { homeTeam: true, awayTeam: true },
+        }).catch(() => []);
+        dbMatches.push(...fresh);
+        dbMatches.sort((a, b) => a.date.getTime() - b.date.getTime());
+      }
     }
 
     // A match cannot still be LIVE/HT if it kicked off more than 4h ago — guards
