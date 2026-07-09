@@ -128,7 +128,7 @@ export default function AppNav() {
             <Trophy size={17} className="text-brand-gold" />
             <div className="leading-none">
               <div className="font-black text-white text-sm tracking-tight group-hover:text-brand-gold transition-colors">
-                cup<span className="text-brand-gold">26</span>
+                footy<span className="text-brand-gold">26</span>
               </div>
               <div className="text-[8px] text-slate-700 tracking-widest uppercase">studio0x.io</div>
             </div>

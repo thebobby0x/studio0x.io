@@ -328,7 +328,7 @@ export default function BracketView({
           </div>
           {championTrack && <AnthemNote track={championTrack} isSilenced={false} />}
           <ShareButton
-            text={`The Last Song Standing 🏆 ${championTrack ? `“${championTrack.title}” — ` : ""}${champion.name} win cup26 · studio0x.io`}
+            text={`The Last Song Standing 🏆 ${championTrack ? `“${championTrack.title}” — ` : ""}${champion.name} win footy26 · studio0x.io`}
             url="/bracket"
             title="The Last Song Standing"
           />
@@ -390,7 +390,7 @@ export default function BracketView({
         {/* Header */}
         <div className="mb-6 text-center">
           <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-            cup26 · Knockout Stage
+            footy26 · Knockout Stage
           </p>
         </div>
 
