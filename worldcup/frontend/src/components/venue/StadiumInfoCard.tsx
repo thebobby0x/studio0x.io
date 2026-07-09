@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { MapPin, Wind, Droplets, Thermometer, Mountain, Users, ChevronDown, ChevronUp, Lightbulb, Sun, Cloud, CloudRain, CloudSnow, Zap, Eye } from "lucide-react";
 import type { VenueInfo } from "@/lib/venues";
 import type { WeatherData } from "@/app/api/weather/route";
+import { CLIMATE_CONTROLLED, crampWatch } from "@/lib/heat";
+import type { HeatOutcomesAggregate } from "@/lib/heatOutcomes";
 
 function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean; size?: number }) {
   if (code === 0 || code === 1) return isDay ? <Sun size={size} className="text-amber-400" /> : <Eye size={size} className="text-slate-400" />;
@@ -15,28 +17,29 @@ function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean;
 }
 
 // ── Cramp Watch™ — heat-stress read from REAL ambient data ───────────────────
-// Bands follow standard heat-index guidance applied to Open-Meteo's apparent
-// temperature (which already folds in humidity). Honest limits, stated in the
-// label: this is AMBIENT weather at the stadium, not pitch-surface temperature,
-// and several WC26 venues are climate-controlled — the outdoor reading doesn't
-// apply inside them.
-const CLIMATE_CONTROLLED = new Set([
-  "AT&T Stadium",        // Arlington/Dallas — retractable roof
-  "NRG Stadium",         // Houston — retractable roof
-  "Mercedes-Benz Stadium", // Atlanta — retractable roof
-  "BC Place",            // Vancouver — retractable roof
-  "SoFi Stadium",        // Inglewood/LA — fixed canopy
-]);
+// Band thresholds + climate-controlled venue list live in lib/heat.ts so this
+// display and the Heat vs. Outcomes aggregate always agree.
 
-function crampWatch(feelsC: number, humidity: number): {
-  level: "Low" | "Moderate" | "High" | "Extreme";
-  color: string;
-  note: string;
-} | null {
-  if (feelsC >= 39) return { level: "Extreme", color: "text-red-400", note: "cooling breaks likely · severe cramp & dehydration risk late" };
-  if (feelsC >= 32) return { level: "High", color: "text-brand-gold", note: "elevated cramp risk in the final 30′ · watch hydration" };
-  if (feelsC >= 27) return { level: "Moderate", color: "text-slate-300", note: humidity >= 60 ? "humid — hydration matters as legs tire" : "hydration matters as legs tire" };
-  return null; // Low — no banner needed
+// Tournament-wide comparison, shown only when heat is a real factor tonight
+// AND we have enough hot-match sample to say anything (n ≥ 3 per side).
+function HeatOutcomesNote({ level }: { level: string }) {
+  const [agg, setAgg] = useState<HeatOutcomesAggregate | null>(null);
+
+  useEffect(() => {
+    if (level !== "High" && level !== "Extreme") return;
+    fetch("/api/stats/heat-outcomes")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => d && !d.error && setAgg(d))
+      .catch(() => null);
+  }, [level]);
+
+  if (!agg || agg.hot.n < 3 || agg.mild.n < 3) return null;
+  return (
+    <span className="text-[10px] text-slate-500 w-full">
+      Hot matches this WC: {agg.hot.lateGoalSharePct}% of goals after 75′ (n={agg.hot.n}) vs{" "}
+      {agg.mild.lateGoalSharePct}% in milder conditions (n={agg.mild.n}) · correlation, not causation
+    </span>
+  );
 }
 
 function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number; lng: number }) {
@@ -105,6 +108,7 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
             <span className="text-[9px] text-slate-700 w-full sm:w-auto sm:ml-auto">
               ambient at stadium (Open-Meteo){covered ? " · climate-controlled venue — outdoor reading" : ""}
             </span>
+            {!covered && <HeatOutcomesNote level={cw.level} />}
           </div>
         );
       })()}

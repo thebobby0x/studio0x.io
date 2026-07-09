@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw, Thermometer } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -193,6 +193,31 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 label: "Ingest Player Stats",
                 desc: "Pull per-match stats from api-football for all finished games. Powers PPI™, Officials™ and cross-metrics. Also runs nightly.",
                 action: () => runSeed("ingest", "/api/admin/ingest-match-stats?secret=wc2026studio0x", "POST"),
+              },
+              {
+                key: "heatBackfill",
+                icon: Thermometer,
+                label: "Backfill Match Weather (Heat vs. Outcomes)",
+                desc: "Stamps every played match with its real kickoff-hour heat index + humidity (Open-Meteo archive) and FT outcome facts. Chunked; safe to re-run — only fills gaps. New matches auto-stamp nightly.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, heatBackfill: "loading" }));
+                  try {
+                    // Chunks of 8 (1 weather + 1 events call per match) so no
+                    // single request nears the 60s Hobby function limit.
+                    let created = 0;
+                    for (let guard = 0; guard < 25; guard++) {
+                      const res = await fetch("/api/admin/backfill-weather?count=8", { method: "POST" });
+                      if (!res.ok) throw new Error(`chunk failed (${res.status})`);
+                      const data = await res.json() as { created: number; outcomesAdded: number; remaining: number };
+                      created += (data.created ?? 0) + (data.outcomesAdded ?? 0);
+                      if ((data.remaining ?? 0) === 0) break;
+                    }
+                    setSeedStatus(s => ({ ...s, heatBackfill: created > 0 ? "done" : "error" }));
+                  } catch {
+                    setSeedStatus(s => ({ ...s, heatBackfill: "error" }));
+                  }
+                  setTimeout(() => setSeedStatus(s => ({ ...s, heatBackfill: "idle" })), 6000);
+                },
               },
               {
                 key: "resetAnthems",
