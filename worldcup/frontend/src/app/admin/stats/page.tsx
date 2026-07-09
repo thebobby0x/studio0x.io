@@ -50,7 +50,7 @@ export default async function AdminStatsPage() {
                       <span className="text-xl flex-shrink-0">{s.team?.flagEmoji ?? "🏆"}</span>
                       <div className="min-w-0">
                         <div className="font-semibold text-white truncate">{s.title}</div>
-                        <div className="text-xs text-slate-500 truncate">{s.team?.name ?? "FIFA World Cup 2026"}</div>
+                        <div className="text-xs text-slate-500 truncate">{s.team?.name ?? "cup26"}</div>
                       </div>
                     </div>
                   </td>

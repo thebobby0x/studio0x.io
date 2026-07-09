@@ -8,8 +8,8 @@ import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 
 export const metadata: Metadata = {
-  title: "studio0x · World Cup 2026 Stats Engine",
-  description: "Live match telemetry, prediction markets, and team anthems for FIFA World Cup 2026",
+  title: "cup26 · live tournament stats by studio0x",
+  description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
 };
 
 // Applies the persisted theme BEFORE first paint so there's no flash.

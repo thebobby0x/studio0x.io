@@ -3,7 +3,7 @@
 // Free tier: 100 req/day. Per-date in-memory cache keeps us well within limits.
 
 const BASE    = "https://v3.football.api-sports.io";
-const LEAGUE  = 1;    // FIFA World Cup
+const LEAGUE  = 1;    // World Cup
 const SEASON  = 2026;
 const LIVE_TTL_MS   = 120_000;  // 2 min for today's matches
 const PAST_TTL_MS   = 3_600_000; // 1 hr for finished dates

@@ -14,7 +14,7 @@ import { getVenueInfo } from "@/lib/venues";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AF_BASE = "https://v3.football.api-sports.io";
-const AF_LEAGUE = 1; // FIFA World Cup
+const AF_LEAGUE = 1; // World Cup
 const AF_SEASON = 2026;
 
 export const STATUS_MAP: Record<string, string> = {

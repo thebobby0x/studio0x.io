@@ -182,7 +182,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
                 text={
                   isLive ? `LIVE: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} (${m.status === "HT" ? "HT" : `${m.minute}'`}) · ${groupLabel} · studio0x.io` :
                   isDone ? `FT: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} · ${groupLabel} · studio0x.io` :
-                  `${m.homeTeam.name} vs ${m.awayTeam.name} · ${groupLabel} · World Cup 2026 · studio0x.io`
+                  `${m.homeTeam.name} vs ${m.awayTeam.name} · ${groupLabel} · cup26 · studio0x.io`
                 }
                 url={`/schedule/${m.id}`}
                 title={`${m.homeTeam.name} vs ${m.awayTeam.name}`}
@@ -446,7 +446,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · FIFA World Cup 2026 · Data via api-football.com
+        studio0x.io · cup26 · Data via api-football.com
       </footer>
     </div>
   );

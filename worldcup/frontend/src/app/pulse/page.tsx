@@ -287,7 +287,7 @@ export default function PulsePage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">
-            World Cup <span className="text-brand-gold">2026</span> Travel Pulse
+            cup<span className="text-brand-gold">26</span> Travel Pulse
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
             32 nations · 16 host cities · live flight tracking + modelled fan-travel estimates
@@ -695,7 +695,7 @@ export default function PulsePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · FIFA World Cup 2026 · Flight paths refresh every 60s · Arrivals, flights,
+        studio0x.io · cup26 · Flight paths refresh every 60s · Arrivals, flights,
         hotel rates and revenue are modelled estimates from stadium capacity + travel baselines,
         not measured data
       </footer>

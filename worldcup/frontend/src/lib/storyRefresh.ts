@@ -182,7 +182,7 @@ Return ONLY valid JSON, no other text:
 
     for (const m of recentFT.filter(m => !haveRecap.has(m.fixture))) {
       const stage = stageContext(m.date, m.homeTeam.groupStage);
-      const prompt = `You are studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a match recap.
+      const prompt = `You are studio0x's AI football analyst covering the 2026 World Cup. Write a match recap.
 
 RESULT: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
 TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
