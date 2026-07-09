@@ -321,3 +321,25 @@ model WhiteLabelPartner {
   planName     String   @default("starter")  // starter, pro, enterprise
   createdAt    DateTime @default(now())
 }
+
+// ── Live event capture (VAR Freeze™ §15) ─────────────────────────────────────
+// The api-football feed carries only MATCH MINUTES for events. To measure real
+// wall-clock gaps (e.g. whistle→penalty after a long VAR review — owner heard
+// 3m11s on the FRA-MAR broadcast), we record when each event FIRST APPEARS in
+// our live polling. firstSeenAt deltas ≈ real elapsed time ± feed latency —
+// always disclosed as a Studio0x live-capture measurement. Rows are only ever
+// written while a match is LIVE/HT (writing after FT would fabricate timing).
+model MatchEventLog {
+  id          String   @id @default(cuid())
+  fixture     Int
+  eventKey    String   // `${type}|${detail}|${minute}|${player}` — stable dedup key
+  minute      Int
+  type        String
+  detail      String
+  team        String
+  player      String?
+  firstSeenAt DateTime @default(now())
+
+  @@unique([fixture, eventKey])
+  @@index([fixture])
+}

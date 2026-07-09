@@ -5,12 +5,16 @@ export interface MissedPen {
   minute: number;
   team: string;
   player: string;
+  firstSeenAt?: string;
 }
 
 export interface VarEvent {
   minute: number;
   team: string;
   detail: string;
+  /** Wall-clock moment this event FIRST appeared in our live polling
+   *  (Studio0x capture — enables real whistle→kick timing, ± feed latency) */
+  firstSeenAt?: string;
 }
 
 export interface GoalEvent {
@@ -145,7 +149,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             isOwnGoal: e.detail === "Own Goal",
             isPenalty: e.detail === "Penalty",
           }));
-        const missedPens = events
+        const missedPens: MissedPen[] = events
           .filter((e) => e.type === "Goal" && e.detail === "Missed Penalty")
           .map((e) => ({ minute: e.time.elapsed, team: e.team.name, player: e.player.name }));
         // VAR reviews are real drama — surface them (minute + decision). NB:
@@ -154,6 +158,51 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         const varEvents: VarEvent[] = events
           .filter((e) => e.type === "Var")
           .map((e) => ({ minute: e.time.elapsed, team: e.team.name, detail: e.detail }));
+
+        // ── Live event capture (VAR Freeze™) ────────────────────────────────
+        // Record when each event FIRST appears in our polling so wall-clock
+        // gaps (whistle→kick) are measurable. LIVE/HT only — inserting rows
+        // for a finished match would stamp now() on old events (fabricated
+        // timing). skipDuplicates keeps the first-seen moment immutable.
+        const eventKey = (e: ApiFootballEvent) =>
+          `${e.type}|${e.detail}|${e.time.elapsed}|${e.player?.name ?? ""}`;
+        if (["LIVE", "HT"].includes(match.status) && events.length > 0) {
+          prisma.matchEventLog.createMany({
+            data: events.map((e) => ({
+              fixture: match.fixture,
+              eventKey: eventKey(e),
+              minute: e.time.elapsed,
+              type: e.type,
+              detail: e.detail,
+              team: e.team.name,
+              player: e.player?.name ?? null,
+            })),
+            skipDuplicates: true,
+          }).catch(() => { /* capture is best-effort */ });
+        }
+
+        // Attach captured first-seen timestamps (works live AND after FT for
+        // matches we watched live)
+        try {
+          const logs = await prisma.matchEventLog.findMany({
+            where: { fixture: match.fixture },
+            select: { eventKey: true, firstSeenAt: true },
+          });
+          if (logs.length > 0) {
+            const byKey = new Map(logs.map((l) => [l.eventKey, l.firstSeenAt.toISOString()]));
+            for (const e of events) {
+              const ts = byKey.get(eventKey(e));
+              if (!ts) continue;
+              if (e.type === "Var") {
+                const v = varEvents.find((x) => x.minute === e.time.elapsed && x.detail === e.detail);
+                if (v) v.firstSeenAt = ts;
+              } else if (e.type === "Goal" && e.detail === "Missed Penalty") {
+                const mp = missedPens.find((x) => x.minute === e.time.elapsed && x.player === e.player.name);
+                if (mp) mp.firstSeenAt = ts;
+              }
+            }
+          }
+        } catch { /* timings optional */ }
 
         // Sanity-check: own-goal attribution is reversed (credit goes to other team),
         // so compute effective home/away goal counts and compare against the known score.
