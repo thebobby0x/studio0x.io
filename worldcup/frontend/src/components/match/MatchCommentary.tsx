@@ -29,9 +29,9 @@ interface CommentaryBatch {
 }
 
 const PERSONA_LABELS: Record<Persona, { label: string; emoji: string; color: string }> = {
-  analyst:  { label: "Analyst",  emoji: "📊", color: "text-sky-400 border-sky-500/30 bg-sky-500/10" },
+  analyst:  { label: "Analyst",  emoji: "📊", color: "text-slate-300 border-slate-500/30 bg-white/5" },
   fan:      { label: "Fan",      emoji: "📣", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
-  comedian: { label: "Comedian", emoji: "🎭", color: "text-purple-400 border-purple-500/30 bg-purple-500/10" },
+  comedian: { label: "Comedian", emoji: "🎭", color: "text-slate-400 border-slate-600/40 bg-slate-500/10" },
 };
 
 function detectEmoji(text: string): string {

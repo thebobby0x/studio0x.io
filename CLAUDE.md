@@ -109,6 +109,15 @@ Card pattern: `rounded-2xl bg-brand-card border border-brand-border overflow-hid
 Metric badge pattern: `text-[10px] font-black uppercase tracking-widest text-brand-gold`
 Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "studio0x"
 
+**COLOR DISCIPLINE (owner directive 7/9 — enforce on every new surface):**
+- **Gold** = brand, CTAs, proprietary badges, "next up", AWAY team in duels
+- **Green** = LIVE indicators, HOME team in duels, positive/win states
+- **Red** = live dot + negative/loss states ONLY
+- **Slate** = ALL informational text, draw/neutral states, secondary badges
+- **NO sky/blue/purple/teal accents** on user-facing surfaces (swept 7/9; the flight
+  map's data-viz blue is the one sanctioned exception). Three-way probability/market
+  displays: home green · draw slate · away gold.
+
 ---
 
 ## Key Decisions & Why

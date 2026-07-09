@@ -16,7 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
-import { isMatchInProgress } from "@/lib/tournament";
+import { isMatchInProgress, KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
@@ -197,18 +197,24 @@ export default async function DashboardPage({
   const venueInfo = realVenue ? getVenueInfo(realVenue) : null;
 
   // ── 3-zone hero data: Upcoming (left) · Live/Next (center) · Results (right) ──
-  const toHero = (m: Match): HeroMatch => ({
-    id: m.id,
-    fixture: m.fixture,
-    date: new Date(m.date).toISOString(),
-    status: m.status,
-    home: { name: m.homeTeam.name, code: m.homeTeam.code },
-    away: { name: m.awayTeam.name, code: m.awayTeam.code },
-    homeScore: m.homeScore ?? 0,
-    awayScore: m.awayScore ?? 0,
-    elapsed: m.elapsed ?? 0,
-    group: m.homeTeam.groupStage,
-  });
+  const toHero = (m: Match): HeroMatch => {
+    // Knockout matches carry a residual group from the home team — label them
+    // by round instead (a QF must never read "Group I" on the hero).
+    const isKO = new Date(m.date) >= KNOCKOUT_START;
+    return {
+      id: m.id,
+      fixture: m.fixture,
+      date: new Date(m.date).toISOString(),
+      status: m.status,
+      home: { name: m.homeTeam.name, code: m.homeTeam.code },
+      away: { name: m.awayTeam.name, code: m.awayTeam.code },
+      homeScore: m.homeScore ?? 0,
+      awayScore: m.awayScore ?? 0,
+      elapsed: m.elapsed ?? 0,
+      group: isKO ? undefined : m.homeTeam.groupStage,
+      stage: isKO ? (classifyRound(new Date(m.date)) ?? "Knockout") : undefined,
+    };
+  };
   // Secondary sort on fixture id: final group matchdays kick off simultaneously,
   // so date alone ties and ordering becomes arbitrary. Fixture id is stable and
   // roughly chronological within a matchday.

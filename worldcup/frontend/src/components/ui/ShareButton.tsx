@@ -106,7 +106,7 @@ export default function ShareButton({ text, url, title = "studio0x · World Cup 
         <button
           onClick={handleShare}
           title="Share"
-          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 ${className}`}
+          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/20 ${className}`}
         >
           <Share2 size={12} />
           Share
@@ -115,7 +115,7 @@ export default function ShareButton({ text, url, title = "studio0x · World Cup 
         <button
           onClick={handleShare}
           title="Share"
-          className={`flex items-center justify-center w-6 h-6 rounded-full bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-colors ${className}`}
+          className={`flex items-center justify-center w-6 h-6 rounded-full bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/20 transition-colors ${className}`}
         >
           <Share2 size={11} />
         </button>
@@ -129,7 +129,7 @@ export default function ShareButton({ text, url, title = "studio0x · World Cup 
               onClick={() => openIntent(key)}
               className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-left"
             >
-              <span className="text-sky-400">{icon}</span>
+              <span className="text-brand-gold">{icon}</span>
               {label}
             </button>
           ))}
@@ -137,7 +137,7 @@ export default function ShareButton({ text, url, title = "studio0x · World Cup 
             onClick={handleCopy}
             className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-left border-t border-brand-border/50"
           >
-            <span className={copied ? "text-brand-green" : "text-sky-400"}>
+            <span className={copied ? "text-brand-green" : "text-brand-gold"}>
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </span>
             {copied ? "Copied!" : "Copy link"}

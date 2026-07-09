@@ -8,8 +8,8 @@ function WeatherIcon({ code, isDay }: { code: number; isDay: boolean }) {
   const cls = "shrink-0";
   if (code === 0 || code === 1) return isDay ? <Sun size={11} className={`text-amber-400 ${cls}`} /> : <Cloud size={11} className={`text-slate-400 ${cls}`} />;
   if (code <= 3) return <Cloud size={11} className={`text-slate-400 ${cls}`} />;
-  if (code <= 67) return <CloudRain size={11} className={`text-sky-400 ${cls}`} />;
-  if (code <= 82) return <CloudRain size={11} className={`text-sky-500 ${cls}`} />;
+  if (code <= 67) return <CloudRain size={11} className={`text-slate-300 ${cls}`} />;
+  if (code <= 82) return <CloudRain size={11} className={`text-slate-400 ${cls}`} />;
   return <Zap size={11} className={`text-amber-400 ${cls}`} />;
 }
 

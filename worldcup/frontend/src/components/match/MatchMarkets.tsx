@@ -41,7 +41,7 @@ function OutcomeTile({
 }) {
   const color =
     highlight === "green" ? "text-brand-green" :
-    highlight === "amber" ? "text-amber-400" : "text-sky-400";
+    highlight === "amber" ? "text-slate-400" : "text-amber-400";
   const spread = detail.bid !== null && detail.ask !== null
     ? `${fmtCents(detail.bid)}–${fmtCents(detail.ask)}`
     : null;

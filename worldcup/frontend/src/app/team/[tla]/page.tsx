@@ -356,7 +356,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
               {/* Top assists */}
               <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border">
-                  <Zap size={13} className="text-blue-400" />
+                  <Zap size={13} className="text-slate-300" />
                   <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Assists</span>
                 </div>
                 <div className="divide-y divide-brand-border/30">
@@ -367,7 +367,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
                         <div className="text-xs font-semibold text-slate-200 truncate">{p.name}</div>
                         <div className="text-[10px] text-slate-600">{p.position}</div>
                       </div>
-                      <span className="text-sm font-black text-blue-400 tabular-nums">{p.tournamentStat?.assists ?? 0}</span>
+                      <span className="text-sm font-black text-slate-300 tabular-nums">{p.tournamentStat?.assists ?? 0}</span>
                     </div>
                   ))}
                   {topAssists.filter(p => (p.tournamentStat?.assists ?? 0) > 0).length === 0 && (
@@ -418,9 +418,9 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Player</th>
                       <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Min</th>
                       <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-brand-gold uppercase tracking-widest">IPM™</th>
-                      <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-blue-400 uppercase tracking-widest">SEI™</th>
+                      <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-300 uppercase tracking-widest">SEI™</th>
                       <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-brand-green uppercase tracking-widest">DD™</th>
-                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-purple-400 uppercase tracking-widest">CPS™</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-300 uppercase tracking-widest">CPS™</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-border/30">
@@ -432,9 +432,9 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-slate-500">{p.tournamentStat?.minutesPlayed ?? 0}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-gold">{fmt(p.ipm)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-400">{fmt(p.sei)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-300">{fmt(p.sei)}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-green">{fmt(p.dd)}</td>
-                        <td className="px-4 py-2.5 text-right font-mono font-bold text-purple-400">{fmt(p.cps)}</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-300">{fmt(p.cps)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -442,9 +442,9 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
               </div>
               <div className="px-4 py-2 border-t border-brand-border/30 flex flex-wrap gap-4 text-[9px] text-slate-700">
                 <span><span className="text-brand-gold font-bold">IPM™</span> Impact Per Minute</span>
-                <span><span className="text-blue-400 font-bold">SEI™</span> Shot Efficiency Index</span>
+                <span><span className="text-slate-300 font-bold">SEI™</span> Shot Efficiency Index</span>
                 <span><span className="text-brand-green font-bold">DD™</span> Duel Dominance</span>
-                <span><span className="text-purple-400 font-bold">CPS™</span> Complete Player Score</span>
+                <span><span className="text-slate-300 font-bold">CPS™</span> Complete Player Score</span>
               </div>
             </div>
           </div>
@@ -526,7 +526,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
                                   <span className="text-[10px] font-mono text-brand-gold w-4 text-right" title="Goals">
                                     {s.goals > 0 ? s.goals : "·"}
                                   </span>
-                                  <span className="text-[10px] font-mono text-blue-400 w-4 text-right" title="Assists">
+                                  <span className="text-[10px] font-mono text-slate-300 w-4 text-right" title="Assists">
                                     {s.assists > 0 ? s.assists : "·"}
                                   </span>
                                   <span className="text-[10px] font-mono text-amber-400 w-7 text-right" title="Rating">
@@ -588,7 +588,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
 
               {/* Passing */}
               <div className="rounded-2xl bg-brand-card border border-brand-border p-4">
-                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-3">Key Passes</div>
+                <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-3">Key Passes</div>
                 <div className="space-y-2">
                   {[...withStats]
                     .filter(p => (p.tournamentStat?.passesKey ?? 0) > 0)
@@ -604,7 +604,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
                         </div>
                         <div className="h-1 rounded-full bg-brand-border">
                           <div
-                            className="h-1 rounded-full bg-blue-400"
+                            className="h-1 rounded-full bg-slate-400"
                             style={{ width: `${Math.min(((p.tournamentStat?.passesKey ?? 0) / Math.max(1, ...withStats.map(x => x.tournamentStat?.passesKey ?? 0))) * 100, 100)}%` }}
                           />
                         </div>

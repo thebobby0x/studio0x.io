@@ -31,14 +31,6 @@ interface ScheduleMatch {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function formatCountdown(msUntil: number): string {
-  const totalSecs = Math.floor(msUntil / 1000);
-  const h = Math.floor(totalSecs / 3600);
-  const m = Math.floor((totalSecs % 3600) / 60);
-  if (h > 0) return `in ${h}h ${m}m`;
-  return `in ${m}m`;
-}
-
 function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max - 1) + "…" : str;
 }
@@ -75,13 +67,14 @@ function LiveSection({ liveMatch }: { liveMatch: LiveMatch | null }) {
     );
   }
 
-  return <RecentAndNextChips />;
+  return <PastResultsChips />;
 }
 
-function RecentAndNextChips() {
-  const [recent, setRecent] = useState<ScheduleMatch | null>(null);
-  const [next, setNext] = useState<ScheduleMatch | null>(null);
-  const [now, setNow] = useState(Date.now());
+// The ticker's job when nothing is live: the LAST 3 RESULTS, compact.
+// (The hero below already headlines the next kickoff — duplicating it here
+// was noise, per owner's 7/9 markup.)
+function PastResultsChips() {
+  const [recent, setRecent] = useState<ScheduleMatch[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -89,70 +82,38 @@ function RecentAndNextChips() {
         const res = await fetch("/api/schedule");
         if (!res.ok) return;
         const matches: ScheduleMatch[] = await res.json();
-
-        const finished = matches.filter(
-          (m) => m.status === "FT" && m.homeScore !== null
-        );
-        const upcoming = matches.filter((m) => m.status === "NS");
-
-        // Most recent FT: latest utcDate
-        const sortedFinished = [...finished].sort(
-          (a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime()
-        );
-        setRecent(sortedFinished[0] ?? null);
-
-        // Next NS: soonest utcDate
-        const sortedUpcoming = [...upcoming].sort(
-          (a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()
-        );
-        setNext(sortedUpcoming[0] ?? null);
+        const finished = matches
+          .filter((m) => m.status === "FT" && m.homeScore !== null)
+          .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime());
+        setRecent(finished.slice(0, 3));
       } catch { /* ignore */ }
     }
     load();
   }, []);
 
-  // Tick every minute to keep countdown fresh
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (!recent && !next) return null;
-
-  const nextMs = next ? new Date(next.utcDate).getTime() - now : Infinity;
-  const isImminent = nextMs < 60 * 60 * 1000; // < 60 min
+  if (recent.length === 0) return null;
 
   return (
     <div className="flex items-center gap-3 min-w-0">
-      {recent && (
-        <Link
-          href={`/schedule/${recent.id}`}
-          className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-        >
-          <span className="text-xl">{getFlag(recent.homeTeam.tla)}</span>
-          <span className="text-slate-200 font-bold tabular-nums">
-            {recent.homeScore}–{recent.awayScore}
-          </span>
-          <span className="text-xl">{getFlag(recent.awayTeam.tla)}</span>
-          <span className="ml-0.5 text-[10px] font-bold text-slate-500 uppercase">FT</span>
-        </Link>
-      )}
-      {recent && next && (
-        <span className="text-slate-700">·</span>
-      )}
-      {next && nextMs > 0 && (
-        <Link
-          href={`/schedule/${next.id}`}
-          className={`flex items-center gap-1.5 text-sm sm:text-base font-medium hover:opacity-80 transition-opacity shrink-0 ${
-            isImminent ? "text-amber-400" : "text-slate-300"
-          }`}
-        >
-          <span className="text-xl">{getFlag(next.homeTeam.tla)}</span>
-          <span className="text-slate-500 text-xs">vs</span>
-          <span className="text-xl">{getFlag(next.awayTeam.tla)}</span>
-          <span className="ml-0.5 text-xs font-semibold opacity-90">{formatCountdown(nextMs)}</span>
-        </Link>
-      )}
+      <span className="hidden sm:inline shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-600">
+        Results
+      </span>
+      {recent.map((m, i) => (
+        <span key={m.id} className="flex items-center gap-3 shrink-0">
+          {i > 0 && <span className="text-slate-700">·</span>}
+          <Link
+            href={`/schedule/${m.id}`}
+            className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <span className="text-xl">{getFlag(m.homeTeam.tla)}</span>
+            <span className="text-slate-200 font-bold tabular-nums">
+              {m.homeScore}–{m.awayScore}
+            </span>
+            <span className="text-xl">{getFlag(m.awayTeam.tla)}</span>
+            <span className="ml-0.5 text-[10px] font-bold text-slate-500 uppercase">FT</span>
+          </Link>
+        </span>
+      ))}
     </div>
   );
 }
@@ -163,10 +124,12 @@ function AudioSection() {
   const { current, isPlaying, togglePlay, next, prev } = useAudio();
 
   if (!current) {
+    // Desktop-only: on mobile the anthem shortcut lives in the nav pill row —
+    // this pill was overlapping the ticker text on small screens (owner 7/9).
     return (
       <Link
         href="/anthems"
-        className="flex items-center gap-2 text-sm sm:text-base font-semibold text-brand-gold hover:text-amber-300 transition-colors shrink-0 bg-brand-gold/10 px-3.5 py-1.5 rounded-full border border-brand-gold/20"
+        className="hidden sm:flex items-center gap-2 text-sm sm:text-base font-semibold text-brand-gold hover:text-amber-300 transition-colors shrink-0 bg-brand-gold/10 px-3.5 py-1.5 rounded-full border border-brand-gold/20"
       >
         <Music2 size={16} />
         <span>Team Anthems</span>
@@ -243,8 +206,9 @@ export default function LiveMatchBanner() {
   return (
     <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
       <div className="max-w-7xl mx-auto flex justify-between items-center px-4 h-16 gap-4">
-        {/* Left: live score or recent/upcoming chips */}
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Left: live score or last-3-results chips. Scrolls horizontally on
+            small screens instead of colliding with the audio pill. */}
+        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <LiveSection liveMatch={liveMatch} />
           {liveCount >= 2 && (
             <Link

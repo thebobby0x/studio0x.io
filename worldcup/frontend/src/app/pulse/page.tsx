@@ -69,7 +69,7 @@ function formatNextMatch(iso: string | null): string {
 
 function TempBadge({ c }: { c: number }) {
   const { tempC } = useUnits();
-  const color = c >= 32 ? "text-red-400" : c >= 25 ? "text-amber-400" : "text-sky-400";
+  const color = c >= 32 ? "text-red-400" : c >= 25 ? "text-amber-400" : "text-slate-300";
   return <span className={`text-[10px] font-semibold ${color}`}>{tempC(c)}</span>;
 }
 
@@ -209,7 +209,7 @@ function CityCard({
           </div>
 
           <div className="bg-blue-950/30 border border-blue-900/30 rounded-xl px-3 py-2">
-            <div className="text-[9px] uppercase tracking-wider text-blue-500/70 mb-1">
+            <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">
               Travel fact
             </div>
             <div className="text-[11px] text-slate-400 leading-relaxed">{city.travelFact}</div>
@@ -463,7 +463,7 @@ export default function PulsePage() {
               <div className="text-[10px] text-slate-600 mt-0.5">projected total</div>
             </div>
             <div className="rounded-2xl bg-gradient-to-br from-blue-950/30 to-brand-card border border-blue-900/20 px-4 py-3">
-              <div className="text-[10px] uppercase tracking-widest text-blue-500 mb-1">
+              <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">
                 Intl visitors
               </div>
               <div className="text-2xl font-black text-white">1.5M</div>

@@ -120,7 +120,7 @@ export default function TransitionDangerRating({ goals, homeTeamName, awayTeamNa
             </div>
             <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all"
                 style={{ width: `${(t.tdr / maxTDR) * 100}%` }}
               />
             </div>

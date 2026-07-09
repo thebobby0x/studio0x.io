@@ -74,7 +74,7 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
             World Cup Winner Odds
           </span>
         </div>
-        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-semibold">
+        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400 font-semibold">
           <Wifi size={9} /> Polymarket
         </span>
       </div>

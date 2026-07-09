@@ -231,8 +231,8 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                         {isLive ? (
                           <>
                             <span className="text-brand-gold font-black">{l.goals}G</span>
-                            <span className="text-blue-400">{l.assists}A</span>
-                            {l.hatTricks > 0 && <span className="text-purple-400 font-black">{l.hatTricks}🎩</span>}
+                            <span className="text-slate-300">{l.assists}A</span>
+                            {l.hatTricks > 0 && <span className="text-brand-gold font-black">{l.hatTricks}🎩</span>}
                           </>
                         ) : (
                           <>
@@ -289,8 +289,8 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                         {isLive ? (
                           <>
                             {c.wcGoals > 0 && <span className="text-brand-gold font-black">{c.wcGoals}G</span>}
-                            {c.wcAssists > 0 && <span className="text-blue-400">{c.wcAssists}A</span>}
-                            {c.hatTricks > 0 && <span className="text-purple-400 font-black">{c.hatTricks}🎩</span>}
+                            {c.wcAssists > 0 && <span className="text-slate-300">{c.wcAssists}A</span>}
+                            {c.hatTricks > 0 && <span className="text-brand-gold font-black">{c.hatTricks}🎩</span>}
                             {avgRating && <span className="text-amber-400">★{avgRating}</span>}
                           </>
                         ) : (
@@ -303,7 +303,7 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
 
                     <div className="h-1 rounded-full bg-brand-border overflow-hidden mb-1.5">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-sky-500 to-brand-green"
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-brand-green"
                         style={{ width: `${barPct}%` }}
                       />
                     </div>
