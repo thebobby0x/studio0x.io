@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { syncFixtures } from "@/lib/fixtureSync";
 import { evictCachesIfNearQuota } from "@/lib/blobMaintenance";
+import { backfillMatchWeather } from "@/lib/heatOutcomes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,5 +41,9 @@ export async function GET(req: Request) {
   // 3. Blob cache eviction (quota guard)
   const blob = await evictCachesIfNearQuota();
 
-  return NextResponse.json({ ok: true, sync, ingest, blob });
+  // 4. Heat vs. Outcomes stamp — kickoff-hour weather + outcome facts for
+  // matches played since the last run (≤4/day at this stage; 6 covers slack).
+  const weather = await backfillMatchWeather(6).catch((e) => ({ ok: false, skipped: String(e) }));
+
+  return NextResponse.json({ ok: true, sync, ingest, blob, weather });
 }

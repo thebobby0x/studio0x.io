@@ -343,3 +343,28 @@ model MatchEventLog {
   @@unique([fixture, eventKey])
   @@index([fixture])
 }
+
+// Heat vs. Outcomes (Cramp Watch™ aggregate, backlog §16): one row per fixture
+// with the REAL kickoff-hour weather (Open-Meteo hourly archive — retrieval of
+// archived fact, honest to backfill) plus outcome facts computed from the
+// api-football events feed once the match is FT. climateControlled venues are
+// excluded from heat buckets — their outdoor reading isn't match conditions.
+model MatchWeather {
+  id                String   @id @default(cuid())
+  fixture           Int      @unique
+  kickoff           DateTime
+  tempC             Float
+  feelsC            Float
+  humidity          Float
+  band              String   // Low | Moderate | High | Extreme (lib/heat.ts)
+  source            String   // "archive" (past day) | "recent" (same-day hourly)
+  climateControlled Boolean  @default(false)
+  // Outcome facts — null until the match is FT and events were ingested
+  totalGoals        Int?
+  lateGoals         Int?     // goals scored 75'+ (excl. missed pens)
+  cards             Int?
+  subsAfter75       Int?     // labeled PROXY for fatigue — no cramp event exists
+  capturedAt        DateTime @default(now())
+
+  @@index([band])
+}
