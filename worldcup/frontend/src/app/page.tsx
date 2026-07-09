@@ -18,6 +18,7 @@ import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
 import { isMatchInProgress, KNOCKOUT_START, classifyRound, ROUND_DATES, ROUND_SIZES } from "@/lib/tournament";
+import { getTournamentWinnerMarkets } from "@/lib/polymarket";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
@@ -66,16 +67,95 @@ async function getInitialData() {
   }
 }
 
-async function getTodaySchedule(): Promise<ScheduleMatch[]> {
+async function getTodaySchedule(): Promise<{ today: ScheduleMatch[]; all: ScheduleMatch[] }> {
   try {
     const { GET } = await import("@/app/api/schedule/route");
     const res = await GET();
     const all = (await res.json()) as ScheduleMatch[];
     const today = new Date().toISOString().slice(0, 10);
-    return all.filter((m) => m.utcDate.startsWith(today)).slice(0, 8);
+    return { today: all.filter((m) => m.utcDate.startsWith(today)).slice(0, 8), all };
   } catch {
-    return [];
+    return { today: [], all: [] };
   }
+}
+
+// ── Today-strip storylines (owner 7/9 #4) ─────────────────────────────────────
+// Built ONLY from data we actually hold: recent form from finished results,
+// and the assigned referee's real WC-2026 discipline profile. No injuries or
+// lineup speculation — we have no data source for those (backlog: api-football
+// /injuries once vetted).
+function teamForm(all: ScheduleMatch[], tla: string, n = 3): string {
+  const letters = all
+    .filter(
+      (m) =>
+        m.status === "FT" &&
+        m.homeScore !== null &&
+        (m.homeTeam.tla === tla || m.awayTeam.tla === tla)
+    )
+    .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime())
+    .slice(0, n)
+    .reverse()
+    .map((m) => {
+      const isHome = m.homeTeam.tla === tla;
+      const us = isHome ? m.homeScore! : m.awayScore!;
+      const them = isHome ? m.awayScore! : m.homeScore!;
+      return us > them ? "W" : us < them ? "L" : "D";
+    });
+  return letters.join("");
+}
+
+interface TodayStoryline {
+  form?: string;      // "FRA WWL · MAR WDW"
+  referee?: string;   // "Ref Ramos · 4.2 fouls/card"
+}
+
+async function buildTodayStorylines(
+  today: ScheduleMatch[],
+  all: ScheduleMatch[]
+): Promise<Map<number, TodayStoryline>> {
+  const map = new Map<number, TodayStoryline>();
+  if (today.length === 0) return map;
+
+  // Assigned referees from the DB + their real WC-2026 profiles
+  let refByFixture = new Map<number, string>();
+  let profileByName = new Map<string, { cardThreshold: number | null; letItFlow: number | null }>();
+  try {
+    const rows = await prisma.match.findMany({
+      where: { fixture: { in: today.map((m) => m.id) } },
+      select: { fixture: true, referee: true },
+    });
+    refByFixture = new Map(rows.filter((r) => r.referee).map((r) => [r.fixture, r.referee!]));
+    if (refByFixture.size > 0) {
+      const { GET } = await import("@/app/api/officials/route");
+      const json = (await (await GET()).json()) as {
+        officials?: { name: string; cardThreshold: number | null; letItFlow: number | null }[];
+      };
+      profileByName = new Map((json.officials ?? []).map((o) => [o.name, o]));
+    }
+  } catch { /* storylines degrade gracefully */ }
+
+  for (const m of today) {
+    const s: TodayStoryline = {};
+    const hf = teamForm(all, m.homeTeam.tla);
+    const af = teamForm(all, m.awayTeam.tla);
+    if (hf && af) s.form = `${m.homeTeam.tla} ${hf} · ${m.awayTeam.tla} ${af}`;
+
+    const refName = refByFixture.get(m.id);
+    if (refName) {
+      const p = profileByName.get(refName);
+      const surname = refName.split(" ").slice(-1)[0];
+      if (p?.cardThreshold != null) {
+        const temper =
+          p.letItFlow != null && p.letItFlow >= 60 ? "lets it flow" :
+          p.letItFlow != null && p.letItFlow < 40 ? "quick whistle" : "";
+        s.referee = `Ref ${surname} · ${p.cardThreshold} fouls/card${temper ? ` · ${temper}` : ""}`;
+      } else {
+        s.referee = `Ref ${surname}`;
+      }
+    }
+    if (s.form || s.referee) map.set(m.id, s);
+  }
+  return map;
 }
 
 function matchStatusLabel(status: string, elapsed: number) {
@@ -85,17 +165,56 @@ function matchStatusLabel(status: string, elapsed: number) {
   return "NS";
 }
 
+// ── Result takeaways (owner 7/9 #9) ───────────────────────────────────────────
+// A one-line "so what" beside each finished knockout match, computed purely
+// from real results (+ live Polymarket favorite) — never invented. Group-stage
+// takeaways need point-in-time tables; backlog.
+function buildTakeaways(matches: Match[], favoriteCode: string | null): Map<number, string> {
+  const NEXT_ROUND: Record<string, string> = {
+    "Round of 32": "Round of 16",
+    "Round of 16": "quarter-finals",
+    "Quarter-finals": "semi-finals",
+    "Semi-finals": "the Final",
+  };
+  const map = new Map<number, string>();
+  for (const m of matches) {
+    if (m.status !== "FT") continue;
+    const d = new Date(m.date);
+    if (d < KNOCKOUT_START) continue;
+    const round = classifyRound(d);
+    if (!round) continue;
+    const hs = m.homeScore ?? 0;
+    const as = m.awayScore ?? 0;
+    if (hs === as) {
+      map.set(m.fixture, `${round} tie level after 120' — decided on penalties`);
+      continue;
+    }
+    const winner = hs > as ? m.homeTeam : m.awayTeam;
+    const loser = hs > as ? m.awayTeam : m.homeTeam;
+    let note: string;
+    if (round === "Final") note = `${winner.name} are WORLD CHAMPIONS 🏆`;
+    else if (round === "3rd Place Final") note = `${winner.name} take third place`;
+    else note = `${winner.name} through to the ${NEXT_ROUND[round]} · ${loser.name} out`;
+    if (favoriteCode && winner.code === favoriteCode && round !== "Final") {
+      note += " · now the market favorites";
+    }
+    map.set(m.fixture, note);
+  }
+  return map;
+}
+
 // ── List-view row ──────────────────────────────────────────────────────────────
 
-function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
+function MatchListRow({ m, isFeatured, takeaway }: { m: Match; isFeatured: boolean; takeaway?: string }) {
   const isLive = m.status === "LIVE" || m.status === "HT";
   return (
     <Link
       href={`/schedule/${m.fixture}`}
-      className={`flex items-center gap-3 px-4 py-3 transition-colors rounded-xl group ${
+      className={`block px-4 py-3 transition-colors rounded-xl group ${
         isFeatured ? "bg-brand-green/5 border border-brand-green/20" : "hover:bg-white/3 border border-transparent"
       }`}
     >
+      <div className="flex items-center gap-3">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <FlagImg tla={m.homeTeam.code} size={24} className="shrink-0" />
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
@@ -132,6 +251,12 @@ function MatchListRow({ m, isFeatured }: { m: Match; isFeatured: boolean }) {
           </span>
         )}
       </div>
+      </div>
+      {takeaway && (
+        <div className="mt-1 pl-8 text-[10px] text-slate-500 leading-snug">
+          {takeaway}
+        </div>
+      )}
     </Link>
   );
 }
@@ -144,16 +269,29 @@ export default async function DashboardPage({
   let params: { view?: string; live?: string; focus?: string } = {};
   let matches: Match[] = [];
   let todayMatches: ScheduleMatch[] = [];
+  let allSchedule: ScheduleMatch[] = [];
 
   try {
-    [params, [{ matches }, todayMatches]] = await Promise.all([
+    let sched: { today: ScheduleMatch[]; all: ScheduleMatch[] };
+    [params, [{ matches }, sched]] = await Promise.all([
       searchParams,
       Promise.all([getInitialData(), getTodaySchedule()]),
     ]);
+    todayMatches = sched.today;
+    allSchedule = sched.all;
   } catch (e) {
     console.error("[DashboardPage] top-level fetch failed:", e);
     params = {};
   }
+
+  // Storylines for the today strip (real form + real referee profiles) and the
+  // Polymarket favorite for result takeaways — both fail soft.
+  const [todayStorylines, oddsForFavorite] = await Promise.all([
+    buildTodayStorylines(todayMatches, allSchedule),
+    getTournamentWinnerMarkets().catch(() => null),
+  ]);
+  const favoriteCode = oddsForFavorite?.markets?.[0]?.tla ?? null;
+  const takeaways = buildTakeaways(matches, favoriteCode);
 
   const viewMode = params?.view === "list" ? "list" : "tile";
   const liveMode = params?.live === "split" ? "split" : "focus";
@@ -383,11 +521,12 @@ export default async function DashboardPage({
               {todayMatches.map((m) => {
                 const isLive = m.status === "LIVE" || m.status === "HT";
                 const isDone = m.status === "FT";
+                const story = todayStorylines.get(m.id);
                 return (
                   <Link
                     key={m.id}
                     href={`/schedule/${m.id}`}
-                    className="flex-shrink-0 flex flex-col items-center gap-1.5 px-5 py-4 hover:bg-white/5 transition-colors group min-w-[120px]"
+                    className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-5 py-4 hover:bg-white/5 transition-colors group ${story ? "min-w-[170px]" : "min-w-[120px]"}`}
                   >
                     <div className="flex items-center gap-2 text-sm">
                       <span>{getFlag(m.homeTeam.tla)}</span>
@@ -418,6 +557,13 @@ export default async function DashboardPage({
                           : "NS"}
                       </span>
                     </div>
+                    {/* Storylines — real form + real referee profile (owner 7/9 #4) */}
+                    {story?.form && (
+                      <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{story.form}</span>
+                    )}
+                    {story?.referee && (
+                      <span className="text-[9px] text-slate-600 whitespace-nowrap">{story.referee}</span>
+                    )}
                   </Link>
                 );
               })}
@@ -474,6 +620,7 @@ export default async function DashboardPage({
                       key={m.id}
                       m={m}
                       isFeatured={featuredMatch?.id === m.id}
+                      takeaway={takeaways.get(m.fixture)}
                     />
                   ))}
                 </div>
@@ -720,6 +867,7 @@ export default async function DashboardPage({
                             key={m.id}
                             m={m}
                             isFeatured={featuredMatch.id === m.id}
+                            takeaway={takeaways.get(m.fixture)}
                           />
                         ))}
                       </div>
