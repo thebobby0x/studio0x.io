@@ -15,6 +15,11 @@ export interface WeatherData {
   forecastHigh: number;
   forecastLow: number;
   forecastPrecipMm: number;
+  // Air quality (Open-Meteo Air Quality API / CAMS). null when the AQ service
+  // is unavailable — never fabricated. US AQI scale; pm25 in µg/m³ catches
+  // wildfire smoke that city-level AQI averaging can hide.
+  aqi: number | null;
+  pm25: number | null;
   source: "live" | "cache";
 }
 
@@ -71,10 +76,19 @@ export async function GET(req: Request) {
       `weather_code,wind_speed_10m,wind_direction_10m,is_day,uv_index` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +
       `&wind_speed_unit=kmh&timezone=auto&forecast_days=1`;
+    // Separate service, separate failure domain: air quality must never take
+    // down the core weather strip, so it resolves to null on any error.
+    const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}` +
+      `&current=us_aqi,pm2_5&timezone=UTC`;
 
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 5000);
-    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    const [res, aqJson] = await Promise.all([
+      fetch(url, { signal: ctrl.signal, cache: "no-store" }),
+      fetch(aqUrl, { signal: ctrl.signal, cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]);
     if (!res.ok) throw new Error(`open-meteo ${res.status}`);
 
     const json = await res.json();
@@ -96,6 +110,8 @@ export async function GET(req: Request) {
       forecastHigh:    Math.round(d.temperature_2m_max[0]),
       forecastLow:     Math.round(d.temperature_2m_min[0]),
       forecastPrecipMm: d.precipitation_sum[0],
+      aqi:             aqJson?.current?.us_aqi ?? null,
+      pm25:            aqJson?.current?.pm2_5 ?? null,
       source:          "live",
     };
 

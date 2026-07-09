@@ -13,6 +13,7 @@ import HeroWeather from "@/components/venue/HeroWeather";
 import UpsetMeter from "@/components/stats/UpsetMeter";
 import PressingIntensityIndex from "@/components/stats/PressingIntensityIndex";
 import FormMeter from "@/components/stats/FormMeter";
+import FatigueFactor from "@/components/stats/FatigueFactor";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
@@ -296,6 +297,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             <FormMeter teamTla={m.awayTeam.tla} teamName={m.awayTeam.name} />
           </div>
         </div>
+
+        {/* Fatigue Factor™ — rest + travel between games (owner 7/9) */}
+        <FatigueFactor fixtureId={m.id} />
 
         {/* Live win probability meter — DB match needed for matchId */}
         <MatchWinMeter fixtureId={m.id} />

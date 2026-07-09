@@ -24,6 +24,21 @@ export function heatBand(feelsC: number): HeatBand {
   return "Low";
 }
 
+// US AQI bands (EPA scale). Colors follow the color discipline: slate for
+// informational, gold for caution, red for genuinely bad — never green/blue.
+export function aqiBand(aqi: number): { label: string; color: string; concern: boolean } {
+  if (aqi <= 50) return { label: "Good", color: "text-slate-400", concern: false };
+  if (aqi <= 100) return { label: "Moderate", color: "text-slate-300", concern: false };
+  if (aqi <= 150) return { label: "Unhealthy for Sensitive Groups", color: "text-brand-gold", concern: true };
+  if (aqi <= 200) return { label: "Unhealthy", color: "text-red-400", concern: true };
+  if (aqi <= 300) return { label: "Very Unhealthy", color: "text-red-400", concern: true };
+  return { label: "Hazardous", color: "text-red-400", concern: true };
+}
+
+// EPA 24h PM2.5 standard is 35 µg/m³ — sustained readings above it usually
+// mean smoke or haze (wildfires), not ordinary city pollution.
+export const PM25_SMOKE_THRESHOLD = 35;
+
 export function crampWatch(feelsC: number, humidity: number): {
   level: HeatBand;
   color: string;

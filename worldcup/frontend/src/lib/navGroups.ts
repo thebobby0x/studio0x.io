@@ -37,6 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/standings", label: "Standings" },
       { href: "/bracket", label: "Bracket" },
+      { href: "/records", label: "Records" },
       { href: "/leagues", label: "Leagues" },
       { href: "/officials", label: "Officials" },
     ],

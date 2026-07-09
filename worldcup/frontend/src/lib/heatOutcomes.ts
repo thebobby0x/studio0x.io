@@ -65,6 +65,42 @@ async function fetchKickoffWeather(
   }
 }
 
+interface HourlyAir {
+  aqi: number;
+  pm25: number;
+}
+
+// Kickoff-hour air quality (US AQI + PM2.5) — the wildfire-smoke signal.
+// Separate Open-Meteo service; failure just means null fields, never a
+// failed backfill row.
+async function fetchKickoffAir(
+  lat: number,
+  lng: number,
+  kickoff: Date
+): Promise<HourlyAir | null> {
+  const day = kickoff.toISOString().slice(0, 10);
+  const url =
+    `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}` +
+    `&hourly=us_aqi,pm2_5&start_date=${day}&end_date=${day}&timezone=UTC`;
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const times: string[] = json.hourly?.time ?? [];
+    const hourIso = kickoff.toISOString().slice(0, 13) + ":00";
+    const i = times.indexOf(hourIso);
+    if (i < 0) return null;
+    const aqi = json.hourly.us_aqi?.[i];
+    const pm25 = json.hourly.pm2_5?.[i];
+    if (aqi == null || pm25 == null) return null;
+    return { aqi, pm25 };
+  } catch {
+    return null;
+  }
+}
+
 interface OutcomeFacts {
   totalGoals: number;
   lateGoals: number;
@@ -105,7 +141,7 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
   };
 
   const existing = await prisma.matchWeather.findMany({
-    select: { fixture: true, totalGoals: true },
+    select: { fixture: true, totalGoals: true, aqi: true },
   });
   const byFixture = new Map(existing.map((w) => [w.fixture, w]));
 
@@ -137,7 +173,10 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
         if (!info) { result.skippedNoVenue++; continue; }
         const wx = await fetchKickoffWeather(info.lat, info.lng, m.date);
         if (!wx) { result.skippedNoData++; continue; }
-        const facts = m.status === "FT" ? await fetchOutcomeFacts(m.fixture) : null;
+        const [facts, air] = await Promise.all([
+          m.status === "FT" ? fetchOutcomeFacts(m.fixture) : Promise.resolve(null),
+          fetchKickoffAir(info.lat, info.lng, m.date),
+        ]);
         await prisma.matchWeather.create({
           data: {
             fixture: m.fixture,
@@ -148,6 +187,7 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
             band: heatBand(wx.feelsC),
             source: m.date.toISOString().slice(0, 10) === today ? "recent" : "archive",
             climateControlled: CLIMATE_CONTROLLED.has(m.venue),
+            ...(air ?? {}),
             ...(facts ?? {}),
           },
         });
@@ -155,11 +195,19 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
         if (facts) result.outcomesAdded++;
       } else {
         // Row exists but outcomes were missing when it was created (match was
-        // live at the time) — fill them in now that it's FT.
-        const facts = await fetchOutcomeFacts(m.fixture);
-        if (!facts) { result.skippedNoData++; continue; }
-        await prisma.matchWeather.update({ where: { fixture: m.fixture }, data: facts });
-        result.outcomesAdded++;
+        // live at the time) — fill them in now that it's FT. Piggyback the
+        // air-quality fill for rows stamped before the AQ columns existed.
+        const info = getVenueInfo(m.venue);
+        const [facts, air] = await Promise.all([
+          fetchOutcomeFacts(m.fixture),
+          row.aqi === null && info ? fetchKickoffAir(info.lat, info.lng, m.date) : Promise.resolve(null),
+        ]);
+        if (!facts && !air) { result.skippedNoData++; continue; }
+        await prisma.matchWeather.update({
+          where: { fixture: m.fixture },
+          data: { ...(air ?? {}), ...(facts ?? {}) },
+        });
+        if (facts) result.outcomesAdded++;
       }
     } catch (e) {
       result.errors.push(`fixture ${m.fixture}: ${String(e)}`);
