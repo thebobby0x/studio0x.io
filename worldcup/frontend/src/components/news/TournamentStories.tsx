@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { RefreshCw, Newspaper } from "lucide-react";
 import type { Story } from "@/app/api/ai/stories/route";
 import StoryCard from "@/components/news/StoryCard";
@@ -55,16 +56,34 @@ export default function TournamentStories() {
           <span className="text-xs font-black uppercase tracking-widest text-slate-400">Studio0x Analysis</span>
           <span className="text-[10px] text-slate-600">· AI + ElevenLabs voice</span>
         </div>
-        <button
-          onClick={() => load(true)}
-          disabled={regenerating}
-          className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-brand-gold transition-colors disabled:opacity-40"
-        >
-          <RefreshCw size={11} className={regenerating ? "animate-spin" : ""} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => load(true)}
+            disabled={regenerating}
+            className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-brand-gold transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={11} className={regenerating ? "animate-spin" : ""} />
+            Refresh
+          </button>
+          <Link
+            href="/news"
+            className="text-[11px] font-semibold text-brand-gold hover:text-amber-300 transition-colors"
+          >
+            Archive →
+          </Link>
+        </div>
       </div>
-      {stories.map((s) => <StoryCard key={s.id} story={s} />)}
+      {/* Dashboard keeps a compact top-3 — /news is the full archive (owner
+          7/9 #8: one canonical home for every story, no duplication). */}
+      {stories.slice(0, 3).map((s) => <StoryCard key={s.id} story={s} />)}
+      <div className="text-center">
+        <Link
+          href="/news"
+          className="inline-block text-[11px] font-semibold text-slate-500 hover:text-brand-gold transition-colors py-1"
+        >
+          All stories, previews & recaps in the archive →
+        </Link>
+      </div>
     </div>
   );
 }

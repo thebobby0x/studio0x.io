@@ -127,9 +127,10 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
 // ── Compact side-column row ──────────────────────────────────────────────────
 function SideRow({ m, now, kind }: { m: HeroMatch; now: number; kind: "upcoming" | "result" }) {
   const ct = kind === "upcoming" ? formatKickoffCountdown(m.date, now, { withPrefix: false }) : null;
+  const isTbd = m.home.code === "TBD";
   return (
     <Link
-      href={`/schedule/${m.fixture || m.id}`}
+      href={isTbd ? "/bracket" : `/schedule/${m.fixture || m.id}`}
       className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
     >
       <FlagImg tla={m.home.code} size={18} className="shrink-0" />

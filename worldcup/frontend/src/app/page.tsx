@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import FlagImg from "@/components/ui/FlagImg";
 import { venueCity, getVenueInfo } from "@/lib/venues";
-import { isMatchInProgress, KNOCKOUT_START, classifyRound } from "@/lib/tournament";
+import { isMatchInProgress, KNOCKOUT_START, classifyRound, ROUND_DATES, ROUND_SIZES } from "@/lib/tournament";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
@@ -169,13 +169,17 @@ export default async function DashboardPage({
     .filter((m) => isMatchInProgress(m.status, new Date(m.date).getTime()))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // In split mode, use the focused match for detail sections; otherwise use default featured
+  // In split mode, use the focused match for detail sections; otherwise use default featured.
+  // Priority: live > NEXT game > most recent result (owner 7/9: the next big
+  // moment leads; results are context — they already live in the hero's
+  // Results column, so featuring an FT match duplicated them).
+  const nextNs = nsMatches
+    .slice()
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
   const defaultFeatured =
     inProgress.length > 0
       ? inProgress[0]
-      : ftMatches.length > 0
-      ? ftMatches[ftMatches.length - 1]
-      : (nsMatches[0] ?? matches[matches.length - 1]);
+      : nextNs ?? (ftMatches.length > 0 ? ftMatches[ftMatches.length - 1] : matches[matches.length - 1]);
 
   // In split mode with 2+ live games, the detail sections (win meter, stadium, odds) follow whichever
   // match the user has focused via ?focus=0|1; otherwise fall back to the normal featured match
@@ -227,6 +231,34 @@ export default async function DashboardPage({
         new Date(a.date).getTime() - new Date(b.date).getTime() || a.fixture - b.fixture
     )
     .map(toHero);
+
+  // Fill the Upcoming box (owner 7/9 #3): late in the tournament only a few
+  // fixtures have named teams, so pad with TBD slots for future rounds — the
+  // dates and round names are real (lib/tournament), only the pairings are TBD.
+  {
+    const now = Date.now();
+    for (const rd of ROUND_DATES) {
+      if (rd.to.getTime() < now) continue;
+      const inWindow = matches.filter(
+        (m) => new Date(m.date) >= rd.from && new Date(m.date) <= rd.to
+      ).length;
+      for (let i = inWindow; i < ROUND_SIZES[rd.round] && heroUpcoming.length < 7; i++) {
+        heroUpcoming.push({
+          id: `tbd-${rd.round}-${i}`,
+          fixture: 0,
+          date: rd.from.toISOString(),
+          status: "NS",
+          home: { name: "TBD", code: "TBD" },
+          away: { name: "TBD", code: "TBD" },
+          homeScore: 0,
+          awayScore: 0,
+          elapsed: 0,
+          stage: rd.round,
+        });
+      }
+    }
+    heroUpcoming.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
   const heroResults = ftMatches
     .slice()
     .sort(
@@ -235,11 +267,29 @@ export default async function DashboardPage({
     )
     .map(toHero);
 
-  // The freshest AI story leads the page — previews land ~1h before kickoff
-  // and recaps within minutes of FT, so this is always "the story right now".
-  const topStory = await prisma.newsStory
-    .findFirst({ orderBy: { generatedAt: "desc" } })
-    .catch(() => null);
+  // The headline is about the NEXT BIG MOMENT (owner 7/9 #1), not just the
+  // newest row: prefer the preview for the next kickoff, then any story about
+  // those two teams, then a live-match story, then newest overall.
+  const topStory = await (async () => {
+    try {
+      const liveOrNext = inProgress[0] ?? nextNs;
+      if (liveOrNext) {
+        const preview = await prisma.newsStory.findFirst({
+          where: { fixture: liveOrNext.fixture },
+          orderBy: { generatedAt: "desc" },
+        });
+        if (preview) return preview;
+        const teamStory = await prisma.newsStory.findFirst({
+          where: { teamsInvolved: { hasSome: [liveOrNext.homeTeam.code, liveOrNext.awayTeam.code] } },
+          orderBy: { generatedAt: "desc" },
+        });
+        if (teamStory) return teamStory;
+      }
+      return await prisma.newsStory.findFirst({ orderBy: { generatedAt: "desc" } });
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
@@ -378,8 +428,9 @@ export default async function DashboardPage({
         {/* ── LIST VIEW ───────────────────────────────────────────────────── */}
         {viewMode === "list" && (
           <div className="space-y-4">
-            {/* Live match card — same as tile view */}
-            {featuredMatch && (
+            {/* Live match card — same as tile view (skipped pre-match: the hero
+                already headlines the next game) */}
+            {featuredMatch && (isMatchLiveNow || featuredMatch.status !== "NS") && (
               <>
                 {isMatchLiveNow && (
                   <div className="flex items-center gap-3 -mb-2">
@@ -486,7 +537,10 @@ export default async function DashboardPage({
 
             {featuredMatch ? (
               <div className="space-y-3">
-                {!isMatchLiveNow && (
+                {/* Pre-match the hero already headlines the next game — a second
+                    big card here was pure duplication (owner 7/9 #2). The label
+                    + card render only for live/finished featured matches. */}
+                {!isMatchLiveNow && featuredMatch.status !== "NS" && (
                   <div className="flex items-center gap-3">
                     {(() => {
                       const city = realVenue
@@ -495,7 +549,10 @@ export default async function DashboardPage({
                       const venuePart = realVenue
                         ? ` · ${realVenue}${city ? `, ${city}` : ""}`
                         : "";
-                      const groupPart = `Group ${featuredMatch.homeTeam.groupStage}`;
+                      // Knockout matches carry a residual group — label by round
+                      const groupPart = new Date(featuredMatch.date) >= KNOCKOUT_START
+                        ? (classifyRound(new Date(featuredMatch.date)) ?? "Knockout")
+                        : `Group ${featuredMatch.homeTeam.groupStage}`;
                       if (["LIVE", "HT"].includes(featuredMatch.status))
                         return (
                           <>
@@ -541,7 +598,7 @@ export default async function DashboardPage({
                       </div>
                     )}
                   </div>
-                ) : (
+                ) : featuredMatch.status !== "NS" || isMatchLiveNow ? (
                   <Suspense
                     fallback={
                       <div
@@ -553,7 +610,7 @@ export default async function DashboardPage({
                   >
                     <LiveMatchCard matchId={featuredMatch.id} hero={isMatchLiveNow ?? false} />
                   </Suspense>
-                )}
+                ) : null}
 
                 {/* Focus mode: compact "Also Live" cards for simultaneous matches */}
                 {liveMode === "focus" && liveMatches.length >= 2 && (
@@ -628,7 +685,11 @@ export default async function DashboardPage({
 
                 <LiveWinMeter matchId={featuredMatch.id} />
 
-                {featuredMatch.homeTeam.groupStage && (
+                {/* Group-winner markets are settled once knockouts begin — the
+                    panel only renders during the group stage (owner 7/9 #6).
+                    Future home: a predictions-vs-results analysis page. */}
+                {featuredMatch.homeTeam.groupStage &&
+                  new Date(featuredMatch.date) < KNOCKOUT_START && (
                   <GroupWinnerTickers
                     group={featuredMatch.homeTeam.groupStage}
                     highlightTeams={[featuredMatch.homeTeam.name, featuredMatch.awayTeam.name]}
