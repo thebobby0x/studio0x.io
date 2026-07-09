@@ -503,77 +503,6 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        {/* ── 3-zone hero: Upcoming · Live/Next · Results ── */}
-        <LiveHero live={heroLive} upcoming={heroUpcoming} results={heroResults} />
-
-        {/* Today's match strip */}
-        {todayMatches.length > 0 && (
-          <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
-              <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Today at the World Cup
-              </span>
-              <Link
-                href="/schedule"
-                className="text-[10px] text-brand-gold hover:text-amber-300 transition-colors"
-              >
-                View all →
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto divide-x divide-brand-border/50">
-              {todayMatches.map((m) => {
-                const isLive = m.status === "LIVE" || m.status === "HT";
-                const isDone = m.status === "FT";
-                const story = todayStorylines.get(m.id);
-                return (
-                  <Link
-                    key={m.id}
-                    href={`/schedule/${m.id}`}
-                    className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-5 py-4 hover:bg-white/5 transition-colors group ${story ? "min-w-[170px]" : "min-w-[120px]"}`}
-                  >
-                    <div className="flex items-center gap-2 text-sm">
-                      <span>{getFlag(m.homeTeam.tla)}</span>
-                      <span
-                        className={`font-black text-sm tabular-nums ${
-                          isLive ? "text-white" : isDone ? "text-slate-400" : "text-slate-600"
-                        }`}
-                      >
-                        {isLive || isDone ? `${m.homeScore ?? 0}–${m.awayScore ?? 0}` : "vs"}
-                      </span>
-                      <span>{getFlag(m.awayTeam.tla)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {isLive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      )}
-                      <span
-                        className={`text-[10px] font-semibold ${
-                          isLive ? "text-red-400" : isDone ? "text-slate-600" : "text-slate-500"
-                        }`}
-                      >
-                        {isLive
-                          ? m.status === "HT"
-                            ? "HT"
-                            : `${m.minute}'`
-                          : isDone
-                          ? "FT"
-                          : "NS"}
-                      </span>
-                    </div>
-                    {/* Storylines — real form + real referee profile (owner 7/9 #4) */}
-                    {story?.form && (
-                      <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{story.form}</span>
-                    )}
-                    {story?.referee && (
-                      <span className="text-[9px] text-slate-600 whitespace-nowrap">{story.referee}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* ── LIST VIEW ───────────────────────────────────────────────────── */}
         {viewMode === "list" && (
           <div className="space-y-4">
@@ -606,6 +535,9 @@ export default async function DashboardPage({
                 </Suspense>
               </>
             )}
+
+            {/* Upcoming + History (next-game card leads when nothing is live) */}
+            <LiveHero live={[]} upcoming={heroUpcoming} results={heroResults} hideCenter={isAnyMatchLive} />
 
             {/* All matches list */}
             <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
@@ -827,6 +759,21 @@ export default async function DashboardPage({
                     </Link>
                   </div>
                 )}
+
+                {/* Storylines for the current game — real form + real ref profile */}
+                {isMatchLiveNow && (() => {
+                  const s = todayStorylines.get(featuredMatch.fixture);
+                  if (!s?.form && !s?.referee) return null;
+                  return (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-[10px] text-slate-500">
+                      {s.form && <span className="font-mono">{s.form}</span>}
+                      {s.referee && <span>{s.referee}</span>}
+                    </div>
+                  );
+                })()}
+
+                {/* UPCOMING (next-game hero card when idle) + HISTORY — once each */}
+                <LiveHero live={[]} upcoming={heroUpcoming} results={heroResults} hideCenter={isAnyMatchLive} />
 
                 {/* Sections below the hero */}
                 {realVenue && venueInfo && (

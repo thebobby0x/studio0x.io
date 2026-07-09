@@ -169,10 +169,14 @@ export default function LiveHero({
   live,
   upcoming,
   results,
+  hideCenter = false,
 }: {
   live: HeroMatch[];
   upcoming: HeroMatch[];
   results: HeroMatch[];
+  /** During a live match the CURRENT GAME renders elsewhere (the rich live
+   *  card) — hide the center so the game never appears twice (owner 7/9). */
+  hideCenter?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -193,7 +197,9 @@ export default function LiveHero({
   const recentResult = results[0] ?? null;
 
   const centerSlots: { m: HeroMatch; mode: BigMode }[] = [];
-  if (liveGames.length >= 2) {
+  if (hideCenter) {
+    // no center card — Upcoming + History only
+  } else if (liveGames.length >= 2) {
     centerSlots.push({ m: liveGames[0], mode: "live" }, { m: liveGames[1], mode: "live" });
   } else if (liveGames.length === 1) {
     if (nextGame) centerSlots.push({ m: nextGame, mode: "next" });
@@ -211,8 +217,15 @@ export default function LiveHero({
   const resultsList = results.filter((m) => !bigIds.has(m.id)).slice(0, 6);
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)_minmax(0,1fr)] gap-4">
+    <section
+      className={`grid grid-cols-1 gap-4 ${
+        hideCenter
+          ? "sm:grid-cols-2"
+          : "lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)_minmax(0,1fr)]"
+      }`}
+    >
       {/* CENTER first in the DOM so it stacks on top on mobile */}
+      {!hideCenter && (
       <div className="order-1 lg:order-2 flex flex-col gap-4">
         {centerSlots.length > 0 ? (
           <div className={`grid gap-4 ${centerSlots.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
@@ -226,6 +239,7 @@ export default function LiveHero({
           </div>
         )}
       </div>
+      )}
 
       {/* LEFT: Upcoming */}
       <div className="order-2 lg:order-1 rounded-2xl border border-brand-border bg-brand-card/60 py-3">
