@@ -7,6 +7,12 @@ export interface MissedPen {
   player: string;
 }
 
+export interface VarEvent {
+  minute: number;
+  team: string;
+  detail: string;
+}
+
 export interface GoalEvent {
   minute: number;
   team: string;
@@ -142,6 +148,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         const missedPens = events
           .filter((e) => e.type === "Goal" && e.detail === "Missed Penalty")
           .map((e) => ({ minute: e.time.elapsed, team: e.team.name, player: e.player.name }));
+        // VAR reviews are real drama — surface them (minute + decision). NB:
+        // api-football does NOT provide wall-clock review duration; only the
+        // match minute is known, so any "delay" stat is in MATCH MINUTES.
+        const varEvents: VarEvent[] = events
+          .filter((e) => e.type === "Var")
+          .map((e) => ({ minute: e.time.elapsed, team: e.team.name, detail: e.detail }));
 
         // Sanity-check: own-goal attribution is reversed (credit goes to other team),
         // so compute effective home/away goal counts and compare against the known score.
@@ -160,7 +172,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           }
         }
 
-        if (goals.length > 0 || missedPens.length > 0) return NextResponse.json({ goals, missedPens });
+        if (goals.length > 0 || missedPens.length > 0 || varEvents.length > 0) {
+          return NextResponse.json({ goals, missedPens, varEvents });
+        }
         // No real events yet — fall through to simulation below (LIVE/HT only)
       }
     } catch {

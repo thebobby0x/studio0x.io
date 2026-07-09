@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
 import type { LiveData, LiveMetrics } from "@/lib/types";
-import type { GoalEvent, MissedPen } from "@/app/api/matches/[id]/goals/route";
+import type { GoalEvent, MissedPen, VarEvent } from "@/app/api/matches/[id]/goals/route";
 import type { TeamLiveStats } from "@/lib/liveStats";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
@@ -43,13 +43,28 @@ function toTeamLiveStats(m: LiveMetrics[string] | undefined): TeamLiveStats {
   };
 }
 
-function GoalDisplay({ goals, missedPens = [], homeTeam, awayTeam }: {
+function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTeam }: {
   goals: GoalEvent[];
   missedPens?: MissedPen[];
+  varEvents?: VarEvent[];
   homeTeam: string;
   awayTeam: string;
 }) {
-  if (goals.length === 0 && missedPens.length === 0) return null;
+  if (goals.length === 0 && missedPens.length === 0 && varEvents.length === 0) return null;
+
+  // Honest VAR-delay note: the gap between a VAR decision and a penalty being
+  // struck, in MATCH MINUTES (api-football has no wall-clock review duration).
+  const penMoments = [
+    ...goals.filter((g) => g.isPenalty).map((g) => ({ minute: g.minute, team: g.team, outcome: "scored" as const })),
+    ...missedPens.map((p) => ({ minute: p.minute, team: p.team, outcome: "missed" as const })),
+  ];
+  const varDelayNotes = varEvents
+    .filter((v) => /penalty/i.test(v.detail))
+    .map((v) => {
+      const pen = penMoments.find((pm) => pm.minute >= v.minute && pm.minute - v.minute <= 6);
+      return pen ? { gap: pen.minute - v.minute, outcome: pen.outcome, minute: v.minute } : null;
+    })
+    .filter(Boolean) as { gap: number; outcome: "scored" | "missed"; minute: number }[];
 
   const homeGoals = goals.filter((g) => !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam);
   const awayGoals = goals.filter((g) => !g.isOwnGoal ? g.team === awayTeam : g.team !== awayTeam);
@@ -71,7 +86,21 @@ function GoalDisplay({ goals, missedPens = [], homeTeam, awayTeam }: {
   const awayPens = missedPens.filter((p) => p.team === awayTeam);
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 px-4 pb-3 text-xs text-slate-400">
+    <div className="px-4 pb-3 space-y-1.5">
+      {/* VAR moments — real events from the feed */}
+      {varEvents.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-0.5 text-[10px] text-slate-500">
+          {varEvents.map((v, i) => (
+            <span key={i}>📺 VAR {v.minute}&apos; · {v.detail} ({v.team})</span>
+          ))}
+          {varDelayNotes.map((n, i) => (
+            <span key={`d${i}`} className="text-slate-600">
+              ⏱ {n.gap <= 1 ? "under a minute" : `~${n.gap} match min`} from VAR call to the kick — {n.outcome}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-400">
       <div className="flex flex-col items-end gap-0.5">
         {homeGoals.map((g, i) => (
           <span key={i}>{formatGoal(g)}</span>
@@ -87,6 +116,7 @@ function GoalDisplay({ goals, missedPens = [], homeTeam, awayTeam }: {
         {awayPens.map((p, i) => (
           <span key={`mp${i}`} className="text-slate-600">✗ pen missed · {p.player} {p.minute}&apos;</span>
         ))}
+      </div>
       </div>
     </div>
   );
@@ -114,6 +144,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
   const [data, setData] = useState<LiveData | null>(null);
   const [goals, setGoals] = useState<GoalEvent[] | null>(null);
   const [missedPens, setMissedPens] = useState<MissedPen[]>([]);
+  const [varEvents, setVarEvents] = useState<VarEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -130,6 +161,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       setData(liveData);
       setGoals(goalsData.goals ?? []);
       setMissedPens(goalsData.missedPens ?? []);
+      setVarEvents(goalsData.varEvents ?? []);
     } catch (e) {
       setError(String(e));
     }
@@ -232,10 +264,11 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         </div>
 
         {/* Goal scorers */}
-        {(showGoals || missedPens.length > 0) && goals && (
+        {(showGoals || missedPens.length > 0 || varEvents.length > 0) && goals && (
           <GoalDisplay
             goals={goals}
             missedPens={missedPens}
+            varEvents={varEvents}
             homeTeam={match.homeTeam.name}
             awayTeam={match.awayTeam.name}
           />
@@ -352,10 +385,11 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       </div>
 
       {/* Goal scorers */}
-      {(showGoals || missedPens.length > 0) && goals && (
+      {(showGoals || missedPens.length > 0 || varEvents.length > 0) && goals && (
         <GoalDisplay
           goals={goals}
           missedPens={missedPens}
+          varEvents={varEvents}
           homeTeam={match.homeTeam.name}
           awayTeam={match.awayTeam.name}
         />
