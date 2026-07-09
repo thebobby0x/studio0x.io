@@ -6,7 +6,7 @@ import { Shield, Plane, MapPin } from "lucide-react";
 import type { OfficialProfile } from "@/app/api/officials/route";
 import { GET as officialsGET } from "@/app/api/officials/route";
 
-// Metric badge with the standard Studio0x™ treatment
+// Metric badge with the standard studio0x™ treatment
 function Metric({ label, value, suffix, hint }: { label: string; value: number | null; suffix?: string; hint: string }) {
   return (
     <div className="rounded-xl bg-brand-dark/60 border border-brand-border px-3 py-2.5">
@@ -164,7 +164,7 @@ export default async function OfficialsPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · Officials™ · assignments via api-football · metrics computed from ingested match stats
+        studio0x.io · Officials™ · assignments via api-football · metrics computed from ingested match stats
       </footer>
     </div>
   );

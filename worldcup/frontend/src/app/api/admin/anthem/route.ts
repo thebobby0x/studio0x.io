@@ -47,7 +47,7 @@ export async function PUT(req: Request) {
     const stream = existing
       ? await prisma.audioStream.update({ where: { id: existing.id }, data: updateData, include: { team: true } })
       : await prisma.audioStream.create({
-          data: { teamId: null, audioUrl, title, artistCredit: artistCredit ?? "Suno AI × Studio0x", durationSecs: durationSecs ?? 180, tiktokDeepLink: tiktokDeepLink ?? null, coverArt: coverArt ?? null },
+          data: { teamId: null, audioUrl, title, artistCredit: artistCredit ?? "Suno AI × studio0x", durationSecs: durationSecs ?? 180, tiktokDeepLink: tiktokDeepLink ?? null, coverArt: coverArt ?? null },
           include: { team: true },
         });
     return NextResponse.json(stream);
@@ -63,7 +63,7 @@ export async function PUT(req: Request) {
       teamId: team.id,
       audioUrl,
       title: title ?? `${team.name} World Cup Anthem 2026`,
-      artistCredit: artistCredit ?? "Suno AI × Studio0x",
+      artistCredit: artistCredit ?? "Suno AI × studio0x",
       durationSecs: durationSecs ?? 180,
       tiktokDeepLink: tiktokDeepLink ?? null,
       coverArt: coverArt ?? null,

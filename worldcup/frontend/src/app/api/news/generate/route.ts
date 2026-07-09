@@ -139,7 +139,7 @@ async function handler(req: Request) {
 
   const gameResults = await mapPool(missingGames, CONCURRENCY, async (m) => {
     const stage = stageContext(m.date);
-    const prompt = `You are Studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a concise match recap.
+    const prompt = `You are studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a concise match recap.
 
 MATCH: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
 STAGE: ${stage.label}${stage.isKnockout ? " (knockout — group stage is over; do NOT mention any group)" : ""}
@@ -194,7 +194,7 @@ Return ONLY a JSON object, no other text:
       .join("\n");
     const dayIsKnockout = dayMatches.every(m => stageContext(m.date).isKnockout);
     const prettyDate = new Date(k).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
-    const prompt = `You are Studio0x's AI football editor covering the 2026 FIFA World Cup. Write an end-of-day round-up for all matches played on ${prettyDate}.
+    const prompt = `You are studio0x's AI football editor covering the 2026 FIFA World Cup. Write an end-of-day round-up for all matches played on ${prettyDate}.
 
 RESULTS:
 ${resultsList}

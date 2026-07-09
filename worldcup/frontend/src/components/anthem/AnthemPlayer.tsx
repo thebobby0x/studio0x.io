@@ -156,7 +156,7 @@ export default function AnthemPlayer({ streams }: { streams: AudioStream[] }) {
       <div className="flex items-center gap-2 mb-3">
         <Music2 size={14} className="text-brand-gold" />
         <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Team Anthems</span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-400">Suno AI × Studio0x</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-slate-400">Suno AI × studio0x</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {streams.map((s) => <Track key={s.id} stream={s} />)}

@@ -50,7 +50,7 @@ function goalGravityPeak(homeScore: number, awayScore: number, total: number): s
 
 // Labels below are derived from the FINAL SCORE ONLY — never claim data we
 // don't have (possession, exact goal gaps). The AI cites these verbatim as
-// "Studio0x readings", so a fabricated stat here becomes a published lie.
+// "studio0x readings", so a fabricated stat here becomes a published lie.
 function strikeClock(total: number): string {
   if (total === 0) return "Goalless";
   if (total >= 5) return `High-scoring rhythm — ${total} goals`;
@@ -80,12 +80,12 @@ function buildMatchMetrics(
 }
 
 function buildPrompt(matchData: string, metricsData: string, standingsData: string, knockoutStarted: boolean): string {
-  return `You are Studio0x's AI sports analyst covering the 2026 FIFA World Cup. Write 5 original editorial news stories based on the tournament data below.
+  return `You are studio0x's AI sports analyst covering the 2026 FIFA World Cup. Write 5 original editorial news stories based on the tournament data below.
 ${knockoutStarted ? "\nIMPORTANT: The group stage is OVER — the tournament is in the knockout rounds. Each match below is labeled with its stage. Never describe a knockout match (Round of 32/16, Quarter-final, Semi-final, Final) as a group game or say a knockout result affects a group table.\n" : ""}
 RECENT MATCHES (last 14 days, each labeled with its stage):
 ${matchData}
 
-STUDIO0X PROPRIETARY METRIC READINGS (per-match data):
+studio0x PROPRIETARY METRIC READINGS (per-match data):
 ${metricsData}
 
 Our proprietary stats:
@@ -104,7 +104,7 @@ Write exactly 5 stories in JSON format:
   {
     "category": "MATCH REPORT" | "ANALYSIS" | "STANDINGS" | "METRIC SPOTLIGHT",
     "headline": "Punchy headline (max 12 words)",
-    "body": "3-4 sentences of editorial copy. ONLY reference facts you can see in the data above — NEVER invent player names, goal minutes, scorers, assists, or any match events not in the data. Stick to scores, standings, and metric readings. For METRIC SPOTLIGHT stories, reference specific metric readings naturally as 'per Studio0x data' or 'Studio0x Clutch Index™ shows'. Sound like The Athletic — authoritative but engaging.",
+    "body": "3-4 sentences of editorial copy. ONLY reference facts you can see in the data above — NEVER invent player names, goal minutes, scorers, assists, or any match events not in the data. Stick to scores, standings, and metric readings. For METRIC SPOTLIGHT stories, reference specific metric readings naturally as 'per studio0x data' or 'studio0x Clutch Index™ shows'. Sound like The Athletic — authoritative but engaging.",
     "teamsInvolved": ["TLA1", "TLA2"]
   }
 ]

@@ -496,7 +496,7 @@ export default async function StandingsPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 Stats Engine · Standings computed from live match data
+        studio0x.io · World Cup 2026 Stats Engine · Standings computed from live match data
       </footer>
     </div>
   );

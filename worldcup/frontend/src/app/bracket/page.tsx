@@ -295,7 +295,7 @@ export default async function BracketPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 Stats Engine · Bracket data via api-football.com
+        studio0x.io · World Cup 2026 Stats Engine · Bracket data via api-football.com
       </footer>
     </div>
   );

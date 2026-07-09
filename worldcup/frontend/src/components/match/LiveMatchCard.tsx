@@ -64,7 +64,7 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
       const pen = penMoments.find((pm) => pm.minute >= v.minute && pm.minute - v.minute <= 6);
       if (!pen) return null;
       // Prefer REAL wall-clock delta when we captured both events live
-      // (Studio0x first-seen timestamps); fall back to match-minute gap.
+      // (studio0x first-seen timestamps); fall back to match-minute gap.
       let capturedSecs: number | null = null;
       const penTs = missedPens.find((mp) => mp.minute === pen.minute)?.firstSeenAt;
       if (v.firstSeenAt && penTs) {
@@ -105,7 +105,7 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
           {varDelayNotes.map((n, i) => (
             <span key={`d${i}`} className="text-slate-600">
               ⏱ {n.capturedSecs
-                ? `≈${Math.floor(n.capturedSecs / 60)}m ${n.capturedSecs % 60}s whistle to kick (Studio0x live capture)`
+                ? `≈${Math.floor(n.capturedSecs / 60)}m ${n.capturedSecs % 60}s whistle to kick (studio0x live capture)`
                 : `${n.gap <= 1 ? "under a minute" : `~${n.gap} match min`} from VAR call to the kick`} — {n.outcome}
             </span>
           ))}

@@ -53,7 +53,7 @@ export default function TournamentStories() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper size={15} className="text-brand-gold" />
-          <span className="text-xs font-black uppercase tracking-widest text-slate-400">Studio0x Analysis</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-400">studio0x Analysis</span>
           <span className="text-[10px] text-slate-600">· AI + ElevenLabs voice</span>
         </div>
         <div className="flex items-center gap-3">

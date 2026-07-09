@@ -58,7 +58,7 @@ function formatTime(sec: number) {
 
 function buildShareLinks(stream: Stream, pageUrl: string) {
   const text = encodeURIComponent(
-    `🎵 ${stream.title} — Official FIFA World Cup 2026 Anthem | Suno AI × Studio0x`
+    `🎵 ${stream.title} — Official FIFA World Cup 2026 Anthem | Suno AI × studio0x`
   );
   const url = encodeURIComponent(pageUrl);
   return [

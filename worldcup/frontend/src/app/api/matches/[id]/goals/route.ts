@@ -13,7 +13,7 @@ export interface VarEvent {
   team: string;
   detail: string;
   /** Wall-clock moment this event FIRST appeared in our live polling
-   *  (Studio0x capture — enables real whistle→kick timing, ± feed latency) */
+   *  (studio0x capture — enables real whistle→kick timing, ± feed latency) */
   firstSeenAt?: string;
 }
 

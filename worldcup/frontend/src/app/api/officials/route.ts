@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 //   · fouls/cards aggregate from PlayerMatchStat for the matches each ref worked
 // No invented history, no cross-tournament claims — our data, our metrics.
 //
-// Proprietary metrics (Studio0x™):
+// Proprietary metrics (studio0x™):
 //   Whistle Index™   — fouls called per game (how tightly they call it)
 //   Card Threshold™  — fouls allowed per card shown (high = "lets play flow…
 //                      or lets danger build"; low = quick trigger)
@@ -30,7 +30,7 @@ export interface OfficialProfile {
   fouls: number;
   yellows: number;
   reds: number;
-  // Studio0x™ metrics (null until stats are ingested for their games)
+  // studio0x™ metrics (null until stats are ingested for their games)
   whistleIndex: number | null;   // fouls per game
   cardThreshold: number | null;  // fouls per card
   bookingRate: number | null;    // cards per game

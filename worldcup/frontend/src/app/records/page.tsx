@@ -79,7 +79,7 @@ async function buildPlayerBoards(): Promise<Board[]> {
   ];
 }
 
-// Studio0x Player of the Match honors: highest api-football rating per finished
+// studio0x Player of the Match honors: highest api-football rating per finished
 // match (≥45 minutes played). There is NO official POTM in our data — this is
 // rating-derived and labeled as ours.
 async function buildMvpBoard(): Promise<Board | null> {
@@ -113,7 +113,7 @@ async function buildMvpBoard(): Promise<Board | null> {
   return rows.length > 0
     ? {
         key: "mvp",
-        title: "Studio0x Player of the Match",
+        title: "studio0x Player of the Match",
         metric: "most match-best ratings",
         rows,
         note: "top api-football rating per FT match (≥45′) — no official POTM exists in our data",
@@ -123,6 +123,162 @@ async function buildMvpBoard(): Promise<Board | null> {
 
 interface TeamBoardRow { rank: number; flag: string; name: string; value: string; sub?: string }
 interface TeamBoard { key: string; title: string; metric: string; rows: TeamBoardRow[]; note?: string }
+
+// Team analogs of the player boards — same ingested per-player stats summed by
+// squad, so every player metric has a team-level answer (owner 7/9).
+async function buildTeamStatBoards(): Promise<TeamBoard[]> {
+  const stats = await prisma.playerTournamentStat.findMany({
+    where: { matches: { gt: 0 } },
+    include: { player: { include: { team: true } } },
+  });
+  if (stats.length === 0) return [];
+
+  type Agg = { name: string; flag: string; assists: number; fouls: number; cards: number; shots: number; shotsOn: number };
+  const byTeam = new Map<string, Agg>();
+  for (const s of stats) {
+    const code = s.player.team.code;
+    const t = byTeam.get(code) ?? {
+      name: s.player.team.name, flag: s.player.team.flagEmoji,
+      assists: 0, fouls: 0, cards: 0, shots: 0, shotsOn: 0,
+    };
+    t.assists += s.assists;
+    t.fouls += s.foulsCommitted;
+    t.cards += s.yellowCards + s.redCards * 2;
+    t.shots += s.shotsTotal;
+    t.shotsOn += s.shotsOnTarget;
+    byTeam.set(code, t);
+  }
+  const rows = (value: (t: Agg) => number, fmt: (t: Agg) => string, sub?: (t: Agg) => string): TeamBoardRow[] =>
+    [...byTeam.values()]
+      .filter((t) => value(t) > 0)
+      .sort((a, b) => value(b) - value(a))
+      .slice(0, 5)
+      .map((t, i) => ({ rank: i + 1, flag: t.flag, name: t.name, value: fmt(t), sub: sub?.(t) }));
+
+  return [
+    { key: "tassists", title: "The Supply Lines", metric: "most assists (team)", rows: rows((t) => t.assists, (t) => `${t.assists}`) },
+    { key: "tshots", title: "The Artillery", metric: "most shots (team)", rows: rows((t) => t.shots, (t) => `${t.shots}`, (t) => `${t.shotsOn} on target`) },
+    { key: "tfouls", title: "The Roughnecks", metric: "most fouls (team)", rows: rows((t) => t.fouls, (t) => `${t.fouls}`) },
+    { key: "tcards", title: "The Card Collectors", metric: "most cards (team)", rows: rows((t) => t.cards, (t) => `${t.cards}`), note: "reds weighted ×2 · summed from ingested player stats" },
+  ];
+}
+
+// ── Group boards + data-driven Group Personalities (owner 7/9: "Group of
+// Death exists — let's create other new groups thinking differently") ─────────
+// Every personality is EARNED from results, not vibes: each group gets the
+// title where its group-stage numbers (plus its alumni's knockout run for the
+// Group of Death) are most extreme, with the justifying stat shown.
+interface GroupPersonality { group: string; title: string; why: string }
+
+async function buildGroupSection(): Promise<{ boards: TeamBoard[]; personalities: GroupPersonality[] }> {
+  const { KNOCKOUT_START } = await import("@/lib/tournament");
+  const matches = await prisma.match.findMany({
+    where: { status: "FT" },
+    include: { homeTeam: true, awayTeam: true },
+  });
+  const groupMatches = matches.filter(
+    (m) => m.date < KNOCKOUT_START && /^[A-L]$/.test(m.homeTeam.groupStage ?? "")
+  );
+  if (groupMatches.length === 0) return { boards: [], personalities: [] };
+
+  type G = {
+    goals: number; played: number; draws: number; cleanSheets: number; btts: number;
+    points: Map<string, number>; koWins: number;
+  };
+  const groups = new Map<string, G>();
+  const g = (k: string) => {
+    const cur = groups.get(k) ?? { goals: 0, played: 0, draws: 0, cleanSheets: 0, btts: 0, points: new Map(), koWins: 0 };
+    groups.set(k, cur);
+    return cur;
+  };
+  for (const m of groupMatches) {
+    const grp = g(m.homeTeam.groupStage!);
+    grp.goals += m.homeScore + m.awayScore;
+    grp.played++;
+    if (m.homeScore === m.awayScore) grp.draws++;
+    if (m.homeScore === 0 || m.awayScore === 0) grp.cleanSheets++;
+    if (m.homeScore > 0 && m.awayScore > 0) grp.btts++;
+    const hp = m.homeScore > m.awayScore ? 3 : m.homeScore === m.awayScore ? 1 : 0;
+    grp.points.set(m.homeTeam.code, (grp.points.get(m.homeTeam.code) ?? 0) + hp);
+    grp.points.set(m.awayTeam.code, (grp.points.get(m.awayTeam.code) ?? 0) + (hp === 3 ? 0 : hp === 1 ? 1 : 3));
+  }
+  // Knockout wins by each group's alumni — the retro-validated Group of Death
+  const groupOf = new Map<string, string>();
+  for (const m of groupMatches) {
+    groupOf.set(m.homeTeam.code, m.homeTeam.groupStage!);
+    groupOf.set(m.awayTeam.code, m.awayTeam.groupStage!);
+  }
+  for (const m of matches) {
+    if (m.date < KNOCKOUT_START || m.homeScore === m.awayScore) continue;
+    const winner = m.homeScore > m.awayScore ? m.homeTeam.code : m.awayTeam.code;
+    const grp = groupOf.get(winner);
+    if (grp) g(grp).koWins++;
+  }
+
+  const spread = (x: G) => {
+    const pts = [...x.points.values()];
+    return pts.length > 0 ? Math.max(...pts) - Math.min(...pts) : 0;
+  };
+  const gpm = (x: G) => (x.played > 0 ? x.goals / x.played : 0);
+  const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  const boards: TeamBoard[] = [
+    {
+      key: "ggoals", title: "The Entertainment Districts", metric: "most goals per match (group stage)",
+      rows: [...entries].sort((a, b) => gpm(b[1]) - gpm(a[1])).slice(0, 5).map(([k, x], i) => ({
+        rank: i + 1, flag: "🏟", name: `Group ${k}`, value: gpm(x).toFixed(2), sub: `${x.goals} goals / ${x.played}`,
+      })),
+    },
+    {
+      key: "gko", title: "The Deep Runners", metric: "knockout wins by group alumni",
+      rows: [...entries].filter(([, x]) => x.koWins > 0).sort((a, b) => b[1].koWins - a[1].koWins).slice(0, 5).map(([k, x], i) => ({
+        rank: i + 1, flag: "🏆", name: `Group ${k}`, value: `${x.koWins}`, sub: "KO wins",
+      })),
+    },
+  ];
+
+  // One earned title per group: walk categories in priority order, each claims
+  // its most extreme untitled group. Leftovers get an honest neutral label.
+  const personalities: GroupPersonality[] = [];
+  const titled = new Set<string>();
+  const claim = (
+    title: string,
+    pick: (list: [string, G][]) => [string, G] | undefined,
+    why: (k: string, x: G) => string
+  ) => {
+    const candidates = entries.filter(([k]) => !titled.has(k));
+    const c = pick(candidates);
+    if (!c) return;
+    titled.add(c[0]);
+    personalities.push({ group: c[0], title, why: why(c[0], c[1]) });
+  };
+  const maxBy = (f: (x: G) => number) => (list: [string, G][]) =>
+    list.length ? [...list].sort((a, b) => f(b[1]) - f(a[1]))[0] : undefined;
+  const minBy = (f: (x: G) => number) => (list: [string, G][]) =>
+    list.length ? [...list].sort((a, b) => f(a[1]) - f(b[1]))[0] : undefined;
+
+  claim("The Group of Death — Certified", maxBy((x) => x.koWins), (_, x) => `its alumni have won ${x.koWins} knockout matches — no group sent teams deeper`);
+  claim("The Goal Festival", maxBy(gpm), (_, x) => `${gpm(x).toFixed(2)} goals per match — highest of the twelve`);
+  claim("The Goal Desert", minBy(gpm), (_, x) => `${gpm(x).toFixed(2)} goals per match — lowest of the twelve`);
+  claim("The Stalemate Society", maxBy((x) => x.draws), (_, x) => `${x.draws} draws in ${x.played} matches — nobody would blink`);
+  claim("The Tightrope", minBy(spread), (_, x) => `top-to-bottom points spread of just ${spread(x)} — every match mattered`);
+  claim("The Runaway Train", maxBy(spread), (_, x) => `points spread of ${spread(x)} — one team lapped the field`);
+  claim("The Slugfest", maxBy((x) => x.btts), (_, x) => `both teams scored in ${x.btts} of ${x.played} matches`);
+  claim("The Fortress District", maxBy((x) => x.cleanSheets), (_, x) => `${x.cleanSheets} shutout results in ${x.played} matches`);
+  claim("The Second Act", maxBy((x) => x.koWins), (_, x) => `${x.koWins} knockout wins by its alumni — quietly dangerous`);
+  claim("The Coin Flip", minBy(spread), (_, x) => `points spread of ${spread(x)} — separated by almost nothing`);
+  for (const [k, x] of entries) {
+    if (titled.has(k)) continue;
+    personalities.push({
+      group: k,
+      title: "The Steady Ship",
+      why: `${gpm(x).toFixed(2)} goals per match, ${x.draws} draws — no extremes, all business`,
+    });
+  }
+  personalities.sort((a, b) => a.group.localeCompare(b.group));
+
+  return { boards, personalities };
+}
 
 async function buildTeamAndMatchBoards(): Promise<TeamBoard[]> {
   const matches = await prisma.match.findMany({
@@ -239,7 +395,7 @@ async function buildVarBoard(): Promise<TeamBoard | null> {
           title: "The VAR Theatre",
           metric: "most VAR reviews",
           rows,
-          note: "Studio0x live capture — matches watched live since Jul 9 only, not full-tournament coverage",
+          note: "studio0x live capture — matches watched live since Jul 9 only, not full-tournament coverage",
         }
       : null;
   } catch {
@@ -283,16 +439,20 @@ function BoardCard({ board }: { board: Board | TeamBoard }) {
 }
 
 export default async function RecordsPage() {
-  const [playerBoards, mvp, teamBoards, varBoard] = await Promise.all([
+  const [playerBoards, mvp, teamBoards, teamStatBoards, groupSection, varBoard] = await Promise.all([
     buildPlayerBoards(),
     buildMvpBoard(),
     buildTeamAndMatchBoards(),
+    buildTeamStatBoards(),
+    buildGroupSection(),
     buildVarBoard(),
   ]);
   const boards: (Board | TeamBoard)[] = [
     ...playerBoards.filter((b) => b.rows.length > 0),
     ...(mvp ? [mvp] : []),
     ...teamBoards.filter((b) => b.rows.length > 0),
+    ...teamStatBoards.filter((b) => b.rows.length > 0),
+    ...groupSection.boards.filter((b) => b.rows.length > 0),
     ...(varBoard ? [varBoard] : []),
   ];
 
@@ -331,6 +491,31 @@ export default async function RecordsPage() {
           </div>
         )}
 
+        {groupSection.personalities.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-black text-white tracking-tight">
+                Group <span className="text-brand-gold">Personalities</span>
+              </h2>
+            </div>
+            <p className="text-slate-500 text-xs mb-4">
+              Every title earned from group-stage results (plus each group&apos;s knockout run) —
+              the stat that justifies it is on the card
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {groupSection.personalities.map((p) => (
+                <div key={p.group} className="rounded-2xl bg-brand-card border border-brand-border px-4 py-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-black text-brand-gold">Group {p.group}</span>
+                    <span className="text-sm font-black text-white">{p.title}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">{p.why}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 rounded-2xl bg-brand-card/50 border border-brand-border/50 px-5 py-4">
           <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
             Boards we can&apos;t honestly build (yet)
@@ -338,7 +523,7 @@ export default async function RecordsPage() {
           <ul className="text-xs text-slate-500 space-y-1">
             <li>· <span className="text-slate-400">Distance run</span> — api-football doesn&apos;t provide player tracking/distance data</li>
             <li>· <span className="text-slate-400">Woodwork hits</span> (post/crossbar) — not in our events or stats feeds</li>
-            <li>· <span className="text-slate-400">Official Player of the Match</span> — FIFA&apos;s award isn&apos;t in our data; ours is rating-derived and labeled Studio0x</li>
+            <li>· <span className="text-slate-400">Official Player of the Match</span> — FIFA&apos;s award isn&apos;t in our data; ours is rating-derived and labeled studio0x</li>
             <li>· <span className="text-slate-400">Stoppage time / true match length</span> — the feed reports 90′/120′, not the real clock</li>
             <li>· <span className="text-slate-400">Full-tournament VAR counts</span> — our live capture started Jul 9; earlier matches weren&apos;t recorded</li>
           </ul>
@@ -348,7 +533,7 @@ export default async function RecordsPage() {
         </div>
       </main>
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 Stats Engine · Player stats via api-football.com
+        studio0x.io · World Cup 2026 Stats Engine · Player stats via api-football.com
       </footer>
     </div>
   );
