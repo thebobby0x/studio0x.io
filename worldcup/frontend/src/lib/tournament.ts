@@ -19,18 +19,23 @@ export type KnockoutRound =
 // All dates are UTC. These mirror the seeded fixture dates in the DB — do not
 // change them without re-seeding, since bracket round classification keys off
 // these exact windows.
+// CORRECTED 7/9 to the REAL fixture windows observed in the api-football feed
+// (the original estimates ran ~5 days late: actual R32 began Jun 28 19:00Z,
+// R16 ran Jul 4–7, and the first QF kicked off Jul 9 20:00Z — which the old
+// windows misclassified as R16 and, worse, dated before KNOCKOUT_START,
+// leaking late R32 results into group tables).
 export const TOURNAMENT_START = new Date("2026-06-11T00:00:00Z"); // opening match
-export const GROUP_STAGE_END = new Date("2026-07-02T23:59:59Z");  // last group day
-export const KNOCKOUT_START = new Date("2026-07-03T00:00:00Z");   // R32 kick-off
+export const GROUP_STAGE_END = new Date("2026-06-28T06:00:00Z");  // last group games ~Jun 28 02:00Z
+export const KNOCKOUT_START = new Date("2026-06-28T12:00:00Z");   // R32 kicked off Jun 28 19:00Z
 export const FINAL_DATE = new Date("2026-07-19T00:00:00Z");
 
 export const ROUND_DATES: { round: KnockoutRound; from: Date; to: Date }[] = [
-  { round: "Round of 32",     from: new Date("2026-07-03T00:00:00Z"), to: new Date("2026-07-05T23:59:59Z") },
-  { round: "Round of 16",     from: new Date("2026-07-06T00:00:00Z"), to: new Date("2026-07-09T23:59:59Z") },
-  { round: "Quarter-finals",  from: new Date("2026-07-10T00:00:00Z"), to: new Date("2026-07-11T23:59:59Z") },
-  { round: "Semi-finals",     from: new Date("2026-07-14T00:00:00Z"), to: new Date("2026-07-14T23:59:59Z") },
-  { round: "3rd Place Final", from: new Date("2026-07-17T00:00:00Z"), to: new Date("2026-07-17T23:59:59Z") },
-  { round: "Final",           from: new Date("2026-07-19T00:00:00Z"), to: new Date("2026-07-19T23:59:59Z") },
+  { round: "Round of 32",     from: new Date("2026-06-28T12:00:00Z"), to: new Date("2026-07-04T12:00:00Z") },
+  { round: "Round of 16",     from: new Date("2026-07-04T12:00:01Z"), to: new Date("2026-07-08T23:59:59Z") },
+  { round: "Quarter-finals",  from: new Date("2026-07-09T00:00:00Z"), to: new Date("2026-07-12T23:59:59Z") },
+  { round: "Semi-finals",     from: new Date("2026-07-13T00:00:00Z"), to: new Date("2026-07-15T23:59:59Z") },
+  { round: "3rd Place Final", from: new Date("2026-07-16T00:00:00Z"), to: new Date("2026-07-17T23:59:59Z") },
+  { round: "Final",           from: new Date("2026-07-18T00:00:00Z"), to: new Date("2026-07-19T23:59:59Z") },
 ];
 
 export const ALL_ROUNDS: KnockoutRound[] = ROUND_DATES.map((r) => r.round);
