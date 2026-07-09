@@ -81,9 +81,12 @@ export async function runStoryRefresh(): Promise<{ ok: boolean; previewsWritten:
   let recapsWritten = 0;
 
   // ── 1. Pre-match previews ─────────────────────────────────────────────────
-  // Generate a MATCH PREVIEW for matches kicking off in 50–70 minutes.
-  const previewFrom = new Date(now.getTime() + 50 * 60_000);
-  const previewTo   = new Date(now.getTime() + 70 * 60_000);
+  // Generate a MATCH PREVIEW for anything kicking off in the next 24 hours.
+  // (Was a 50–70min window; widened 7/9 so the dashboard's Top Story can lead
+  // with the next big game all day. Idempotent per fixture — each preview is
+  // still generated exactly once.)
+  const previewFrom = now;
+  const previewTo   = new Date(now.getTime() + 24 * 60 * 60_000);
 
   const upcoming = await prisma.match.findMany({
     where: { status: "NS", date: { gte: previewFrom, lte: previewTo } },
