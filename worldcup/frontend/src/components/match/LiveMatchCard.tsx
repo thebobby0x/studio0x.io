@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
 import type { LiveData, LiveMetrics } from "@/lib/types";
-import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
+import type { GoalEvent, MissedPen } from "@/app/api/matches/[id]/goals/route";
 import type { TeamLiveStats } from "@/lib/liveStats";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
@@ -43,12 +43,13 @@ function toTeamLiveStats(m: LiveMetrics[string] | undefined): TeamLiveStats {
   };
 }
 
-function GoalDisplay({ goals, homeTeam, awayTeam }: {
+function GoalDisplay({ goals, missedPens = [], homeTeam, awayTeam }: {
   goals: GoalEvent[];
+  missedPens?: MissedPen[];
   homeTeam: string;
   awayTeam: string;
 }) {
-  if (goals.length === 0) return null;
+  if (goals.length === 0 && missedPens.length === 0) return null;
 
   const homeGoals = goals.filter((g) => !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam);
   const awayGoals = goals.filter((g) => !g.isOwnGoal ? g.team === awayTeam : g.team !== awayTeam);
@@ -64,16 +65,27 @@ function GoalDisplay({ goals, homeTeam, awayTeam }: {
     return `${g.scorer}${suffix} ⚽ ${minute}`;
   }
 
+  // Missed penalties are KEY MOMENTS, not goals — shown muted with an ✗ so a
+  // saved/skied PK never reads as a score (Mbappé, FRA-MAR QF).
+  const homePens = missedPens.filter((p) => p.team === homeTeam);
+  const awayPens = missedPens.filter((p) => p.team === awayTeam);
+
   return (
     <div className="grid grid-cols-2 gap-x-4 px-4 pb-3 text-xs text-slate-400">
       <div className="flex flex-col items-end gap-0.5">
         {homeGoals.map((g, i) => (
           <span key={i}>{formatGoal(g)}</span>
         ))}
+        {homePens.map((p, i) => (
+          <span key={`mp${i}`} className="text-slate-600">✗ pen missed · {p.player} {p.minute}&apos;</span>
+        ))}
       </div>
       <div className="flex flex-col items-start gap-0.5">
         {awayGoals.map((g, i) => (
           <span key={i}>{formatGoal(g)}</span>
+        ))}
+        {awayPens.map((p, i) => (
+          <span key={`mp${i}`} className="text-slate-600">✗ pen missed · {p.player} {p.minute}&apos;</span>
         ))}
       </div>
     </div>
@@ -101,6 +113,7 @@ function StatBar({ label, homeVal, awayVal }: { label: string; homeVal: number; 
 export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero?: boolean }) {
   const [data, setData] = useState<LiveData | null>(null);
   const [goals, setGoals] = useState<GoalEvent[] | null>(null);
+  const [missedPens, setMissedPens] = useState<MissedPen[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -116,6 +129,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       ]);
       setData(liveData);
       setGoals(goalsData.goals ?? []);
+      setMissedPens(goalsData.missedPens ?? []);
     } catch (e) {
       setError(String(e));
     }
@@ -218,9 +232,10 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         </div>
 
         {/* Goal scorers */}
-        {showGoals && (
+        {(showGoals || missedPens.length > 0) && goals && (
           <GoalDisplay
             goals={goals}
+            missedPens={missedPens}
             homeTeam={match.homeTeam.name}
             awayTeam={match.awayTeam.name}
           />
@@ -337,9 +352,10 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       </div>
 
       {/* Goal scorers */}
-      {showGoals && (
+      {(showGoals || missedPens.length > 0) && goals && (
         <GoalDisplay
           goals={goals}
+          missedPens={missedPens}
           homeTeam={match.homeTeam.name}
           awayTeam={match.awayTeam.name}
         />

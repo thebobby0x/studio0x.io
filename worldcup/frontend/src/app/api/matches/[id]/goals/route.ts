@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export interface MissedPen {
+  minute: number;
+  team: string;
+  player: string;
+}
+
 export interface GoalEvent {
   minute: number;
   team: string;
@@ -119,8 +125,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       if (res.ok) {
         const json = await res.json();
         const events: ApiFootballEvent[] = json.response ?? [];
+        // api-football emits MISSED penalties as type "Goal" with detail
+        // "Missed Penalty" — counting those as goals showed Mbappé "scoring"
+        // a PK he missed (owner report, live FRA-MAR). They are key moments,
+        // not goals: surfaced separately as missedPens.
         const goals: GoalEvent[] = events
-          .filter((e) => e.type === "Goal")
+          .filter((e) => e.type === "Goal" && e.detail !== "Missed Penalty")
           .map((e) => ({
             minute: e.time.elapsed,
             team: e.team.name,
@@ -129,6 +139,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             isOwnGoal: e.detail === "Own Goal",
             isPenalty: e.detail === "Penalty",
           }));
+        const missedPens = events
+          .filter((e) => e.type === "Goal" && e.detail === "Missed Penalty")
+          .map((e) => ({ minute: e.time.elapsed, team: e.team.name, player: e.player.name }));
 
         // Sanity-check: own-goal attribution is reversed (credit goes to other team),
         // so compute effective home/away goal counts and compare against the known score.
@@ -147,7 +160,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           }
         }
 
-        if (goals.length > 0) return NextResponse.json({ goals });
+        if (goals.length > 0 || missedPens.length > 0) return NextResponse.json({ goals, missedPens });
         // No real events yet — fall through to simulation below (LIVE/HT only)
       }
     } catch {
