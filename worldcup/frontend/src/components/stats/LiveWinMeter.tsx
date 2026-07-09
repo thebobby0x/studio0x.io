@@ -67,7 +67,7 @@ export default function LiveWinMeter({ matchId }: { matchId: string }) {
         </div>
         <div className="flex items-center gap-2">
           {isLive && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-          <span className="text-[10px] text-blue-400 font-semibold">Polymarket</span>
+          <span className="text-[10px] text-slate-500 font-semibold">Polymarket</span>
           {isLive && <span className="text-[10px] text-slate-600">+ score model</span>}
         </div>
       </div>
@@ -76,15 +76,15 @@ export default function LiveWinMeter({ matchId }: { matchId: string }) {
       <div className="px-6 py-5">
         <div className="grid grid-cols-3 gap-4 items-center">
           <ProbSegment prob={probs.home} color="text-brand-green" label={homeTeam} />
-          <ProbSegment prob={probs.draw} color="text-amber-400" label="Draw" />
-          <ProbSegment prob={probs.away} color="text-sky-400" label={awayTeam} />
+          <ProbSegment prob={probs.draw} color="text-slate-400" label="Draw" />
+          <ProbSegment prob={probs.away} color="text-amber-400" label={awayTeam} />
         </div>
 
         {/* Visual bar */}
         <div className="mt-4 flex h-3 rounded-full overflow-hidden gap-0.5">
           <div className="bg-brand-green/70 transition-all duration-700 rounded-l-full" style={{ width: `${probs.home * 100}%` }} />
-          <div className="bg-amber-400/70 transition-all duration-700" style={{ width: `${probs.draw * 100}%` }} />
-          <div className="bg-sky-400/70 transition-all duration-700 rounded-r-full" style={{ width: `${probs.away * 100}%` }} />
+          <div className="bg-slate-500/70 transition-all duration-700" style={{ width: `${probs.draw * 100}%` }} />
+          <div className="bg-amber-400/70 transition-all duration-700 rounded-r-full" style={{ width: `${probs.away * 100}%` }} />
         </div>
       </div>
 

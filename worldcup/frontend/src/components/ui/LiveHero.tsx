@@ -17,6 +17,9 @@ export interface HeroMatch {
   awayScore: number;
   elapsed: number;
   group?: string;
+  /** Knockout round label ("Round of 16", "Quarter Final"…). When set, it wins
+   *  over `group` — knockout games must never be labeled "Group X". */
+  stage?: string;
 }
 
 // ── Live time / status pill ──────────────────────────────────────────────────
@@ -51,7 +54,7 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
       {/* top label */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          {m.group ? `Group ${m.group}` : "World Cup"}
+          {m.stage ?? (m.group ? `Group ${m.group}` : "World Cup")}
         </span>
         {isLive ? (
           <span className="flex items-center gap-1.5 text-[11px] font-black text-red-400">
@@ -176,10 +179,12 @@ export default function LiveHero({
     return () => clearInterval(id);
   }, []);
 
-  // ── Center: two big cards pairing the live game with context ──
+  // ── Center: big cards ──
   //  · 2+ live  → both live games
   //  · 1 live   → next-up (left) + live (right)   ← "now + next"
-  //  · 0 live   → recent result (left) + next-up (right)
+  //  · 0 live   → the NEXT game is the hero (owner 7/9: results are context,
+  //               not the headline — they live in the Results list). A recent
+  //               result only takes the big slot when nothing is upcoming.
   const liveGames = live.slice(0, 2);
   const nextGame = upcoming[0] ?? null;
   const recentResult = results[0] ?? null;
@@ -191,9 +196,10 @@ export default function LiveHero({
     if (nextGame) centerSlots.push({ m: nextGame, mode: "next" });
     else if (recentResult) centerSlots.push({ m: recentResult, mode: "result" });
     centerSlots.push({ m: liveGames[0], mode: "live" });
-  } else {
-    if (recentResult) centerSlots.push({ m: recentResult, mode: "result" });
-    if (nextGame) centerSlots.push({ m: nextGame, mode: "next" });
+  } else if (nextGame) {
+    centerSlots.push({ m: nextGame, mode: "next" });
+  } else if (recentResult) {
+    centerSlots.push({ m: recentResult, mode: "result" });
   }
 
   // Don't repeat a big-card match in the side lists.

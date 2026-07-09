@@ -72,8 +72,8 @@ interface PlayerRow {
 
 const METRICS: Record<MetricKey, { label: string; desc: string; unit: string; color: string }> = {
   ipm: { label: "Impact Per Minute™",     desc: "Attack contribution per 90 — goals+assists+key passes weighted by time",          unit: "pts/90", color: "text-amber-400" },
-  sei: { label: "Shot Efficiency Index™",  desc: "Goals per shot weighted by on-target accuracy — the clinical finisher metric",    unit: "%",      color: "text-sky-400"  },
-  dd:  { label: "Duel Dominance™",         desc: "Physical contest win rate weighted by volume — not just % but total impact",      unit: "score",  color: "text-purple-400" },
+  sei: { label: "Shot Efficiency Index™",  desc: "Goals per shot weighted by on-target accuracy — the clinical finisher metric",    unit: "%",      color: "text-brand-gold"  },
+  dd:  { label: "Duel Dominance™",         desc: "Physical contest win rate weighted by volume — not just % but total impact",      unit: "score",  color: "text-brand-gold" },
   cps: { label: "Complete Player Score™",  desc: "Attack+defense+creativity vs disciplinary cost — 5 categories in one number",    unit: "score",  color: "text-brand-green" },
   pr:  { label: "Pressure Resistance™",    desc: "Match rating × foul balance — performance quality under physical challenge",      unit: "score",  color: "text-rose-400"  },
 };
@@ -148,7 +148,7 @@ export default async function TournamentXMetrics({ limit = 10, metric = "cps" as
                 </div>
                 <div className="mt-1 h-0.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full bg-gradient-to-r ${metric === "ipm" ? "from-amber-500 to-amber-300" : metric === "sei" ? "from-sky-500 to-sky-300" : metric === "dd" ? "from-purple-500 to-purple-300" : metric === "cps" ? "from-emerald-500 to-emerald-300" : "from-rose-500 to-rose-300"}`}
+                    className={`h-full rounded-full bg-gradient-to-r ${metric === "ipm" ? "from-amber-500 to-amber-300" : metric === "sei" ? "from-amber-500 to-amber-300" : metric === "dd" ? "from-amber-500 to-amber-300" : metric === "cps" ? "from-emerald-500 to-emerald-300" : "from-rose-500 to-rose-300"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>

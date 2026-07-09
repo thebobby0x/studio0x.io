@@ -7,13 +7,13 @@ import ShareButton from "@/components/ui/ShareButton";
 import { registerStoryStop, stopAllStories, startAmbient, stopAmbient } from "@/lib/storyAudio";
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  "MATCH REPORT":     "bg-brand-blue/20 text-blue-300",
-  "MATCH PREVIEW":    "bg-teal-500/20 text-teal-300",
-  "ANALYSIS":         "bg-brand-gold/20 text-amber-300",
-  "STANDINGS":        "bg-emerald-500/20 text-emerald-300",
-  "METRIC SPOTLIGHT": "bg-purple-500/20 text-purple-300",
-  "GAME RECAP":       "bg-brand-blue/20 text-blue-300",
-  "DAILY RECAP":      "bg-brand-gold/20 text-amber-300",
+  "MATCH REPORT":     "bg-white/10 text-slate-300",
+  "MATCH PREVIEW":    "bg-white/10 text-slate-300",
+  "ANALYSIS":         "bg-white/10 text-slate-300",
+  "STANDINGS":        "bg-white/10 text-slate-300",
+  "METRIC SPOTLIGHT": "bg-brand-gold/20 text-brand-gold",
+  "GAME RECAP":       "bg-white/10 text-slate-300",
+  "DAILY RECAP":      "bg-brand-gold/20 text-brand-gold",
 };
 
 export interface StoryCardData {
@@ -232,7 +232,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
           <button
             onClick={handleDeepDive}
             disabled={deepDiveLoading}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 disabled:opacity-40"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-brand-gold/30 text-brand-gold hover:bg-brand-gold/10 disabled:opacity-40"
           >
             {deepDiveLoading ? <Loader2 size={12} className="animate-spin" /> : <Telescope size={12} />}
             {deepDiveLoading ? "Analysing…" : deepDiveOpen ? "Close" : "Go Deeper"}

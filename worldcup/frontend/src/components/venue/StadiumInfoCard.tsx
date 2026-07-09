@@ -8,9 +8,9 @@ import type { WeatherData } from "@/app/api/weather/route";
 function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean; size?: number }) {
   if (code === 0 || code === 1) return isDay ? <Sun size={size} className="text-amber-400" /> : <Eye size={size} className="text-slate-400" />;
   if (code <= 3) return <Cloud size={size} className="text-slate-400" />;
-  if (code <= 67) return <CloudRain size={size} className="text-sky-400" />;
-  if (code <= 77) return <CloudSnow size={size} className="text-blue-300" />;
-  if (code <= 82) return <CloudRain size={size} className="text-sky-500" />;
+  if (code <= 67) return <CloudRain size={size} className="text-slate-300" />;
+  if (code <= 77) return <CloudSnow size={size} className="text-slate-300" />;
+  if (code <= 82) return <CloudRain size={size} className="text-slate-400" />;
   return <Zap size={size} className="text-amber-400" />;
 }
 
@@ -55,7 +55,7 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
         <span>{weather.windKph} km/h {weather.windDir}</span>
       </div>
       {weather.precipMm > 0 && (
-        <div className="flex items-center gap-1 text-sky-400">
+        <div className="flex items-center gap-1 text-slate-300">
           <CloudRain size={11} />
           <span>{weather.precipMm.toFixed(1)} mm</span>
         </div>

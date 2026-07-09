@@ -95,7 +95,7 @@ export default async function ClubContributionIndex({ limit = 10 }: { limit?: nu
                 <div className="text-[9px] text-slate-600 mt-0.5">{c.league}</div>
                 <div className="mt-1 h-1 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-sky-500 to-brand-green"
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-brand-green"
                     style={{ width: `${pct}%` }}
                   />
                 </div>

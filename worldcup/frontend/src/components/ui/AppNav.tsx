@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy, LogIn, LogOut, User, Shield, ChevronDown } from "lucide-react";
+import { Trophy, LogIn, LogOut, User, Shield, ChevronDown, Music2 } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import LiveClock from "./LiveClock";
@@ -175,9 +175,11 @@ export default function AppNav() {
           </div>
         </div>
 
-        {/* Mobile: the ACTIVE group's pages as a pill row (groups switch via bottom bar) */}
+        {/* Mobile: the ACTIVE group's pages as a pill row (groups switch via bottom bar).
+            Anthems shortcut sits right-aligned here — moved up out of the ticker,
+            where it was overlapping the results text (owner 7/9 markup). */}
         <div className="sm:hidden border-t border-brand-border/50">
-          <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {activeGroup.items.map((item) => {
               const itemActive = item.exact ? path === item.href : path.startsWith(item.href) && item.href !== "/";
               return (
@@ -194,6 +196,17 @@ export default function AppNav() {
                 </Link>
               );
             })}
+            <Link
+              href="/anthems"
+              className={`ml-auto shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                path.startsWith("/anthems")
+                  ? "font-bold text-brand-dark bg-brand-gold"
+                  : "font-semibold text-brand-gold bg-brand-gold/10 border border-brand-gold/20"
+              }`}
+            >
+              <Music2 size={12} />
+              Anthems
+            </Link>
           </div>
         </div>
       </nav>
