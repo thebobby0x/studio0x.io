@@ -11,6 +11,7 @@ import TournamentOddsPanel from "@/components/stats/TournamentOddsPanel";
 import StadiumInfoCard from "@/components/venue/StadiumInfoCard";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import TournamentStories from "@/components/news/TournamentStories";
+import TopStory from "@/components/news/TopStory";
 import type { Match } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
@@ -234,12 +235,33 @@ export default async function DashboardPage({
     )
     .map(toHero);
 
+  // The freshest AI story leads the page — previews land ~1h before kickoff
+  // and recaps within minutes of FT, so this is always "the story right now".
+  const topStory = await prisma.newsStory
+    .findFirst({ orderBy: { generatedAt: "desc" } })
+    .catch(() => null);
+
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
       <LiveRefresh isLive={isAnyMatchLive} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {/* ── Top Story headline — click to read the full AI story ── */}
+        {topStory && (
+          <TopStory
+            story={{
+              id: topStory.id,
+              category: topStory.category,
+              headline: topStory.headline,
+              body: topStory.body,
+              teamsInvolved: topStory.teamsInvolved,
+              generatedAt: topStory.generatedAt.toISOString(),
+              audioUrl: topStory.audioUrl,
+            }}
+          />
+        )}
+
         {/* Compact header row */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
