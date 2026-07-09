@@ -2,11 +2,49 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Music2, VolumeX, Pause } from "lucide-react";
 import FlagImg from "@/components/ui/FlagImg";
+import ShareButton from "@/components/ui/ShareButton";
+import { useAudio, type Track } from "@/lib/AudioContext";
 import type { BracketMatch, KnockoutRound } from "@/app/bracket/page";
 
 interface Props {
   rounds: Record<KnockoutRound, BracketMatch[]>;
+  /** team code -> anthem track (The Soundtrack Survives) */
+  anthems?: Record<string, Track>;
+  songsStanding?: number;
+  unresolvedPens?: number;
+  champion?: { name: string; code: string } | null;
+  silenced?: string[];
+}
+
+// ── The Soundtrack Survives: per-team play button on every card ──────────────
+// Gold ♪ while the song is alive; muted "silenced" treatment once the team is
+// knocked out (still playable — elegy mode).
+function AnthemNote({ track, isSilenced }: { track: Track; isSilenced: boolean }) {
+  const { current, isPlaying, play, togglePlay } = useAudio();
+  const isThis = current?.id === track.id;
+  const playingThis = isThis && isPlaying;
+  return (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isThis) togglePlay();
+        else play(track, [track], 0);
+      }}
+      title={isSilenced ? `Silenced — ${track.title}` : `Play "${track.title}"`}
+      className={`shrink-0 flex items-center justify-center w-5 h-5 rounded-full transition-colors ${
+        playingThis
+          ? "bg-brand-gold text-brand-dark"
+          : isSilenced
+          ? "bg-white/5 text-slate-600 hover:text-slate-400"
+          : "bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/25"
+      }`}
+    >
+      {playingThis ? <Pause size={10} /> : isSilenced ? <VolumeX size={10} /> : <Music2 size={10} />}
+    </button>
+  );
 }
 
 const ALL_ROUNDS: KnockoutRound[] = [
@@ -60,11 +98,15 @@ function TeamRow({
   score,
   isWinner,
   showScore,
+  track,
+  silencedSong,
 }: {
   team: { name: string; code: string; flagEmoji: string } | null;
   score: number;
   isWinner: boolean;
   showScore: boolean;
+  track?: Track;
+  silencedSong?: boolean;
 }) {
   const isTbd = !team;
   return (
@@ -91,20 +133,23 @@ function TeamRow({
           {isTbd ? "TBD" : team.name}
         </span>
       </div>
-      {showScore && !isTbd && (
-        <span
-          className={`text-sm font-black shrink-0 ${
-            isWinner ? "text-brand-gold" : "text-slate-400"
-          }`}
-        >
-          {score}
-        </span>
-      )}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {track && <AnthemNote track={track} isSilenced={!!silencedSong} />}
+        {showScore && !isTbd && (
+          <span
+            className={`text-sm font-black ${
+              isWinner ? "text-brand-gold" : "text-slate-400"
+            }`}
+          >
+            {score}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function MatchCard({ match }: { match: BracketMatch }) {
+function MatchCard({ match, anthems = {}, silencedSet }: { match: BracketMatch; anthems?: Record<string, Track>; silencedSet?: Set<string> }) {
   const finished = isFinished(match.status);
   const live = isLive(match.status);
   const showScore = finished || live;
@@ -144,6 +189,8 @@ function MatchCard({ match }: { match: BracketMatch }) {
         score={match.homeScore}
         isWinner={homeWins}
         showScore={showScore}
+        track={match.homeTeam ? anthems[match.homeTeam.code] : undefined}
+        silencedSong={match.homeTeam ? silencedSet?.has(match.homeTeam.code) : false}
       />
 
       {/* Divider */}
@@ -155,6 +202,8 @@ function MatchCard({ match }: { match: BracketMatch }) {
         score={match.awayScore}
         isWinner={awayWins}
         showScore={showScore}
+        track={match.awayTeam ? anthems[match.awayTeam.code] : undefined}
+        silencedSong={match.awayTeam ? silencedSet?.has(match.awayTeam.code) : false}
       />
 
       {/* Predict strip — shown on upcoming matches with known teams */}
@@ -198,10 +247,14 @@ function RoundColumn({
   round,
   matches,
   highlight,
+  anthems,
+  silencedSet,
 }: {
   round: KnockoutRound;
   matches: BracketMatch[];
   highlight: boolean;
+  anthems?: Record<string, Track>;
+  silencedSet?: Set<string>;
 }) {
   return (
     <div className="flex flex-col min-w-[180px] max-w-[200px] shrink-0">
@@ -225,7 +278,7 @@ function RoundColumn({
       {/* Match cards stacked vertically */}
       <div className="flex flex-col gap-2">
         {matches.map((m) => (
-          <MatchCard key={m.id} match={m} />
+          <MatchCard key={m.id} match={m} anthems={anthems} silencedSet={silencedSet} />
         ))}
       </div>
     </div>
@@ -243,8 +296,17 @@ const ROUNDS_TOP_TO_BOTTOM: KnockoutRound[] = [
 
 // ── Main bracket view ─────────────────────────────────────────────────────────
 
-export default function BracketView({ rounds }: Props) {
+export default function BracketView({
+  rounds,
+  anthems = {},
+  songsStanding,
+  unresolvedPens = 0,
+  champion = null,
+  silenced = [],
+}: Props) {
   const [activeRound, setActiveRound] = useState<KnockoutRound>("Round of 32");
+  const silencedSet = new Set(silenced);
+  const championTrack = champion ? anthems[champion.code] : undefined;
 
   // Detect if any round has live or completed matches (to highlight it)
   const liveRound = ALL_ROUNDS.find((r) =>
@@ -254,6 +316,37 @@ export default function BracketView({ rounds }: Props) {
 
   return (
     <>
+      {/* ── The Soundtrack Survives ─────────────────────────────────────────── */}
+      {champion ? (
+        <div className="mb-5 rounded-2xl border border-brand-gold/40 bg-gradient-to-r from-brand-gold/15 via-brand-card to-brand-card px-5 py-4 flex flex-wrap items-center gap-3">
+          <span className="text-2xl">🏆</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-black uppercase tracking-widest text-brand-gold">The Last Song Standing</div>
+            <div className="text-sm font-black text-white truncate">
+              {championTrack ? `“${championTrack.title}” — ` : ""}{champion.name}
+            </div>
+          </div>
+          {championTrack && <AnthemNote track={championTrack} isSilenced={false} />}
+          <ShareButton
+            text={`The Last Song Standing 🏆 ${championTrack ? `“${championTrack.title}” — ` : ""}${champion.name} win the World Cup · studio0x.io`}
+            url="/bracket"
+            title="The Last Song Standing"
+          />
+        </div>
+      ) : songsStanding !== undefined && (
+        <div className="mb-5 rounded-2xl border border-brand-border bg-brand-card px-5 py-3.5 flex flex-wrap items-center gap-3">
+          <Music2 size={15} className="text-brand-gold shrink-0" />
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Songs Still Standing</span>
+            <span className="text-xl font-black text-white tabular-nums">{songsStanding}</span>
+            <span className="text-[10px] text-slate-600">of 48 anthems · one falls with every knockout</span>
+          </div>
+          <span className="ml-auto text-[9px] text-slate-600">
+            ♪ on every card plays that nation’s anthem{unresolvedPens > 0 ? ` · ${unresolvedPens} penalty tie awaiting confirmed winner — both songs still count` : ""}
+          </span>
+        </div>
+      )}
+
       {/* ── Mobile: round tabs + single column ─────────────────────────────── */}
       <div className="lg:hidden">
         {/* Tab bar */}
@@ -287,7 +380,7 @@ export default function BracketView({ rounds }: Props) {
         {/* Cards for selected round */}
         <div className="flex flex-col gap-3">
           {rounds[activeRound].map((m) => (
-            <MatchCard key={m.id} match={m} />
+            <MatchCard key={m.id} match={m} anthems={anthems} silencedSet={silencedSet} />
           ))}
         </div>
       </div>
@@ -328,7 +421,7 @@ export default function BracketView({ rounds }: Props) {
                 <div className="flex flex-wrap gap-3 justify-center">
                   {matches.map((m) => (
                     <div key={m.id} className="min-w-[160px] max-w-[200px] flex-1">
-                      <MatchCard match={m} />
+                      <MatchCard match={m} anthems={anthems} silencedSet={silencedSet} />
                     </div>
                   ))}
                 </div>
@@ -339,7 +432,7 @@ export default function BracketView({ rounds }: Props) {
 
         {/* Footer note */}
         <p className="mt-6 text-center text-[10px] font-mono text-slate-700">
-          Group stage concludes Jul 2 · Round of 32 begins Jul 3
+          Knockout stage · Round of 32 → Final · Jun 28 – Jul 19
         </p>
       </div>
 
