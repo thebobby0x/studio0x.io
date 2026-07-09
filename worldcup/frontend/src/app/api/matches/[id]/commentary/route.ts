@@ -107,6 +107,7 @@ export async function GET(
         if (e.type === "Goal") return `${e.minute}' GOAL – ${e.team}: ${e.player}${e.assist ? ` (assist: ${e.assist})` : ""}${e.detail === "Own Goal" ? " (OG)" : ""}${e.detail === "Penalty" ? " (pen)" : ""}`;
         if (e.type === "Card") return `${e.minute}' ${e.detail} – ${e.player} (${e.team})`;
         if (e.type === "subst") return `${e.minute}' SUB – ${e.team}: ${e.player}`;
+        if (e.type === "Var") return `${e.minute}' VAR REVIEW – ${e.detail} (${e.team})`;
         return `${e.minute}' ${e.type} – ${e.player} (${e.team})`;
       }).join("\n")
     : "No events yet.";
