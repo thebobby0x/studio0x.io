@@ -8,7 +8,7 @@ import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 
 export const metadata: Metadata = {
-  title: "Studio0x · World Cup 2026 Stats Engine",
+  title: "studio0x · World Cup 2026 Stats Engine",
   description: "Live match telemetry, prediction markets, and team anthems for FIFA World Cup 2026",
 };
 

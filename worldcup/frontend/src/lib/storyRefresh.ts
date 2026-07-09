@@ -123,7 +123,7 @@ export async function runStoryRefresh(): Promise<{ ok: boolean; previewsWritten:
         : "(First match of the tournament for both teams)";
 
       const stage = stageContext(m.date, m.homeTeam.groupStage);
-      const prompt = `You are Studio0x's AI football analyst. Write a pre-match preview for this upcoming World Cup 2026 match, kicking off in ${kickoffIn} minutes.
+      const prompt = `You are studio0x's AI football analyst. Write a pre-match preview for this upcoming World Cup 2026 match, kicking off in ${kickoffIn} minutes.
 
 MATCH: ${m.homeTeam.name} vs ${m.awayTeam.name}
 STAGE: ${stage.label}${stage.isKnockout ? " (knockout — the group stage is over; do NOT mention any group)" : ""}
@@ -182,7 +182,7 @@ Return ONLY valid JSON, no other text:
 
     for (const m of recentFT.filter(m => !haveRecap.has(m.fixture))) {
       const stage = stageContext(m.date, m.homeTeam.groupStage);
-      const prompt = `You are Studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a match recap.
+      const prompt = `You are studio0x's AI football analyst covering the 2026 FIFA World Cup. Write a match recap.
 
 RESULT: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
 TYPE: ${dramaLabel(m.homeScore, m.awayScore)}

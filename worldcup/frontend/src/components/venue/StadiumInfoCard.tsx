@@ -5,6 +5,7 @@ import { MapPin, Wind, Droplets, Thermometer, Mountain, Users, ChevronDown, Chev
 import type { VenueInfo } from "@/lib/venues";
 import type { WeatherData } from "@/app/api/weather/route";
 import { CLIMATE_CONTROLLED, crampWatch, aqiBand, PM25_SMOKE_THRESHOLD } from "@/lib/heat";
+import { useUnits } from "@/lib/units";
 import type { HeatOutcomesAggregate } from "@/lib/heatOutcomes";
 
 function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean; size?: number }) {
@@ -44,6 +45,7 @@ function HeatOutcomesNote({ level }: { level: string }) {
 
 function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number; lng: number }) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const { tempC, windKph, precipMm } = useUnits();
 
   useEffect(() => {
     const params = new URLSearchParams({ venue: venueName });
@@ -67,12 +69,12 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 px-4 border-t border-brand-border/50 text-xs text-slate-400">
       <div className="flex items-center gap-1.5 font-semibold text-white">
         <WeatherIcon code={weather.conditionCode} isDay={weather.isDay} />
-        <span>{weather.tempC}°C</span>
+        <span>{tempC(weather.tempC)}</span>
         <span className="font-normal text-slate-500 text-[10px]">({weather.condition})</span>
       </div>
       <div className="flex items-center gap-1">
         <Thermometer size={11} className="text-slate-500" />
-        <span>Feels {weather.feelsLikeC}°C</span>
+        <span>Feels {tempC(weather.feelsLikeC)}</span>
       </div>
       <div className="flex items-center gap-1">
         <Droplets size={11} className="text-slate-500" />
@@ -80,12 +82,12 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
       </div>
       <div className="flex items-center gap-1">
         <Wind size={11} className="text-slate-500" />
-        <span>{weather.windKph} km/h {weather.windDir}</span>
+        <span>{windKph(weather.windKph)} {weather.windDir}</span>
       </div>
       {weather.precipMm > 0 && (
         <div className="flex items-center gap-1 text-slate-300">
           <CloudRain size={11} />
-          <span>{weather.precipMm.toFixed(1)} mm</span>
+          <span>{precipMm(weather.precipMm)}</span>
         </div>
       )}
       {weather.isDay && weather.uvIndex >= 3 && (
@@ -110,8 +112,8 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
         );
       })()}
       <div className="ml-auto text-[10px] text-slate-600 tabular-nums hidden sm:block">
-        H:{weather.forecastHigh}° L:{weather.forecastLow}°
-        {weather.forecastPrecipMm > 0 ? ` · ${weather.forecastPrecipMm.toFixed(1)}mm` : ""}
+        H:{tempC(weather.forecastHigh)} L:{tempC(weather.forecastLow)}
+        {weather.forecastPrecipMm > 0 ? ` · ${precipMm(weather.forecastPrecipMm)}` : ""}
       </div>
 
       {/* Cramp Watch™ — only surfaces when heat is a real factor */}
@@ -124,7 +126,7 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Cramp Watch™</span>
             <span className={`text-[11px] font-black ${cw.color}`}>{cw.level}</span>
             <span className="text-[10px] text-slate-500">
-              heat index {weather.feelsLikeC}° · {weather.humidity}% RH — {cw.note}
+              heat index {tempC(weather.feelsLikeC)} · {weather.humidity}% RH — {cw.note}
             </span>
             <span className="text-[9px] text-slate-700 w-full sm:w-auto sm:ml-auto">
               ambient at stadium (Open-Meteo){covered ? " · climate-controlled venue — outdoor reading" : ""}
@@ -145,6 +147,7 @@ interface Props {
 export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [factIdx, setFactIdx] = useState(0);
+  const { altM, tempC } = useUnits();
 
   const nextFact = useCallback(() => {
     setFactIdx(i => (i + 1) % venueInfo.didYouKnow.length);
@@ -158,10 +161,10 @@ export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
   }, [nextFact, venueInfo.didYouKnow.length]);
 
   const altLabel = venueInfo.altitudeM >= 1000
-    ? `${venueInfo.altitudeM.toLocaleString()}m — thin air!`
+    ? `${altM(venueInfo.altitudeM)} — thin air!`
     : venueInfo.altitudeM >= 300
-    ? `${venueInfo.altitudeM}m`
-    : `${venueInfo.altitudeM}m (sea level)`;
+    ? altM(venueInfo.altitudeM)
+    : `${altM(venueInfo.altitudeM)} (sea level)`;
 
   const altColor = venueInfo.altitudeM >= 1500
     ? "text-amber-400"
@@ -205,7 +208,7 @@ export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
         </div>
         <div className="bg-brand-card px-4 py-3 flex flex-col gap-0.5">
           <span className="text-[10px] text-slate-600 uppercase tracking-wider">Avg June Temp</span>
-          <span className="text-sm font-semibold text-slate-200">{venueInfo.avgJuneTempC}°C · {venueInfo.avgJuneHumidityPct}% humidity</span>
+          <span className="text-sm font-semibold text-slate-200">{tempC(venueInfo.avgJuneTempC)} · {venueInfo.avgJuneHumidityPct}% humidity</span>
         </div>
       </div>
 
@@ -244,7 +247,7 @@ export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-1">Altitude</div>
-            <div className={altColor}>{venueInfo.altitudeM.toLocaleString()} m above sea level</div>
+            <div className={altColor}>{altM(venueInfo.altitudeM)} above sea level</div>
             {venueInfo.altitudeM >= 1000 && (
               <div className="text-[10px] text-amber-500/70 mt-0.5">
                 High altitude reduces O₂ by ~{Math.round((1 - Math.exp(-venueInfo.altitudeM / 8500)) * 100)}%
@@ -253,7 +256,7 @@ export default function StadiumInfoCard({ venueName, venueInfo }: Props) {
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-1">Avg June Climate</div>
-            <div>{venueInfo.avgJuneTempC}°C · {venueInfo.avgJuneHumidityPct}% humidity</div>
+            <div>{tempC(venueInfo.avgJuneTempC)} · {venueInfo.avgJuneHumidityPct}% humidity</div>
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-1">Country</div>

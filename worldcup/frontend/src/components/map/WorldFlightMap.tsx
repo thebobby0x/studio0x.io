@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useUnits } from "@/lib/units";
 import { geoNaturalEarth1, geoPath, geoInterpolate } from "d3-geo";
 import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
@@ -58,6 +59,7 @@ interface VB { x: number; y: number; w: number; h: number }
 const INIT_VB: VB = { x: 0, y: 0, w: W, h: H };
 
 export default function WorldFlightMap() {
+  const { tempC, distKm } = useUnits();
   const [countries,     setCountries]     = useState<string[]>([]);
   const [arcs,          setArcs]          = useState<FlightArc[]>([]);
   const [density,       setDensity]       = useState<VenueDensity[]>([]);
@@ -447,7 +449,7 @@ export default function WorldFlightMap() {
               <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5 text-[11px] text-slate-500">
                 <span>⚽ {venueInfo.capacity.toLocaleString()} seats</span>
                 {venueInfo.altitudeM > 0 && <span>⛰ {venueInfo.altitudeM} m altitude</span>}
-                <span>🌡 {venueInfo.avgJuneTempC}°C · {venueInfo.avgJuneHumidityPct}% humidity in June</span>
+                <span>🌡 {tempC(venueInfo.avgJuneTempC)} · {venueInfo.avgJuneHumidityPct}% humidity in June</span>
               </div>
               {venueInfo.didYouKnow.length > 0 && (
                 <p className="mt-2.5 text-[11px] text-slate-500 italic leading-relaxed">"{venueInfo.didYouKnow[0]}"</p>
@@ -488,7 +490,7 @@ export default function WorldFlightMap() {
                 return (
                   <div className="flex flex-col gap-1 mt-2.5 text-[11px] text-slate-500">
                     <div className="flex gap-4">
-                      <span>✈ {s.miles.toLocaleString()} mi · {s.km.toLocaleString()} km</span>
+                      <span>✈ {distKm(s.km)}</span>
                       <span>⏱ ~{s.hours}h flight</span>
                     </div>
                     <div className="flex gap-4 text-slate-600">

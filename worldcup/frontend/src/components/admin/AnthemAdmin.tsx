@@ -25,7 +25,7 @@ const EMPTY_FORM = {
   teamCode: "",
   audioUrl: "",
   title: "",
-  artistCredit: "Suno AI × Studio0x",
+  artistCredit: "Suno AI × studio0x",
   durationSecs: "",
   tiktokDeepLink: "",
 };
@@ -77,7 +77,7 @@ export default function AnthemAdmin() {
       teamCode: team.code,
       audioUrl: team.anthem?.audioUrl ?? "",
       title: team.anthem?.title ?? `${team.name} World Cup Anthem 2026`,
-      artistCredit: team.anthem?.artistCredit ?? "Suno AI × Studio0x",
+      artistCredit: team.anthem?.artistCredit ?? "Suno AI × studio0x",
       durationSecs: team.anthem?.durationSecs ? String(team.anthem.durationSecs) : "",
       tiktokDeepLink: team.anthem?.tiktokDeepLink ?? "",
     });
@@ -390,7 +390,7 @@ export default function AnthemAdmin() {
                     type="text"
                     value={form.artistCredit}
                     onChange={(e) => setForm((f) => ({ ...f, artistCredit: e.target.value }))}
-                    placeholder="Suno AI × Studio0x"
+                    placeholder="Suno AI × studio0x"
                     className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-green text-sm"
                   />
                 </div>

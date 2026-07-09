@@ -59,7 +59,7 @@ async function importOne(item: Item): Promise<ImportResult> {
   }
 
   // Upsert anthem record
-  const credit = artistCredit ?? "Suno AI × Studio0x";
+  const credit = artistCredit ?? "Suno AI × studio0x";
   const secs = durationSecs ?? 180;
 
   try {

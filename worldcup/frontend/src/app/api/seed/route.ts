@@ -562,7 +562,7 @@ async function seed(req: Request) {
         const preserveUrl = !!existing && !existing.audioUrl.includes("soundhelix.com");
         await prisma.audioStream.upsert({
           where: { id: a.id },
-          create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × Studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
+          create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
           update: { teamId, title: a.title, durationSecs: a.durationSecs, ...(preserveUrl ? {} : { audioUrl: a.url }) },
         });
         return preserveUrl ? "preserved" : "written";

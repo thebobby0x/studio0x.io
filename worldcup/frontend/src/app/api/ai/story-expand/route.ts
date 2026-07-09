@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     max_tokens: 1024,
     messages: [{
       role: "user",
-      content: `You are a senior editor at Studio0x, a premium AI sports analytics platform covering the 2026 FIFA World Cup.
+      content: `You are a senior editor at studio0x, a premium AI sports analytics platform covering the 2026 FIFA World Cup.
 
 A reader just clicked "Go Deeper" on this story:
 

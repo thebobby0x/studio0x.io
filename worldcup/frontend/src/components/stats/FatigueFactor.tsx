@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 import { BatteryLow } from "lucide-react";
+import UnitDist from "@/components/ui/UnitDist";
 
 // ── Fatigue Factor™ (owner 7/9: "did we account for short turnaround / travel
 // between games?") ────────────────────────────────────────────────────────────
@@ -101,13 +102,13 @@ export default async function FatigueFactor({ fixtureId }: { fixtureId: number }
         </div>
         {s.hopKm !== null && (
           <div>
-            <span className="text-white font-bold tabular-nums">{s.hopKm.toLocaleString()}</span> km
+            <span className="text-white font-bold tabular-nums"><UnitDist km={s.hopKm} /></span>{" "}
             from {s.lastVenueCity}
           </div>
         )}
         {s.tourKm !== null && (
           <div className="text-slate-500">
-            {s.tourKm.toLocaleString()} km toured this WC
+            <UnitDist km={s.tourKm} /> toured this WC
           </div>
         )}
       </div>

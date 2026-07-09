@@ -181,7 +181,7 @@ export default function GroupWinnerTickers({ group, highlightTeams = [], showTou
       <div className="px-4 py-2 border-t border-brand-border/50 text-[10px] text-slate-600 flex items-center gap-3">
         <span>${totalVol.toLocaleString(undefined, { maximumFractionDigits: 0 })} vol</span>
         {data.totalLiquidity > 0 && <span>${data.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 0 })} liq</span>}
-        <span className="text-slate-700">· Advance % + Win Cup path are Studio0x models derived from Polymarket prices · polymarket.com</span>
+        <span className="text-slate-700">· Advance % + Win Cup path are studio0x models derived from Polymarket prices · polymarket.com</span>
       </div>
     </div>
   );

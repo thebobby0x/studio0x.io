@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Single source of truth for every Studio0x anthem backed by a Google Drive file.
+// Single source of truth for every studio0x anthem backed by a Google Drive file.
 //
 // Before this existed, anthem sources were split across two batch routes
 // (batch-anthem = original 8 teams + 4 FIFA, batch-import-anthems = 12 newer

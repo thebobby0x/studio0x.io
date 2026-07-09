@@ -121,7 +121,7 @@ export default async function LeaguesPage() {
           <ClubWCImpact limit={12} />
         </div>
 
-        {/* Studio0x Proprietary Metrics */}
+        {/* studio0x Proprietary Metrics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <ClubContributionIndex limit={8} />
           <PlayerPerformanceIndex limit={10} />
@@ -212,7 +212,7 @@ export default async function LeaguesPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        Studio0x.io · World Cup 2026 · Club &amp; League breakdown
+        studio0x.io · World Cup 2026 · Club &amp; League breakdown
       </footer>
     </div>
   );

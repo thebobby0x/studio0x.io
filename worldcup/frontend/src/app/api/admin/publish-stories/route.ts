@@ -8,9 +8,9 @@ export const maxDuration = 60;
 
 function storiesToMarkdown(stories: Story[], date: string): string {
   const lines = [
-    `# Studio0x World Cup 2026 — ${date}`,
+    `# studio0x World Cup 2026 — ${date}`,
     "",
-    `*AI-generated match analysis powered by Studio0x · [studio0x.io](https://worldcup-2026-sandy.vercel.app)*`,
+    `*AI-generated match analysis powered by studio0x · [studio0x.io](https://worldcup-2026-sandy.vercel.app)*`,
     "",
     "---",
     "",
@@ -30,7 +30,7 @@ function storiesToMarkdown(stories: Story[], date: string): string {
     lines.push("");
   }
 
-  lines.push(`*Generated ${new Date().toUTCString()} · [Studio0x](https://worldcup-2026-sandy.vercel.app)*`);
+  lines.push(`*Generated ${new Date().toUTCString()} · [studio0x](https://worldcup-2026-sandy.vercel.app)*`);
   return lines.join("\n");
 }
 
@@ -157,12 +157,12 @@ export async function POST(req: Request) {
     const rssFeed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
-    <title>Studio0x World Cup 2026 Digest</title>
+    <title>studio0x World Cup 2026 Digest</title>
     <link>https://worldcup-2026-sandy.vercel.app</link>
-    <description>AI-powered match analysis and tournament stories from Studio0x, the world's first AI sports analytics platform.</description>
+    <description>AI-powered match analysis and tournament stories from studio0x, the world's first AI sports analytics platform.</description>
     <language>en-us</language>
     <itunes:category text="Sports"/>
-    <itunes:author>Studio0x AI</itunes:author>
+    <itunes:author>studio0x AI</itunes:author>
     <itunes:explicit>false</itunes:explicit>
     ${rssItems}
   </channel>

@@ -54,7 +54,7 @@ async function runImport(req: Request) {
           teamId: team.id,
           audioUrl: blob.url,
           title: entry.title,
-          artistCredit: "Suno AI × Studio0x",
+          artistCredit: "Suno AI × studio0x",
           durationSecs: 180,
         },
       });

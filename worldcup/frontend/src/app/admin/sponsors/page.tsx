@@ -61,7 +61,7 @@ export default async function SponsorsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-black text-white">Sponsor Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Studio0x · World Cup 2026</p>
+            <p className="text-xs text-slate-500 mt-0.5">studio0x · World Cup 2026</p>
           </div>
           <div className="flex gap-4 text-right">
             <div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Cloud, Sun, CloudRain, Zap } from "lucide-react";
 import type { WeatherData } from "@/app/api/weather/route";
+import { useUnits } from "@/lib/units";
 
 function WeatherIcon({ code, isDay }: { code: number; isDay: boolean }) {
   const cls = "shrink-0";
@@ -15,6 +16,7 @@ function WeatherIcon({ code, isDay }: { code: number; isDay: boolean }) {
 
 export default function HeroWeather({ venueName }: { venueName: string }) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const { tempC } = useUnits();
 
   useEffect(() => {
     fetch(`/api/weather?venue=${encodeURIComponent(venueName)}`)
@@ -28,7 +30,7 @@ export default function HeroWeather({ venueName }: { venueName: string }) {
   return (
     <span className="flex items-center gap-1.5">
       <WeatherIcon code={weather.conditionCode} isDay={weather.isDay} />
-      <span className="font-semibold text-slate-300">{weather.tempC}°C</span>
+      <span className="font-semibold text-slate-300">{tempC(weather.tempC)}</span>
       <span className="text-slate-600 text-[10px]">{weather.condition}</span>
     </span>
   );
