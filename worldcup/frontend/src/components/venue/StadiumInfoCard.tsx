@@ -14,6 +14,31 @@ function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean;
   return <Zap size={size} className="text-amber-400" />;
 }
 
+// ── Cramp Watch™ — heat-stress read from REAL ambient data ───────────────────
+// Bands follow standard heat-index guidance applied to Open-Meteo's apparent
+// temperature (which already folds in humidity). Honest limits, stated in the
+// label: this is AMBIENT weather at the stadium, not pitch-surface temperature,
+// and several WC26 venues are climate-controlled — the outdoor reading doesn't
+// apply inside them.
+const CLIMATE_CONTROLLED = new Set([
+  "AT&T Stadium",        // Arlington/Dallas — retractable roof
+  "NRG Stadium",         // Houston — retractable roof
+  "Mercedes-Benz Stadium", // Atlanta — retractable roof
+  "BC Place",            // Vancouver — retractable roof
+  "SoFi Stadium",        // Inglewood/LA — fixed canopy
+]);
+
+function crampWatch(feelsC: number, humidity: number): {
+  level: "Low" | "Moderate" | "High" | "Extreme";
+  color: string;
+  note: string;
+} | null {
+  if (feelsC >= 39) return { level: "Extreme", color: "text-red-400", note: "cooling breaks likely · severe cramp & dehydration risk late" };
+  if (feelsC >= 32) return { level: "High", color: "text-brand-gold", note: "elevated cramp risk in the final 30′ · watch hydration" };
+  if (feelsC >= 27) return { level: "Moderate", color: "text-slate-300", note: humidity >= 60 ? "humid — hydration matters as legs tire" : "hydration matters as legs tire" };
+  return null; // Low — no banner needed
+}
+
 function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number; lng: number }) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
@@ -64,6 +89,25 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
         H:{weather.forecastHigh}° L:{weather.forecastLow}°
         {weather.forecastPrecipMm > 0 ? ` · ${weather.forecastPrecipMm.toFixed(1)}mm` : ""}
       </div>
+
+      {/* Cramp Watch™ — only surfaces when heat is a real factor */}
+      {(() => {
+        const cw = crampWatch(weather.feelsLikeC, weather.humidity);
+        if (!cw) return null;
+        const covered = CLIMATE_CONTROLLED.has(venueName);
+        return (
+          <div className="w-full flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1.5 mt-0.5 border-t border-brand-border/40">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Cramp Watch™</span>
+            <span className={`text-[11px] font-black ${cw.color}`}>{cw.level}</span>
+            <span className="text-[10px] text-slate-500">
+              heat index {weather.feelsLikeC}° · {weather.humidity}% RH — {cw.note}
+            </span>
+            <span className="text-[9px] text-slate-700 w-full sm:w-auto sm:ml-auto">
+              ambient at stadium (Open-Meteo){covered ? " · climate-controlled venue — outdoor reading" : ""}
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }
