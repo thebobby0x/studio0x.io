@@ -113,7 +113,7 @@ export async function GET(
     : "No events yet.";
 
   const systemPrompt = PERSONAS[persona] ?? PERSONAS.analyst;
-  const userPrompt = `FIFA World Cup 2026 match — ${score}
+  const userPrompt = `World Cup 2026 match — ${score}
 Status: ${match.status}${isLive ? ` (${match.elapsed}' played)` : ""}
 
 Events so far:

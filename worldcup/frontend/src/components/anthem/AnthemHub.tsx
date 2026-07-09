@@ -19,7 +19,7 @@ function streamToTrack(s: Stream): Track {
     title: s.title,
     audioUrl: s.audioUrl,
     durationSecs: s.durationSecs ?? 180,
-    teamName: s.team?.name ?? "FIFA World Cup 2026",
+    teamName: s.team?.name ?? "cup26",
     teamCode: s.team?.code ?? "",
     flagEmoji: s.team?.flagEmoji ?? "🏆",
   };
@@ -58,7 +58,7 @@ function formatTime(sec: number) {
 
 function buildShareLinks(stream: Stream, pageUrl: string) {
   const text = encodeURIComponent(
-    `🎵 ${stream.title} — Official FIFA World Cup 2026 Anthem | Suno AI × studio0x`
+    `🎵 ${stream.title} — cup26 anthem | Suno AI × studio0x`
   );
   const url = encodeURIComponent(pageUrl);
   return [
@@ -336,7 +336,7 @@ export default function AnthemHub({
           <div className={`rounded-2xl bg-gradient-to-br ${teamGradient(current?.team?.code)} p-8 flex items-center gap-5 shadow-xl`}>
             <div className="text-7xl drop-shadow-xl select-none">{current?.team?.flagEmoji ?? "🏆"}</div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-white/60 uppercase tracking-widest">{current?.team?.name ?? "FIFA World Cup 2026"}</div>
+              <div className="text-xs font-semibold text-white/60 uppercase tracking-widest">{current?.team?.name ?? "cup26"}</div>
               <h2 className="text-xl font-bold text-white mt-1 leading-snug">{current?.title}</h2>
               <div className="text-sm text-white/50 mt-1">{current?.artistCredit}</div>
             </div>
@@ -480,7 +480,7 @@ export default function AnthemHub({
                         : "bg-slate-700 text-slate-300 hover:bg-slate-600"
                     }`}
                   >
-                    {f === "all" ? "All" : f === "team" ? "Team" : "FIFA"}
+                    {f === "all" ? "All" : f === "team" ? "Team" : "Tournament"}
                   </button>
                 ))}
               </div>
@@ -511,11 +511,11 @@ export default function AnthemHub({
             {/* List */}
             <div className="divide-y divide-brand-border overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-340px)]">
 
-              {/* FIFA section */}
+              {/* Tournament (non-team) section */}
               {showFifa && fifaStreams.length > 0 && (
                 <>
                   <div className="px-4 py-2 bg-brand-dark/40 text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                    🏆 FIFA World Cup
+                    🏆 Tournament
                   </div>
                   {fifaStreams.map((s) => {
                     const isActive = s.id === currentStreamId;
@@ -530,7 +530,7 @@ export default function AnthemHub({
                           <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
                             {s.title}
                           </div>
-                          <div className="text-xs text-slate-500">FIFA World Cup 2026</div>
+                          <div className="text-xs text-slate-500">cup26</div>
                         </div>
                         {isActive && isPlaying && (
                           <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>

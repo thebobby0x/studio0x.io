@@ -31,7 +31,7 @@ function resolveUrl(url?: string): string {
   return url ? new URL(url, window.location.origin).toString() : window.location.href;
 }
 
-export default function ShareButton({ text, url, title = "studio0x · World Cup 2026", variant = "icon", className = "" }: Props) {
+export default function ShareButton({ text, url, title = "studio0x · cup26", variant = "icon", className = "" }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);

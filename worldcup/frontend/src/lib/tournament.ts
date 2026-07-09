@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Single source of truth for FIFA World Cup 2026 tournament dates + countdown
+// Single source of truth for World Cup 2026 tournament dates + countdown
 // helpers. Every component that shows a date, a "days until" headline, or a
 // kickoff countdown MUST import from here so the numbers agree everywhere.
 //

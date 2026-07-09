@@ -467,9 +467,9 @@ export default async function RecordsPage() {
               Tournament <span className="text-brand-gold">Records</span>
             </h1>
             <ShareButton
-              text="World Cup 2026 Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io"
+              text="cup26 Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io"
               url="/records"
-              title="World Cup 2026 Tournament Records"
+              title="cup26 Records"
               className="ml-1"
             />
           </div>
@@ -533,7 +533,7 @@ export default async function RecordsPage() {
         </div>
       </main>
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · World Cup 2026 Stats Engine · Player stats via api-football.com
+        studio0x.io · cup26 stats engine · Player stats via api-football.com
       </footer>
     </div>
   );

@@ -76,7 +76,7 @@ export default function AnthemAdmin() {
     setForm({
       teamCode: team.code,
       audioUrl: team.anthem?.audioUrl ?? "",
-      title: team.anthem?.title ?? `${team.name} World Cup Anthem 2026`,
+      title: team.anthem?.title ?? `${team.name} Anthem · cup26`,
       artistCredit: team.anthem?.artistCredit ?? "Suno AI × studio0x",
       durationSecs: team.anthem?.durationSecs ? String(team.anthem.durationSecs) : "",
       tiktokDeepLink: team.anthem?.tiktokDeepLink ?? "",
@@ -378,7 +378,7 @@ export default function AnthemAdmin() {
                     type="text"
                     value={form.title}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder={`${selected.name} World Cup Anthem 2026`}
+                    placeholder={`${selected.name} Anthem · cup26`}
                     className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-green text-sm"
                   />
                 </div>

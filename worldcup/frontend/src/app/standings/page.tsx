@@ -376,12 +376,12 @@ export default async function StandingsPage() {
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-black text-white tracking-tight">
-              FIFA World Cup 2026 <span className="text-brand-gold">Standings</span>
+              cup26 <span className="text-brand-gold">Standings</span>
             </h1>
             <ShareButton
-              text="World Cup 2026 group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io"
+              text="cup26 group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io"
               url="/standings"
-              title="World Cup 2026 Standings"
+              title="cup26 Standings"
             />
           </div>
           <p className="text-slate-500 mt-1 text-sm">
@@ -496,7 +496,7 @@ export default async function StandingsPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · World Cup 2026 Stats Engine · Standings computed from live match data
+        studio0x.io · cup26 stats engine · Standings computed from live match data
       </footer>
     </div>
   );

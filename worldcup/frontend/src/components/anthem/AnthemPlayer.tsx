@@ -79,7 +79,7 @@ function Track({ stream }: { stream: AudioStream }) {
       >
         <div className="text-3xl">{stream.team?.flagEmoji ?? "🏆"}</div>
         <div className="ml-3">
-          <div className="text-xs font-semibold text-white/80 uppercase tracking-widest">{stream.team?.name ?? "FIFA World Cup 2026"}</div>
+          <div className="text-xs font-semibold text-white/80 uppercase tracking-widest">{stream.team?.name ?? "cup26"}</div>
           <div className="text-white font-bold text-sm leading-tight">{stream.title}</div>
         </div>
       </div>

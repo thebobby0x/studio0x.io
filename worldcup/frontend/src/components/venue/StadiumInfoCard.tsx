@@ -37,7 +37,7 @@ function HeatOutcomesNote({ level }: { level: string }) {
   if (!agg || agg.hot.n < 3 || agg.mild.n < 3) return null;
   return (
     <span className="text-[10px] text-slate-500 w-full">
-      Hot matches this WC: {agg.hot.lateGoalSharePct}% of goals after 75′ (n={agg.hot.n}) vs{" "}
+      Hot matches this tournament: {agg.hot.lateGoalSharePct}% of goals after 75′ (n={agg.hot.n}) vs{" "}
       {agg.mild.lateGoalSharePct}% in milder conditions (n={agg.mild.n}) · correlation, not causation
     </span>
   );

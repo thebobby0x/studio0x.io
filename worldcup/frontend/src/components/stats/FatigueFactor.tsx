@@ -108,7 +108,7 @@ export default async function FatigueFactor({ fixtureId }: { fixtureId: number }
         )}
         {s.tourKm !== null && (
           <div className="text-slate-500">
-            <UnitDist km={s.tourKm} /> toured this WC
+            <UnitDist km={s.tourKm} /> toured this tournament
           </div>
         )}
       </div>

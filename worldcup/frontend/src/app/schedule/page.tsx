@@ -53,7 +53,7 @@ export default async function SchedulePage() {
         {/* Page header */}
         <div className="mb-8">
           <h1 className="text-3xl font-black text-white tracking-tight">
-            FIFA World Cup 2026 <span className="text-brand-gold">Schedule</span>
+            cup26 <span className="text-brand-gold">Schedule</span>
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
             Live scores · Countdowns · Full group stage & knockout bracket
@@ -74,7 +74,7 @@ export default async function SchedulePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · World Cup 2026 Stats Engine · Schedule data via api-football.com
+        studio0x.io · cup26 stats engine · Schedule data via api-football.com
       </footer>
     </div>
   );
