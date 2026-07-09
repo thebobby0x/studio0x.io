@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import AppNav from "@/components/ui/AppNav";
 import BracketView from "@/components/bracket/BracketView";
 import ShareButton from "@/components/ui/ShareButton";
+import type { Track } from "@/lib/AudioContext";
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
@@ -147,8 +148,84 @@ async function fetchKnockoutMatches(): Promise<Record<KnockoutRound, BracketMatc
   return grouped;
 }
 
+// ── The Soundtrack Survives (owner-approved §14) ─────────────────────────────
+// Anthems ride the real bracket: every card can play its teams' songs, a
+// loser's song is "silenced", and the strip counts the songs still standing.
+async function fetchAnthemTracks(): Promise<Record<string, Track>> {
+  try {
+    const streams = await prisma.audioStream.findMany({
+      where: { teamId: { not: null } },
+      include: { team: true },
+    });
+    const map: Record<string, Track> = {};
+    for (const st of streams) {
+      if (!st.team) continue;
+      map[st.team.code] = {
+        id: st.id,
+        title: st.title,
+        audioUrl: st.audioUrl,
+        durationSecs: st.durationSecs ?? 180,
+        teamName: st.team.name,
+        teamCode: st.team.code,
+        flagEmoji: st.team.flagEmoji ?? "\u{1F3F3}",
+      };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Survival math from real results only. Penalty-decided ties (FT draws) leave
+// BOTH anthems standing until the winner shows up in a later round — we don't
+// store shootout scores, so we don't guess.
+function soundtrackStatus(rounds: Record<KnockoutRound, BracketMatch[]>) {
+  const participants = new Set<string>();
+  const silenced = new Set<string>();
+  let unresolvedPens = 0;
+  let champion: { name: string; code: string } | null = null;
+
+  const laterAppearance = new Set<string>();
+  for (const r of ALL_ROUNDS) {
+    for (const m of rounds[r]) {
+      for (const t of [m.homeTeam, m.awayTeam]) {
+        if (t) { participants.add(t.code); }
+      }
+    }
+  }
+  for (const r of ALL_ROUNDS) {
+    for (const m of rounds[r]) {
+      if (m.status !== "FT" || !m.homeTeam || !m.awayTeam) continue;
+      if (m.homeScore === m.awayScore) {
+        // pens — resolved only if one side already appears in a later round
+        const later = ALL_ROUNDS.slice(ALL_ROUNDS.indexOf(r) + 1);
+        const advanced = [m.homeTeam, m.awayTeam].find((t) =>
+          later.some((lr) => rounds[lr].some((lm) =>
+            lm.homeTeam?.code === t!.code || lm.awayTeam?.code === t!.code))
+        );
+        if (advanced) {
+          const out = advanced.code === m.homeTeam.code ? m.awayTeam : m.homeTeam;
+          silenced.add(out.code);
+        } else if (r !== "3rd Place Final" && r !== "Final") {
+          unresolvedPens++;
+        }
+        continue;
+      }
+      const winner = m.homeScore > m.awayScore ? m.homeTeam : m.awayTeam;
+      const loser = m.homeScore > m.awayScore ? m.awayTeam : m.homeTeam;
+      if (r !== "3rd Place Final") silenced.add(loser.code);
+      if (r === "Final") champion = winner;
+    }
+  }
+  void laterAppearance;
+  const alive = participants.size > 0 ? participants.size - silenced.size : 48;
+  return { alive, unresolvedPens, champion, silenced };
+}
+
 export default async function BracketPage() {
   const rounds = await fetchKnockoutMatches();
+  const [anthems] = await Promise.all([fetchAnthemTracks()]);
+  const soundtrack = soundtrackStatus(rounds);
   const now = new Date();
   const isPreKnockout = now < KNOCKOUT_START;
   const daysToKnockout = daysUntil(KNOCKOUT_START, now);
@@ -207,7 +284,14 @@ export default async function BracketPage() {
           </div>
         )}
 
-        <BracketView rounds={rounds} />
+        <BracketView
+          rounds={rounds}
+          anthems={anthems}
+          songsStanding={soundtrack.alive}
+          unresolvedPens={soundtrack.unresolvedPens}
+          champion={soundtrack.champion}
+          silenced={[...soundtrack.silenced]}
+        />
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
