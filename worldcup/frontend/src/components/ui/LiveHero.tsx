@@ -187,7 +187,9 @@ export default function LiveHero({
   //               not the headline — they live in the Results list). A recent
   //               result only takes the big slot when nothing is upcoming.
   const liveGames = live.slice(0, 2);
-  const nextGame = upcoming[0] ?? null;
+  // TBD placeholders pad the Upcoming list but must NEVER take the hero slot —
+  // the big card is always a real fixture.
+  const nextGame = upcoming.find((m) => m.home.code !== "TBD") ?? null;
   const recentResult = results[0] ?? null;
 
   const centerSlots: { m: HeroMatch; mode: BigMode }[] = [];

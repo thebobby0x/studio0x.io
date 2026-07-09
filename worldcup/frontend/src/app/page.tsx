@@ -376,7 +376,10 @@ export default async function DashboardPage({
   {
     const now = Date.now();
     for (const rd of ROUND_DATES) {
-      if (rd.to.getTime() < now) continue;
+      // ONLY pad rounds that haven't started — padding an in-progress round
+      // created a past-dated "TBD Kick off" phantom that outranked the real
+      // next game (owner report 7/9).
+      if (rd.from.getTime() <= now) continue;
       const inWindow = matches.filter(
         (m) => new Date(m.date) >= rd.from && new Date(m.date) <= rd.to
       ).length;
