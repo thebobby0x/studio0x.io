@@ -103,6 +103,7 @@ export async function GET(
 
   const eventSummary = events.length > 0
     ? events.map(e => {
+        if (e.type === "Goal" && e.detail === "Missed Penalty") return `${e.minute}' PENALTY MISSED – ${e.team}: ${e.player} (no goal)`;
         if (e.type === "Goal") return `${e.minute}' GOAL – ${e.team}: ${e.player}${e.assist ? ` (assist: ${e.assist})` : ""}${e.detail === "Own Goal" ? " (OG)" : ""}${e.detail === "Penalty" ? " (pen)" : ""}`;
         if (e.type === "Card") return `${e.minute}' ${e.detail} – ${e.player} (${e.team})`;
         if (e.type === "subst") return `${e.minute}' SUB – ${e.team}: ${e.player}`;
