@@ -118,6 +118,19 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
   map's data-viz blue is the one sanctioned exception). Three-way probability/market
   displays: home green · draw slate · away gold.
 
+**BRANDING (owner directives 7/9 — durable, enforce on every new surface):**
+- Wordmark is **studio0x** — never "Studio0x" or "STUDIO0X" (swept 7/9, PR #135).
+- **"footy" is the studio0x soccer product family name** (owner 7/9). Products in
+  dev include: **footy passport**, **footy arcade**, **footy activities pack**, and
+  more. New soccer-side products/features should consider footy-family naming first.
+- The tournament app's temp launch brand is **footy26** (PRs #136–#137) — replaced
+  all FIFA marks ("FIFA", "World Cup" in product branding) pending permanent branding.
+  Launch target: `footy26.studio0x.io` subdomain (apex stays GitHub Pages — store).
+  AI-generated editorial content may still reference the tournament factually
+  (nominative use); product branding may not. Never claim "official" anything.
+- The `"World Cup Stadium"` string is a DB **venue sentinel**, not branding — never
+  rename it in comparisons without migrating the data (near-miss 7/9).
+
 ---
 
 ## Key Decisions & Why

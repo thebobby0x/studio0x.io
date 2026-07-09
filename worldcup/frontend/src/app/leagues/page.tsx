@@ -77,7 +77,7 @@ export default async function LeaguesPage() {
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
             {hasData
-              ? `${totalClubs} clubs from ${totalLeagues} leagues represented at cup26`
+              ? `${totalClubs} clubs from ${totalLeagues} leagues represented at footy26`
               : "Club data not yet seeded — use the admin seed route to populate"}
           </p>
         </div>
@@ -212,7 +212,7 @@ export default async function LeaguesPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · cup26 · Club &amp; League breakdown
+        studio0x.io · footy26 · Club &amp; League breakdown
       </footer>
     </div>
   );

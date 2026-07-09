@@ -870,7 +870,7 @@ export default async function DashboardPage({
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · cup26 · Data refreshes every 5 seconds
+        studio0x.io · footy26 · Data refreshes every 5 seconds
       </footer>
     </div>
   );

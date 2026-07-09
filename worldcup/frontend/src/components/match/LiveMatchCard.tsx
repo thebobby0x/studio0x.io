@@ -227,7 +227,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
               <VenueWeather lat={venueInfo.lat} lng={venueInfo.lng} timezone={venueInfo.timezone} />
             )}
             <ShareButton
-              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · cup26 · studio0x.io`}
+              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · footy26 · studio0x.io`}
               url={`/schedule/${match.fixture}`}
               title={`${match.homeTeam.name} vs ${match.awayTeam.name}`}
             />
