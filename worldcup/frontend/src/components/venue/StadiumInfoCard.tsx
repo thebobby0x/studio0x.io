@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { MapPin, Wind, Droplets, Thermometer, Mountain, Users, ChevronDown, ChevronUp, Lightbulb, Sun, Cloud, CloudRain, CloudSnow, Zap, Eye } from "lucide-react";
 import type { VenueInfo } from "@/lib/venues";
 import type { WeatherData } from "@/app/api/weather/route";
-import { CLIMATE_CONTROLLED, crampWatch } from "@/lib/heat";
+import { CLIMATE_CONTROLLED, crampWatch, aqiBand, PM25_SMOKE_THRESHOLD } from "@/lib/heat";
 import type { HeatOutcomesAggregate } from "@/lib/heatOutcomes";
 
 function WeatherIcon({ code, isDay, size = 16 }: { code: number; isDay: boolean; size?: number }) {
@@ -88,6 +88,27 @@ function WeatherStrip({ venueName, lat, lng }: { venueName: string; lat: number;
           <span>{weather.precipMm.toFixed(1)} mm</span>
         </div>
       )}
+      {weather.isDay && weather.uvIndex >= 3 && (
+        <div className="flex items-center gap-1">
+          <Sun size={11} className="text-slate-500" />
+          <span>UV {Math.round(weather.uvIndex)}{weather.uvIndex >= 8 ? " (very high)" : weather.uvIndex >= 6 ? " (high)" : ""}</span>
+        </div>
+      )}
+      {weather.aqi !== null && (() => {
+        const band = aqiBand(weather.aqi);
+        const smoke = (weather.pm25 ?? 0) >= PM25_SMOKE_THRESHOLD;
+        // Good air is a non-story — only take strip space when it isn't
+        if (!band.concern && !smoke) return null;
+        return (
+          <div className="flex items-center gap-1">
+            <Wind size={11} className="text-slate-500" />
+            <span className={band.color}>
+              AQI {Math.round(weather.aqi!)} · {band.label}
+              {smoke ? ` · PM2.5 ${Math.round(weather.pm25!)} µg/m³ — possible smoke/haze` : ""}
+            </span>
+          </div>
+        );
+      })()}
       <div className="ml-auto text-[10px] text-slate-600 tabular-nums hidden sm:block">
         H:{weather.forecastHigh}° L:{weather.forecastLow}°
         {weather.forecastPrecipMm > 0 ? ` · ${weather.forecastPrecipMm.toFixed(1)}mm` : ""}

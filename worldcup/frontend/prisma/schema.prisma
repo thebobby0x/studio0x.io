@@ -359,6 +359,10 @@ model MatchWeather {
   band              String   // Low | Moderate | High | Extreme (lib/heat.ts)
   source            String   // "archive" (past day) | "recent" (same-day hourly)
   climateControlled Boolean  @default(false)
+  // Air quality at kickoff (Open-Meteo Air Quality/CAMS): US AQI + PM2.5 µg/m³.
+  // Catches wildfire smoke. null = service had no data — never fabricated.
+  aqi               Float?
+  pm25              Float?
   // Outcome facts — null until the match is FT and events were ingested
   totalGoals        Int?
   lateGoals         Int?     // goals scored 75'+ (excl. missed pens)
