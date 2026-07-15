@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npx prisma generate --schema=prisma/schema.prisma && npx prisma db push --schema=prisma/schema.prisma && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ..",
+  "crons": [
+    { "path": "/api/sync?all=true", "schedule": "0 3 * * *" }
+  ]
+}

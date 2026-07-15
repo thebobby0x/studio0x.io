@@ -12,7 +12,8 @@ re-wrapped and rebranded outside sport — e.g. podiumSelect re-wrapped as **fes
 
 **Principle (proposed 7/15, owner AGREED):** module *code/IDs stay
 vertical-neutral* (e.g. `travel-select`, `news`, `arcade`); vertical brands
-(podiumSelect, festivalHopper) are a skin/config layer. Naming code after one
+(podiumSelect, festivalHopper) are a skin/config layer. RATIFIED code-IDs so far:
+**`schedule`** (→ podiumSchedule, rebuilt 7/15 as `podiumschedule/` in this monorepo). Naming code after one
 vertical's brand makes re-wrapping expensive. Extraction contract (feature
 flags, data adapters, no cross-module imports) is post-tournament work — also
 owner-agreed.
@@ -33,7 +34,7 @@ So each module has three name layers: neutral code-ID → white-label product na
 |---|---|---|
 | podiumMetrics | THE PLATFORM — sport-agnostic stats engine; per-deployment branding ("podiumMetrics – World Cup 26", "– F1 2026", …) | **Live** (this app) |
 | podiumSelect | VIP sport travel app (always was the travel app) | In dev — pre-naming build exists ("Event Concierge OS", created.app; URL held privately — see dev-access rule below) |
-| podiumSchedule | Global sport calendar | Functioning dev build (created.app; URL held privately — see dev-access rule below) — Data Sync Center pulls TheSportsDB (soccer: WC26, UCL, Euros, Copa América, CAF/AFC/CONCACAF/CONMEBOL comps, Women's WC…) + Jolpica (F1). As of 7/15: 17 tournaments tracked, 3 synced (WC26, UCL 26-27, F1 2026), 14 pending, 0 missing teams. |
+| podiumSchedule | Global sport calendar — **REBUILT in this monorepo 7/15** (`podiumschedule/frontend/`, code-ID `schedule`, SIE vocabulary, /events depot API in v1; see docs/studio0x_Portfolio_ModuleInventoryAndMigration_2026-07-15.md). Prior dev build (created.app; URL held privately — see dev-access rule below) — Data Sync Center pulls TheSportsDB (soccer: WC26, UCL, Euros, Copa América, CAF/AFC/CONCACAF/CONMEBOL comps, Women's WC…) + Jolpica (F1). As of 7/15: 17 tournaments tracked, 3 synced (WC26, UCL 26-27, F1 2026), 14 pending, 0 missing teams. |
 
 ## Modules (owner list 7/15 + earlier concepts)
 
