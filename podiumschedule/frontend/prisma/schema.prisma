@@ -1,0 +1,83 @@
+// podiumSchedule — the sportOS fixtures/schedule depot.
+// Module code-ID: "schedule" (vertical-neutral); podiumSchedule is the
+// white-label name layer.
+//
+// SIE vocabulary from day one (per the 7/15 cross-session brief):
+// Sport → Competition → Event → Venue → Team. "Event", never "match".
+// Records are keyed on internal opaque IDs; vendor ids live in
+// (source, sourceId) reference columns — NEVER as the business key
+// (the Match.fixture lesson from podiumMetrics). A full multi-source
+// ExternalRef table is a flagged v1.1 decision (BK to ratify).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Competition {
+  id         String    @id @default(cuid())
+  slug       String    @unique
+  name       String
+  sport      String // "soccer" | "f1" | …
+  region     String    @default("")
+  season     String // "2026" or "2025-2026"
+  source     String // primary ingest source: "thesportsdb" | "jolpica"
+  sourceId   String    @default("") // vendor league id; empty = unmapped
+  status     String    @default("not_synced") // not_synced | synced | error
+  lastSyncAt DateTime?
+  syncError  String?
+  events     Event[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Venue {
+  id      String  @id @default(cuid())
+  name    String
+  city    String  @default("")
+  country String  @default("")
+  events  Event[]
+
+  @@unique([name, city])
+}
+
+model Team {
+  id         String  @id @default(cuid())
+  name       String
+  sport      String
+  badgeUrl   String?
+  source     String
+  sourceId   String
+  homeEvents Event[] @relation("home")
+  awayEvents Event[] @relation("away")
+
+  @@unique([source, sourceId])
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  source        String
+  sourceId      String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  competitionId String
+  name          String // "Arsenal vs Chelsea" · "British Grand Prix"
+  round         String      @default("")
+  date          DateTime
+  venue         Venue?      @relation(fields: [venueId], references: [id])
+  venueId       String?
+  homeTeam      Team?       @relation("home", fields: [homeTeamId], references: [id])
+  homeTeamId    String?
+  awayTeam      Team?       @relation("away", fields: [awayTeamId], references: [id])
+  awayTeamId    String?
+  homeScore     Int?
+  awayScore     Int?
+  status        String      @default("scheduled") // scheduled | live | finished
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([competitionId, date])
+  @@index([date])
+}

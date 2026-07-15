@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Theme tokens (RGB triples so Tailwind alpha modifiers like /10 keep working).
+   Dark is the default — luxury: deep warm near-black, champagne gold, rich
+   emerald. [data-theme="light"] flips to a warm-ivory "lite mode".
+   Tailwind's brand.* colors read these vars (see tailwind.config.ts), so the
+   whole app re-skins from here.
+──────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg: 5 7 14;            /* deep warm near-black (was #060b18) */
+  --card: 11 18 32;
+  --border: 28 37 54;
+  --green: 16 185 129;
+  --gold: 217 180 92;      /* champagne gold (was amber #f59e0b) */
+  --blue: 59 130 246;
+  --ink: #e2e8f0;          /* body text */
+}
+
+[data-theme="light"] {
+  --bg: 246 244 238;       /* warm ivory — luxe light, not stark white */
+  --card: 255 255 255;
+  --border: 227 222 210;
+  --green: 12 143 102;
+  --gold: 160 127 44;      /* darkened champagne for contrast on ivory */
+  --blue: 37 99 235;
+  --ink: #232019;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: var(--ink);
+  font-family: "Inter", system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgb(var(--bg)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--border)); border-radius: 3px; }
+
+/* Pulse animation for live indicator */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.live-dot { animation: livePulse 1.4s ease-in-out infinite; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   LITE MODE utility remaps. Components are authored dark-first with hardcoded
+   slate/white utilities; these attribute-scoped overrides flip the most-used
+   ones so the whole app reads correctly on ivory without touching every file.
+   (Deliberately curated — accent colors like red/amber stay as-is; brand.*
+   utilities re-theme automatically via the vars above.)
+──────────────────────────────────────────────────────────────────────────── */
+[data-theme="light"] .text-white { color: #1d1a14; }
+[data-theme="light"] .text-slate-200 { color: #2a261e; }
+[data-theme="light"] .text-slate-300 { color: #3d382e; }
+[data-theme="light"] .text-slate-400 { color: #5c5546; }
+[data-theme="light"] .text-slate-500 { color: #6f675a; }
+[data-theme="light"] .text-slate-600 { color: #8a8171; }
+[data-theme="light"] .text-slate-700 { color: #a89f8d; }
+
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(0, 0, 0, 0.045); }
+[data-theme="light"] .hover\:bg-white\/3:hover { background-color: rgba(0, 0, 0, 0.03); }
+[data-theme="light"] .bg-slate-700 { background-color: #e8e3d7; }
+[data-theme="light"] .hover\:bg-slate-600:hover { background-color: #ddd7c8; }
+[data-theme="light"] .hover\:bg-slate-800:hover { background-color: #efebe0; }
+
+/* Inverted "selected pill" pattern (bg-white + text-brand-dark) */
+[data-theme="light"] .bg-white { background-color: #1d1a14; }
+[data-theme="light"] .text-brand-dark { color: #f6f4ee; }
+
+/* Dark drop-shadows read heavy on ivory */
+[data-theme="light"] .shadow-black\/50 { --tw-shadow-color: rgba(90, 80, 60, 0.2); }
