@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { classifyRound } from "@/lib/tournament";
 
 const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // World Cup
@@ -147,8 +148,13 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
       const homeTla = m.homeTeam.code;
       const awayTla = m.awayTeam.code;
       const group = m.homeTeam.groupStage || m.awayTeam.groupStage || "";
-      const isGroupStage = !!group && group !== "KO";
-      const stage = isGroupStage ? "GROUP_STAGE" : "KNOCKOUT";
+      // Stage by DATE, not by group membership: knockout teams still carry their
+      // group, so group-based classification labeled the 7/14 FRA-ESP semi-final
+      // "Group Stage · Matchday 6" (France's 6th appearance). classifyRound maps
+      // the fixture date to its real knockout round.
+      const round = classifyRound(m.date);
+      const stage = round ? (ROUND_TO_STAGE[round] ?? "KNOCKOUT") : "GROUP_STAGE";
+      const isGroupStage = !round;
 
       // Compute matchday per group by counting matches per team
       let matchday = 0;
@@ -172,8 +178,10 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
         matchday,
         homeTeam: { name: m.homeTeam.name, tla: homeTla },
         awayTeam: { name: m.awayTeam.name, tla: awayTla },
-        homeScore: m.status === "FT" ? m.homeScore : null,
-        awayScore: m.status === "FT" ? m.awayScore : null,
+        // LIVE/HT scores are real (maintained by the per-match live route) —
+        // nulling them rendered a live 0-2 as 0-0 on the hero (7/14 FRA-ESP).
+        homeScore: m.status !== "NS" ? m.homeScore : null,
+        awayScore: m.status !== "NS" ? m.awayScore : null,
       };
     });
   } catch {
@@ -231,8 +239,20 @@ function applyDbOverlay(data: ScheduleMatch[], overlay: Map<number, DbEntry>): S
     if (m.status === "FT") return m;
     // DB is useful when api-football still shows NS but match has actually started/finished
     if (m.status === "NS") return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed };
-    // For LIVE/HT: let live overlay handle it; don't regress with a potentially stale DB value
-    return m;
+    // For LIVE/HT: the DB is actively maintained by the per-match live route (the
+    // same rows the LiveMatchBanner shows), while our bulk feed can be a stale
+    // cache or DB-synthesised snapshot when api-football flakes — the owner
+    // watched a hero card stuck at 0-0/73' under a banner reading 0-2/73'
+    // (7/14 FRA-ESP). Scores and minutes only move UP within a match, so
+    // max-merge picks whichever side is fresher without needing timestamps.
+    // The live overlay still runs after this and overwrites with real-time
+    // feed data whenever it's available.
+    return {
+      ...m,
+      minute:    Math.max(m.minute, db.elapsed),
+      homeScore: Math.max(m.homeScore ?? 0, db.homeScore),
+      awayScore: Math.max(m.awayScore ?? 0, db.awayScore),
+    };
   });
 }
 
