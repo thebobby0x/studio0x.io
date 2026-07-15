@@ -112,7 +112,7 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
         <div className="flex items-center gap-2">
           <Trophy size={13} className="text-brand-gold" />
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            footy26 Winner Odds
+            Tournament Winner Odds
           </span>
         </div>
         <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400 font-semibold">

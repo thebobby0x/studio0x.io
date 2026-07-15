@@ -8,7 +8,7 @@ import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 
 export const metadata: Metadata = {
-  title: "footy26 · live tournament stats by studio0x",
+  title: "podiumMetrics · live tournament stats by studio0x",
   description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
 };
 

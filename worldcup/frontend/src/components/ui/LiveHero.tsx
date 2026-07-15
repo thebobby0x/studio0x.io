@@ -54,7 +54,7 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
       {/* top label */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          {m.stage ?? (m.group ? `Group ${m.group}` : "footy26")}
+          {m.stage ?? (m.group ? `Group ${m.group}` : "Tournament")}
         </span>
         {isLive ? (
           <span className="flex items-center gap-1.5 text-[11px] font-black text-red-400">

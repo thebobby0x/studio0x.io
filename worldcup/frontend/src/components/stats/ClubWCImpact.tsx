@@ -52,13 +52,13 @@ function wcTalkingPoint(c: ClubEntry, rank: number, grandTotal: number): string 
   const pct = grandTotal > 0 ? Math.round((c.wcGoals / grandTotal) * 100) : 0;
   const top2 = c.playerNames.slice(0, 2).join(" & ");
   if (c.hatTricks >= 2)
-    return `${c.club} players have delivered ${c.hatTricks} hat-tricks — the most explosive club presence at footy26.`;
+    return `${c.club} players have delivered ${c.hatTricks} hat-tricks — the most explosive club presence at the 2026 tournament.`;
   if (c.hatTricks === 1)
-    return `${c.club} already has a hat-trick at footy26 — ${top2} carrying the banner for ${c.league}.`;
+    return `${c.club} already has a tournament hat-trick — ${top2} carrying the banner for ${c.league}.`;
   if (rank === 0 && c.wcGoals > 0)
     return `${c.club} leads all clubs with ${c.wcGoals} WC goals${pct > 0 ? ` (${pct}% of all goals scored)` : ""} — ${top2} are the tournament's dominant club force.`;
   if (c.wcGoals === 0 && c.wcMinutes > 0)
-    return `${c.club}'s ${c.playerNames.length} players have clocked ${c.wcMinutes} footy26 minutes — contributing without getting on the scoresheet.`;
+    return `${c.club}'s ${c.playerNames.length} players have clocked ${c.wcMinutes} tournament minutes — contributing without getting on the scoresheet.`;
   return `${c.club}: ${c.playerNames.length} players · ${c.wcGoals}G ${c.wcAssists}A across ${c.wcMatches} appearances.`;
 }
 
@@ -67,7 +67,7 @@ function previewTalkingPoint(c: ClubEntry, rank: number): string {
   if (rank === 0)
     return `${c.club} sends the most players to this tournament — ${top2} among a star-studded WC squad with ${c.careerGoals} combined international goals.`;
   if (c.careerGoals > 30)
-    return `${c.playerNames.length} ${c.club} players bring a combined ${c.careerGoals} international goals to footy26 — elite firepower on the stage.`;
+    return `${c.playerNames.length} ${c.club} players bring a combined ${c.careerGoals} international goals to the 2026 tournament — elite firepower on the stage.`;
   return `${c.club} is represented by ${c.playerNames.length} player${c.playerNames.length !== 1 ? "s" : ""} — ${top2} carrying the club flag.`;
 }
 
@@ -75,16 +75,16 @@ function leagueTalkingPoint(l: LeagueEntry, rank: number, grandTotal: number, is
   const pct = grandTotal > 0 ? Math.round((l.goals / grandTotal) * 100) : 0;
   if (isLive) {
     if (rank === 0 && l.goals > 0)
-      return `${l.league} clubs account for ${pct}% of all footy26 goals — the clearest argument for its global supremacy.`;
+      return `${l.league} clubs account for ${pct}% of all tournament goals — the clearest argument for its global supremacy.`;
     if (l.hatTricks > 0)
       return `${l.league} players have recorded ${l.hatTricks} hat-trick${l.hatTricks > 1 ? "s" : ""} — elite finishing runs in this league.`;
-    return `${l.clubs} ${l.league} clubs: ${l.goals}G ${l.assists}A combined at footy26.`;
+    return `${l.clubs} ${l.league} clubs: ${l.goals}G ${l.assists}A combined at the 2026 tournament.`;
   } else {
     if (rank === 0)
-      return `${l.league} sends the most players to this footy26 — ${l.players} players from ${l.clubs} clubs bringing ${l.careerGoals} combined international goals.`;
+      return `${l.league} sends the most players to this tournament — ${l.players} players from ${l.clubs} clubs bringing ${l.careerGoals} combined international goals.`;
     if (l.careerGoals > 50)
       return `${l.players} ${l.league} players carry ${l.careerGoals} international goals into this tournament — a league built on global talent.`;
-    return `${l.clubs} ${l.league} clubs represented across ${l.players} footy26 players.`;
+    return `${l.clubs} ${l.league} clubs represented across ${l.players} tournament players.`;
   }
 }
 

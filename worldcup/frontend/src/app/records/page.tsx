@@ -467,9 +467,9 @@ export default async function RecordsPage() {
               Tournament <span className="text-brand-gold">Records</span>
             </h1>
             <ShareButton
-              text="footy26 Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io"
+              text="podiumMetrics Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io"
               url="/records"
-              title="footy26 Records"
+              title="podiumMetrics Records"
               className="ml-1"
             />
           </div>
@@ -533,7 +533,7 @@ export default async function RecordsPage() {
         </div>
       </main>
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · footy26 stats engine · Player stats via api-football.com
+        studio0x.io · podiumMetrics · Player stats via api-football.com
       </footer>
     </div>
   );

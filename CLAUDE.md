@@ -118,16 +118,25 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
   map's data-viz blue is the one sanctioned exception). Three-way probability/market
   displays: home green · draw slate · away gold.
 
-**BRANDING (owner directives 7/9 — durable, enforce on every new surface):**
+**BRANDING (owner directives 7/9 + 7/15 — durable, enforce on every new surface):**
 - Wordmark is **studio0x** — never "Studio0x" or "STUDIO0X" (swept 7/9, PR #135).
-- **"footy" is the studio0x soccer product family name** (owner 7/9). Products in
-  dev include: **footy passport**, **footy arcade**, **footy activities pack**, and
-  more. New soccer-side products/features should consider footy-family naming first.
-- The tournament app's temp launch brand is **footy26** (PRs #136–#137) — replaced
-  all FIFA marks ("FIFA", "World Cup" in product branding) pending permanent branding.
-  Launch target: `footy26.studio0x.io` subdomain (apex stays GitHub Pages — store).
-  AI-generated editorial content may still reference the tournament factually
-  (nominative use); product branding may not. Never claim "official" anything.
+- **sportOS structure (owner decision, Wed 7/15/2026 8:30am ET — CURRENT):** the umbrella
+  project is **sportOS**. Under it:
+  1. **podiumSelect** — VIP sport-related travel app.
+  2. **podiumSchedule** — global sport calendar (exists under a different name on anything.com).
+  3. **podiumMetrics** — THIS app (the tournament stats engine). Swept footy26 → podiumMetrics
+     (PR #138). Product names are camelCase (podiumXxx), matching the studio0x family style.
+- "footy" was the prior soccer product family name (owner 7/9: footy passport, footy arcade,
+  footy activities pack) and the app's temp brand was footy26 (PRs #136–#137) — **superseded
+  7/15 by the sportOS/podium structure** for this app. Historical footy products may still
+  exist in dev; don't reuse "footy" for new surfaces without owner confirmation.
+- FIFA-free rules stand: no FIFA marks in product branding ("FIFA", "World Cup" as branding).
+  AI-generated editorial content may still reference the tournament factually (nominative
+  use); product branding may not. Never claim "official" anything.
+  Launch target subdomain: `podiummetrics.studio0x.io` (apex stays GitHub Pages — store).
+- Tournament-reference copy is NOT brand copy: things a team can win, play in, or score at
+  are "the tournament"/"the 2026 tournament", never the product name (a team can't "win
+  podiumMetrics"). Brand goes in titles, wordmarks, footers, share-text sign-offs.
 - The `"World Cup Stadium"` string is a DB **venue sentinel**, not branding — never
   rename it in comparisons without migrating the data (near-miss 7/9).
 
