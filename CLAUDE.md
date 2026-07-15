@@ -159,13 +159,17 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
 
 **MODULES (owner directive, standing + expanded 7/15):** everything is built in
 add/removable MODULES; modules are white-label and re-wrappable across verticals
-(podiumSelect ≡ festivalHopper ≡ "ETP" under a future **eventOS**). sportOS module
-ideas to pursue: podiumNews, podiumCommunity, podiumMuseum, podiumArcade,
-podiumPassport, podiumCollectors — several already exist as proto-modules inside
-this app (news, predict/fan zone, records/anthems, sentiment). Full registry +
-extraction plan: **`docs/sportos-modules.md`**. Keep module code/IDs
-vertical-neutral; vertical brands are a skin layer. Module extraction is
-post-tournament work — don't refactor mid-tournament.
+(podiumSelect ≡ festivalHopper ≡ "ETP" under **eventOS** — which is a FUNCTIONING
+product, world debut IMEX America Oct 2026). sportOS module ideas to pursue:
+podiumNews, podiumCommunity, podiumMuseum, podiumArcade, podiumPassport,
+podiumCollectors — several already exist as proto-modules inside this app (news,
+predict/fan zone, records/anthems, sentiment). Three name layers per module:
+neutral code-ID → white-label product (podiumXxx) → go-to-market skins, both ours
+(podiumPassport → footyPassport) and customers' (FIFA could license podiumPassport
+as "FIFA World Cup Passport"). News is a SEPARATE module from live-game following
+(one News-creation depot feeds both apps). Full registry + extraction plan:
+**`docs/sportos-modules.md`**. Keep module code/IDs vertical-neutral (owner-agreed);
+module extraction is post-tournament work — don't refactor mid-tournament.
 
 **OWNER SHORTHAND:** "QCC" = "any Questions, Comments, Concerns (or suggestions)
 before we move forward?" — when the owner writes QCC, respond with genuine
