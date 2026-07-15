@@ -68,7 +68,7 @@ export default async function OfficialsPage() {
             <ShareButton
               text="The Officials — WC 2026 referee profiles with Whistle Index™, Card Threshold™ and Let It Flow™ ratings · studio0x.io"
               url="/officials"
-              title="footy26 — The Officials"
+              title="podiumMetrics — The Officials"
             />
           </div>
           <p className="text-slate-500 text-sm">

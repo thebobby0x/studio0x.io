@@ -135,7 +135,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
       <div className="min-h-screen bg-brand-dark text-slate-200 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="text-6xl">{getFlag(TLA)}</div>
-          <p className="text-slate-400 font-semibold">Team not found in the footy26 schedule.</p>
+          <p className="text-slate-400 font-semibold">Team not found in the tournament schedule.</p>
           <Link href="/schedule" className="text-brand-gold hover:text-amber-300 text-sm">← Back to schedule</Link>
         </div>
       </div>
@@ -658,7 +658,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · footy26 stats engine · Data via api-football.com
+        studio0x.io · podiumMetrics · Data via api-football.com
       </footer>
     </div>
   );

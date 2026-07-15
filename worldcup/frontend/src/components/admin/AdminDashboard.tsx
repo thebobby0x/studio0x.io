@@ -120,7 +120,7 @@ export default function AdminDashboard({ users }: { users: User[] }) {
           </div>
           <div>
             <h1 className="text-xl font-black text-white">Super Admin</h1>
-            <p className="text-xs text-slate-500">studio0x · footy26</p>
+            <p className="text-xs text-slate-500">studio0x · podiumMetrics</p>
           </div>
         </div>
 

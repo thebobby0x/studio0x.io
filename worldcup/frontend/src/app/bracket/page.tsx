@@ -247,14 +247,14 @@ export default async function BracketPage() {
               Knockout <span className="text-brand-gold">Bracket</span>
             </h1>
             <ShareButton
-              text="footy26 Knockout Bracket — every round, live scores and prediction markets · studio0x.io"
+              text="podiumMetrics Knockout Bracket — every round, live scores and prediction markets · studio0x.io"
               url="/bracket"
-              title="footy26 Knockout Bracket"
+              title="podiumMetrics Knockout Bracket"
               className="ml-1"
             />
           </div>
           <p className="text-slate-500 text-sm">
-            footy26 · Round of 32 through the Final · July 3–19
+            podiumMetrics · Round of 32 through the Final · July 3–19
           </p>
         </div>
 
@@ -295,7 +295,7 @@ export default async function BracketPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · footy26 stats engine · Bracket data via api-football.com
+        studio0x.io · podiumMetrics · Bracket data via api-football.com
       </footer>
     </div>
   );

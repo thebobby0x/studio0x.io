@@ -57,7 +57,7 @@ export default async function NewsPage() {
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-black text-white">
-          footy26 <span className="text-brand-gold">News</span>
+          podiumMetrics <span className="text-brand-gold">News</span>
         </h1>
         <p className="text-sm text-slate-500 mt-1">
           AI match recaps & daily round-ups · every result, archived · <span className="font-mono text-slate-700">studio0x</span>
