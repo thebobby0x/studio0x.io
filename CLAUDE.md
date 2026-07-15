@@ -122,14 +122,27 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
 - Wordmark is **studio0x** — never "Studio0x" or "STUDIO0X" (swept 7/9, PR #135).
 - **sportOS structure (owner decision, Wed 7/15/2026 8:30am ET — CURRENT):** the umbrella
   project is **sportOS**. Under it:
-  1. **podiumSelect** — VIP sport-related travel app.
-  2. **podiumSchedule** — global sport calendar (exists under a different name on anything.com).
-  3. **podiumMetrics** — THIS app (the tournament stats engine). Swept footy26 → podiumMetrics
-     (PR #138). Product names are camelCase (podiumXxx), matching the studio0x family style.
-- "footy" was the prior soccer product family name (owner 7/9: footy passport, footy arcade,
-  footy activities pack) and the app's temp brand was footy26 (PRs #136–#137) — **superseded
-  7/15 by the sportOS/podium structure** for this app. Historical footy products may still
-  exist in dev; don't reuse "footy" for new surfaces without owner confirmation.
+  1. **podiumSelect** — the VIP sport-related travel app (has ALWAYS been the travel app —
+     it is NOT a renamed footyPassport).
+  2. **podiumSchedule** — global sport calendar (exists under a different name on anything.com;
+     owner providing links).
+  3. **podiumMetrics** — THIS app, and it is **the PLATFORM product, sport-agnostic**:
+     one consistent product name across every sport, with per-deployment branding like
+     "podiumMetrics – World Cup 26", "podiumMetrics – F1 2026", "podiumMetrics – UEFA
+     Champions League 2027", "podiumMetrics – Women's World Cup 2027" (owner examples,
+     7/15 follow-up). Swept footy26 → podiumMetrics (PR #138). Product names are
+     camelCase (podiumXxx), matching the studio0x family style.
+- **footyPassport** (owner clarification 7/15): a Digital Passport product — users download
+  it at tournaments (World Cup as example) and complete activities / check in at games, fan
+  zones, and other activations. A distinct product concept, still in dev; not superseded by
+  and not the same as podiumSelect. The app's temp brand footy26 (PRs #136–#137) WAS
+  superseded by podiumMetrics; don't reuse "footy" for new surfaces without owner confirmation.
+- Deployment-name caveat: the owner's examples put the tournament name in the deployment
+  subtitle ("podiumMetrics – World Cup 26"). Descriptive/nominative subtitle is a lighter IP
+  footprint than branding the product itself with FIFA marks, but it still uses the mark —
+  flagged to owner 7/15; get explicit owner sign-off (ideally after the TM screen) before
+  putting "World Cup" into any user-facing product title. In-app brand today remains
+  plain "podiumMetrics".
 - FIFA-free rules stand: no FIFA marks in product branding ("FIFA", "World Cup" as branding).
   AI-generated editorial content may still reference the tournament factually (nominative
   use); product branding may not. Never claim "official" anything.
