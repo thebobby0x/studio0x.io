@@ -134,6 +134,10 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
   AI-generated editorial content may still reference the tournament factually (nominative
   use); product branding may not. Never claim "official" anything.
   Launch target subdomain: `podiummetrics.studio0x.io` (apex stays GitHub Pages — store).
+  Domain structure is FLAT (owner 7/15): one subdomain per product, no sportOS hub subdomain
+  for now. DNS lives on GoDaddy. Internal names (repo `worldcup/`, Vercel `worldcup-2026`,
+  DB) stay as-is — owner 7/15: current build is the trial/refinement iteration; carry
+  learnings into the next iteration rather than renaming internals now.
 - Tournament-reference copy is NOT brand copy: things a team can win, play in, or score at
   are "the tournament"/"the 2026 tournament", never the product name (a team can't "win
   podiumMetrics"). Brand goes in titles, wordmarks, footers, share-text sign-offs.
@@ -467,6 +471,16 @@ Never push directly to main.
     formations, minutes, stats, injuries, or historical anecdotes not present in the prompt data.
     When adding a new AI surface, copy the grounding rules; a missing guardrail = published
     hallucinations (see docs/eod-2026-07-06.md, PR #108).
+
+22. **Live-data freshness: the DB and the bulk feed disagree mid-game** — the banner
+    (`/api/live`) reads DB rows maintained by the per-match live route, while pages read
+    `/api/schedule` (bulk feed + overlays). When api-football flakes, the schedule side
+    serves stale caches or DB-synthesis and the hero froze at 0-0 under a 0-2 banner
+    (owner 7/14, FRA-ESP semi). Hardened (PR #139): max-merge DB scores/minutes into
+    LIVE/HT feed rows (both only move up); synthesizeFromDb classifies stage by DATE
+    (`classifyRound`) not group membership and keeps LIVE scores; the live route never
+    persists clock-simulated state to the DB; LiveRefresh mounts on schedule + match
+    pages. If hero/banner diverge again, suspect a NEW writer of stale Match rows.
 
 ---
 

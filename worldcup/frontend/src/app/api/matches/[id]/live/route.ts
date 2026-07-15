@@ -145,8 +145,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     liveProbs = liveWinProbability(preMatchHomeWinProb, homeScore, awayScore, elapsed, status);
   }
 
-  // Persist updated state non-blocking
-  prisma.match.update({ where: { id }, data: { elapsed, status, homeScore, awayScore } }).catch(() => {});
+  // Persist updated state non-blocking — but ONLY when it came from a real feed.
+  // When both feeds fail, status/elapsed above are clock-simulated and scores are
+  // the (possibly stale) DB row; writing that back would stamp fabricated state
+  // into the DB, which the schedule route and LiveMatchBanner then serve as truth.
+  if (afMatch || fdMatch) {
+    prisma.match.update({ where: { id }, data: { elapsed, status, homeScore, awayScore } }).catch(() => {});
+  }
 
   const isMatchLive = status === "LIVE" || status === "HT";
   return NextResponse.json({

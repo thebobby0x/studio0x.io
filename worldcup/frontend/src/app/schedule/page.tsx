@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
 import ScheduleView from "./ScheduleView";
+import LiveRefresh from "@/components/ui/LiveRefresh";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { prisma } from "@/lib/prisma";
 
@@ -44,10 +45,14 @@ async function fetchSchedule(): Promise<ScheduleMatch[]> {
 
 export default async function SchedulePage() {
   const matches = await fetchSchedule();
+  const hasLive = matches.some((m) => m.status === "LIVE" || m.status === "HT");
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
+      {/* The LIVE NOW card is server-rendered — keep it moving while a game is on
+          (owner report 7/14: card frozen at 0-0/73' under a 0-2 banner). */}
+      <LiveRefresh isLive={hasLive} />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Page header */}

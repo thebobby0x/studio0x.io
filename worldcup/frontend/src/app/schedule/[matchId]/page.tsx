@@ -21,6 +21,7 @@ import MatchPulse from "@/components/match/MatchPulse";
 import MatchMarkets from "@/components/match/MatchMarkets";
 import ShareButton from "@/components/ui/ShareButton";
 import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
+import LiveRefresh from "@/components/ui/LiveRefresh";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
 
@@ -159,6 +160,10 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
+      {/* Server-rendered hero goes stale the moment the render is done — without
+          this, a live page shows kickoff-time data until a manual reload
+          (owner report 7/14: hero 0-0 under a banner reading 0-2). */}
+      <LiveRefresh isLive={isLive} />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         {/* Back */}
