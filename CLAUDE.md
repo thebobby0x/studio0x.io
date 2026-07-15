@@ -499,6 +499,14 @@ Never push directly to main.
     When adding a new AI surface, copy the grounding rules; a missing guardrail = published
     hallucinations (see docs/eod-2026-07-06.md, PR #108).
 
+23. **fixtureSync can only be trusted if the /teams call succeeded** — teamCodeById is
+    built from a SECOND api-football call; when it failed, every knockout fixture
+    resolved to the TBD sentinel and the diff-writer downgraded real, already-played
+    pairings back to TBD (owner report 7/15 launch night: "TBD 0-2 TBD" everywhere,
+    AI story "TBD Stuns TBD"). Fixed (PR #145): empty team-map aborts the sync, and
+    per-fixture real→TBD downgrades are refused (upgrades and real→real corrections
+    still apply). Recovery is one "Sync Fixtures (Safe)" click once /teams works.
+
 22. **Live-data freshness: the DB and the bulk feed disagree mid-game** — the banner
     (`/api/live`) reads DB rows maintained by the per-match live route, while pages read
     `/api/schedule` (bulk feed + overlays). When api-football flakes, the schedule side

@@ -8,9 +8,20 @@ import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 import SportOSFooter from "@/components/ui/SportOSFooter";
 
+const SITE_URL = "https://podiummetrics.studio0x.io";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "podiumMetrics · live tournament stats by studio0x",
   description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
+  alternates: { canonical: "./" },
+  openGraph: {
+    siteName: "podiumMetrics",
+    title: "podiumMetrics · live tournament stats by studio0x",
+    description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
+    url: SITE_URL,
+    type: "website",
+  },
 };
 
 // Applies the persisted theme BEFORE first paint so there's no flash.

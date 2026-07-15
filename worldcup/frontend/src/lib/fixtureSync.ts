@@ -99,6 +99,16 @@ export async function syncFixtures(): Promise<SyncResult> {
       .map((t) => [t.team.id, t.team.code!.toUpperCase()])
   );
 
+  // Guard: an empty team map means the /teams call failed or came back hollow.
+  // Proceeding would resolve EVERY knockout fixture to the TBD sentinel and the
+  // diff-writer would downgrade real, already-played pairings back to TBD
+  // (owner report 7/15: dashboard full of "TBD 0-2 TBD" for finished semis).
+  // The fixtures call has this guard; the teams call never did.
+  if (teamCodeById.size === 0) {
+    result.skipped = "api-football /teams returned no codes — refusing to sync (would downgrade knockout teams to TBD)";
+    return result;
+  }
+
   // ── 2. Upsert teams by code (stable IDs — anthem links survive) ────────────
   const teamMeta = new Map<string, string>(); // code → name
   for (const f of afFixtures) {
@@ -145,6 +155,15 @@ export async function syncFixtures(): Promise<SyncResult> {
     const awayTeamId = teamIdByCode.get(awayCode);
     if (!homeTeamId || !awayTeamId) continue; // group fixture with unknown code — skip
 
+    // Belt-and-braces with the empty-map guard above: a real team is NEVER
+    // downgraded to the TBD sentinel on a per-fixture basis either (a single
+    // unmapped id must not un-pair a decided knockout slot). Upgrades
+    // (TBD → real) and corrections (real → different real) still apply.
+    const tbdId = teamIdByCode.get("TBD");
+    const curRow = existingByFixture.get(f.fixture.id);
+    const effHomeTeamId = (homeTeamId === tbdId && curRow && curRow.homeTeamId !== tbdId) ? curRow.homeTeamId : homeTeamId;
+    const effAwayTeamId = (awayTeamId === tbdId && curRow && curRow.awayTeamId !== tbdId) ? curRow.awayTeamId : awayTeamId;
+
     const status = STATUS_MAP[f.fixture.status.short] ?? "NS";
     const homeScore = f.goals.home ?? 0;
     const awayScore = f.goals.away ?? 0;
@@ -159,8 +178,8 @@ export async function syncFixtures(): Promise<SyncResult> {
         await prisma.match.create({
           data: {
             fixture: f.fixture.id,
-            homeTeamId,
-            awayTeamId,
+            homeTeamId: effHomeTeamId,
+            awayTeamId: effAwayTeamId,
             venue,
             // Prefer OUR canonical city name (matches travel-stats/venue maps);
             // api-football's raw city string only as fallback.
@@ -181,13 +200,13 @@ export async function syncFixtures(): Promise<SyncResult> {
           cur.awayScore !== awayScore ||
           cur.elapsed !== elapsed ||
           cur.date.getTime() !== date.getTime() ||
-          cur.homeTeamId !== homeTeamId || // TBD → real team upgrade
-          cur.awayTeamId !== awayTeamId ||
+          cur.homeTeamId !== effHomeTeamId || // TBD → real team upgrade (never the reverse)
+          cur.awayTeamId !== effAwayTeamId ||
           (referee !== null && cur.referee !== referee); // don't null-out a known ref
         if (changed) {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
-            data: { status, homeScore, awayScore, elapsed, date, homeTeamId, awayTeamId, ...(referee !== null ? { referee } : {}) },
+            data: { status, homeScore, awayScore, elapsed, date, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {
