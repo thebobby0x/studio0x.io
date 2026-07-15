@@ -6,6 +6,7 @@ import { AudioProvider } from "@/lib/AudioContext";
 import FloatingMiniPlayer from "@/components/ui/FloatingMiniPlayer";
 import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
+import SportOSFooter from "@/components/ui/SportOSFooter";
 
 export const metadata: Metadata = {
   title: "podiumMetrics · live tournament stats by studio0x",
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AudioProvider>
               <AdminBanner />
               {children}
+              <SportOSFooter />
               <FloatingMiniPlayer />
               <BottomNav />
             </AudioProvider>
