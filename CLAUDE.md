@@ -140,6 +140,10 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
 - The `"World Cup Stadium"` string is a DB **venue sentinel**, not branding — never
   rename it in comparisons without migrating the data (near-miss 7/9).
 
+**OWNER SHORTHAND:** "QCC" = "any Questions, Comments, Concerns (or suggestions)
+before we move forward?" — when the owner writes QCC, respond with genuine
+questions/feedback on the plan just described, then proceed.
+
 ---
 
 ## Key Decisions & Why
