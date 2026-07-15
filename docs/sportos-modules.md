@@ -11,9 +11,9 @@ re-wrapped and rebranded outside sport — e.g. podiumSelect re-wrapped as **fes
 **eventOS**. The white-label modules ARE the white-label platform.
 
 **Principle (proposed 7/15, owner AGREED):** module *code/IDs stay
-vertical-neutral*. RATIFIED code-IDs so far: **`schedule`** (→ podiumSchedule,
-rebuilt 7/15 as `podiumschedule/` in this monorepo) (e.g. `travel-select`, `news`, `arcade`); vertical brands
-(podiumSelect, festivalHopper) are a skin/config layer. Naming code after one
+vertical-neutral* (e.g. `travel-select`, `news`, `arcade`); vertical brands
+(podiumSelect, festivalHopper) are a skin/config layer. RATIFIED code-IDs so far:
+**`schedule`** (→ podiumSchedule, rebuilt 7/15 as `podiumschedule/` in this monorepo). Naming code after one
 vertical's brand makes re-wrapping expensive. Extraction contract (feature
 flags, data adapters, no cross-module imports) is post-tournament work — also
 owner-agreed.
