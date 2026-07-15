@@ -32,8 +32,8 @@ So each module has three name layers: neutral code-ID → white-label product na
 | Product | What it is | Status |
 |---|---|---|
 | podiumMetrics | THE PLATFORM — sport-agnostic stats engine; per-deployment branding ("podiumMetrics – World Cup 26", "– F1 2026", …) | **Live** (this app) |
-| podiumSelect | VIP sport travel app (always was the travel app) | In dev |
-| podiumSchedule | Global sport calendar (exists under another name on anything.com; links coming) | Exists externally |
+| podiumSelect | VIP sport travel app (always was the travel app) | In dev — pre-naming build: https://event-concierge-os-805.created.app/ ("Event Concierge OS") |
+| podiumSchedule | Global sport calendar | Functioning dev build: https://globalsport-events-db-v1-1-15.created.app — Data Sync Center pulls TheSportsDB (soccer: WC26, UCL, Euros, Copa América, CAF/AFC/CONCACAF/CONMEBOL comps, Women's WC…) + Jolpica (F1). As of 7/15: 17 tournaments tracked, 3 synced (WC26, UCL 26-27, F1 2026), 14 pending, 0 missing teams. |
 
 ## Modules (owner list 7/15 + earlier concepts)
 
@@ -44,7 +44,16 @@ So each module has three name layers: neutral code-ID → white-label product na
 | podiumMuseum | Sport heritage/archive | Partial — Records page, anthem hub |
 | podiumArcade | Games/prediction play | Partial — `/predict`, anthem bracket, Fan Zone |
 | podiumPassport | Digital event passport: download at event, complete activities, check in at games/fan zones/activations. **podiumPassport = the white-label product; footyPassport = the soccer skin studio0x takes to market** (owner 7/15). Customer-skin example: FIFA → "FIFA World Cup Passport". | Not started |
-| podiumCollectors | Collectibles | Not started |
+| podiumCollectors | Collectibles. Name candidates: **podiumCollector** or **podiumCollect** (rhymes with podiumSelect) — owner leaning TBD. | Functioning dev build: https://veefriends-trading-card-app-778.created.app — built for VeeFriends collectors (owner is one). Possible go-to-market skin **"veeBay"**; owner strategy: get Gary Vaynerchuk's attention to invest or purchase. (TM note for the screen: "veeBay" echoes eBay's mark, and VeeFriends is Gary V's IP — as a pitch TO him that's the point, but don't take the skin to market without his blessing.) |
+
+## Strategic note: podiumSchedule as the fixture depot
+
+podiumSchedule's sync center (TheSportsDB + Jolpica) already ingests the exact
+tournaments podiumMetrics wants to deploy against (WC, UCL, F1, Women's WC, Euros…).
+Same pattern as the News depot: ONE schedule/fixtures depot could feed every
+podiumMetrics deployment instead of each deployment wiring its own feed
+(podiumMetrics – World Cup 26 uses api-football today; next iteration could read
+from podiumSchedule's DB). Evaluate at extraction time.
 
 ## Cross-vertical wrap examples (owner 7/15)
 
