@@ -10,10 +10,22 @@ re-wrapped and rebranded outside sport — e.g. podiumSelect re-wrapped as **fes
 (music-festival-to-festival travel) or as **ETP (Event Travel Planner)** inside a future
 **eventOS**. The white-label modules ARE the white-label platform.
 
-**Principle (proposed 7/15, pending owner sign-off):** module *code/IDs stay
+**Principle (proposed 7/15, owner AGREED):** module *code/IDs stay
 vertical-neutral* (e.g. `travel-select`, `news`, `arcade`); vertical brands
 (podiumSelect, festivalHopper) are a skin/config layer. Naming code after one
-vertical's brand makes re-wrapping expensive.
+vertical's brand makes re-wrapping expensive. Extraction contract (feature
+flags, data adapters, no cross-module imports) is post-tournament work — also
+owner-agreed.
+
+**The business model (owner 7/15):** create an OS platform per industry (sportOS
+for sport), then white-label modules serve BOTH tracks:
+1. **Own products** — studio0x skins the module and takes it to market
+   (podiumPassport → **footyPassport**, the soccer skin we sell).
+2. **Customer licensing** — customers skin the same module however they want
+   (e.g. FIFA could license podiumPassport to create "FIFA World Cup Passport").
+
+So each module has three name layers: neutral code-ID → white-label product name
+(podiumXxx) → go-to-market skins (ours + customers').
 
 ## Products (sportOS)
 
@@ -27,11 +39,11 @@ vertical's brand makes re-wrapping expensive.
 
 | Module | Concept | Proto inside podiumMetrics today? |
 |---|---|---|
-| podiumNews | Sport news engine | ✅ `/news` — AI previews/recaps/round-ups |
+| podiumNews | Sport news engine. **SEPARATE from live-game following** (owner 7/15): some users want only a news feed; non-sport verticals may have no in-game live feeds at all — separating now is the foundation. Architecture: ONE **News creation depot** (the AI news pipeline already serving pregame/postgame articles in this app) feeds both the news module and podiumMetrics — direction of feed TBD at extraction. | ✅ `/news` — AI previews/recaps/round-ups |
 | podiumCommunity | Fan community | Partial — predictions, sentiment tickers |
 | podiumMuseum | Sport heritage/archive | Partial — Records page, anthem hub |
 | podiumArcade | Games/prediction play | Partial — `/predict`, anthem bracket, Fan Zone |
-| podiumPassport | Digital tournament passport: download at event, complete activities, check in at games/fan zones/activations (evolved from footyPassport — soccer skin) | Not started |
+| podiumPassport | Digital event passport: download at event, complete activities, check in at games/fan zones/activations. **podiumPassport = the white-label product; footyPassport = the soccer skin studio0x takes to market** (owner 7/15). Customer-skin example: FIFA → "FIFA World Cup Passport". | Not started |
 | podiumCollectors | Collectibles | Not started |
 
 ## Cross-vertical wrap examples (owner 7/15)
@@ -42,7 +54,8 @@ vertical's brand makes re-wrapping expensive.
 ## Umbrellas
 
 - **sportOS** — current, active.
-- **eventOS** — future umbrella for event-vertical wraps (exploratory, owner 7/15).
+- **eventOS** — a FUNCTIONING PRODUCT (owner 7/15), not yet in market, needs further
+  development. **World debut: IMEX America, October 2026.**
 
 ## Extraction path (post-tournament next iteration — see task #8)
 
