@@ -157,6 +157,16 @@ Proprietary metric subtitle: `text-[9px] text-slate-700 font-mono` with text "st
 - The `"World Cup Stadium"` string is a DB **venue sentinel**, not branding — never
   rename it in comparisons without migrating the data (near-miss 7/9).
 
+**MODULES (owner directive, standing + expanded 7/15):** everything is built in
+add/removable MODULES; modules are white-label and re-wrappable across verticals
+(podiumSelect ≡ festivalHopper ≡ "ETP" under a future **eventOS**). sportOS module
+ideas to pursue: podiumNews, podiumCommunity, podiumMuseum, podiumArcade,
+podiumPassport, podiumCollectors — several already exist as proto-modules inside
+this app (news, predict/fan zone, records/anthems, sentiment). Full registry +
+extraction plan: **`docs/sportos-modules.md`**. Keep module code/IDs
+vertical-neutral; vertical brands are a skin layer. Module extraction is
+post-tournament work — don't refactor mid-tournament.
+
 **OWNER SHORTHAND:** "QCC" = "any Questions, Comments, Concerns (or suggestions)
 before we move forward?" — when the owner writes QCC, respond with genuine
 questions/feedback on the plan just described, then proceed.
