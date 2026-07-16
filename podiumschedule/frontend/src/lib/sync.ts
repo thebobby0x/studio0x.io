@@ -11,7 +11,11 @@ import type { Competition } from "@prisma/client";
 //   · per-competition status/error recorded for the sync center UI
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TSDB_KEY = process.env.TSDB_KEY ?? "3"; // "3" = TheSportsDB free/dev key
+// TheSportsDB free/dev key: "123" is the current one ("3" was retired and now
+// 404s — first live sync failed on it while keyless Jolpica succeeded, 7/16).
+// Set TSDB_KEY for a paid key (higher rate limits + full season data; the free
+// tier caps season event lists, so expect partial fixture sets without it).
+const TSDB_KEY = process.env.TSDB_KEY ?? "123";
 const TSDB_BASE = () => `https://www.thesportsdb.com/api/v1/json/${TSDB_KEY}`;
 const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
 
