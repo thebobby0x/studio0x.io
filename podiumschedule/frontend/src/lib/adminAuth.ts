@@ -5,12 +5,15 @@
 //   · Authorization: Bearer <token>    → CRON_SECRET (Vercel cron auto-header)
 export function isAuthorized(req: Request): boolean {
   const url = new URL(req.url);
-  const syncSecret = process.env.SYNC_SECRET;
+  // trim() both sides: env values and pasted secrets routinely pick up
+  // stray whitespace/newlines, and a 1am "x Forbidden" from an invisible
+  // trailing space is a rite of passage nobody needs twice (owner, 7/16).
+  const syncSecret = process.env.SYNC_SECRET?.trim();
   if (syncSecret) {
-    const given = url.searchParams.get("secret") ?? req.headers.get("x-sync-secret") ?? "";
+    const given = (url.searchParams.get("secret") ?? req.headers.get("x-sync-secret") ?? "").trim();
     if (given === syncSecret) return true;
   }
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers.get("authorization") === `Bearer ${cronSecret}`) return true;
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (cronSecret && req.headers.get("authorization")?.trim() === `Bearer ${cronSecret}`) return true;
   return false;
 }
