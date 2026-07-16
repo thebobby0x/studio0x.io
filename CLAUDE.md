@@ -254,6 +254,8 @@ Never commit these. All live in Vercel environment settings.
 | `AUTH_GOOGLE_ID` | NextAuth | |
 | `AUTH_GOOGLE_SECRET` | NextAuth | |
 | `AUTH_SECRET` | NextAuth | |
+| `AUTH_URL` | NextAuth | `https://podiummetrics.studio0x.io` — pins OAuth flow to the canonical domain (set 7/15 with the Google-console redirect URI; sign-in on the custom domain broke without it) |
+| `CRON_SECRET` | Nightly crons | Vercel auto-sends as bearer on cron calls; REQUIRED since SEED_SECRET rotation killed the legacy `?secret=` params (set 7/15 — crons had been silently 401ing) |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob (TTS cache) | |
 | `CONTENT_REPO_TOKEN` | GitHub PAT for studio0x-content repo | Needs `contents` + `workflow` scopes |
 
