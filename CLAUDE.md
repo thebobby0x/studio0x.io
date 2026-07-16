@@ -29,8 +29,13 @@ Worldcup never reads store/, supabase/, tools/; uses its OWN Neon DB, never the 
 
 ## What This Project Is
 
-**Studio0x.io** is an AI-powered sports stats and media platform. The first deployment
-is a **FIFA World Cup 2026 stats engine** at `worldcup-2026-sandy.vercel.app`.
+**Studio0x.io** is an AI-powered sports stats and media platform. This lane's app is
+**podiumMetrics** — the sport-agnostic stats PLATFORM under the **sportOS** umbrella —
+live at **`podiummetrics.studio0x.io`** (Vercel project `worldcup-2026`;
+`worldcup-2026-sandy.vercel.app` still serves as an alias). Deployment #1 is the 2026
+World Cup. Sibling product **podiumSchedule** (the fixtures depot) lives at
+`podiumschedule/frontend/` with its own Vercel project + Neon DB. See the BRANDING and
+MODULES blocks + `docs/sportos-modules.md` for the full structure.
 
 The long-term vision is a **white-label platform** that can be skinned for any tournament:
 F1, UEFA Champions League, NFL, etc. The World Cup build is the reference implementation.
@@ -60,6 +65,8 @@ studio0x.io/
 │       │   │   └── venue/
 │       │   └── lib/
 │       └── package.json
+├── podiumschedule/
+│   └── frontend/          ← podiumSchedule — sportOS fixtures depot (own Vercel + Neon)
 ├── docs/                  ← EOD reports, session notes
 │   └── eod-2026-06-21.md  ← Most recent session report
 ├── studio0x-content/      ← Separate repo for social/content distribution
@@ -521,7 +528,29 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-07-07)
+## Current Production State (as of 2026-07-16)
+
+**Jul 15–16 shipped (PRs #138–#153, see `docs/eod-2026-07-15.md` + `eod-2026-07-16.md`):**
+- **podiumMetrics brand live under sportOS** (owner structure decision 7/15): wordmark,
+  metadata, sportOS family footer with quiet links. Tournament-reference copy is not
+  brand copy (a team can't "win podiumMetrics").
+- **`podiummetrics.studio0x.io` LIVE**: GoDaddy CNAME + Vercel domain (production env),
+  canonical metadata (`metadataBase`/OG). Sign-in works on the custom domain
+  (`AUTH_URL` env + Google-console redirect URI). `CRON_SECRET` set — nightly crons
+  authenticate again (they had been silently 401ing since SEED_SECRET rotation).
+- **Live-data hardening** (PR #139): max-merge DB↔feed for LIVE/HT, date-based stage
+  classification, LiveRefresh on schedule + match pages, no sim persistence.
+- **TBD-downgrade guards** (PR #145): empty /teams map aborts sync; real→TBD refused.
+- **Round windows corrected** (PR #147): 3rd place (FRA-ENG ~Jul 19 00Z) vs Final
+  (ESP-ARG ~Jul 19 22Z) split at Jul 19 12:00Z.
+- **podiumSchedule DEPLOYED & SYNCING** (PRs #146, #149–#152): own Vercel project
+  `podiumschedule` + Neon (DIRECT connection string — pooled fails `prisma db push`),
+  env SYNC_SECRET/CRON_SECRET/TSDB_KEY(optional), TheSportsDB free key is "123"
+  (retired "3" broke soccer syncs; free tier caps season lists — paid key for full
+  seasons), /api/events depot API live. F1 2026 fully synced via Jolpica.
+- **Remaining tournament state**: 3rd place FRA-ENG Jul 18 (ET), Final ESP-ARG Jul 19.
+
+## Previous Production State (2026-07-07)
 
 **Jul 7 shipped (see `docs/eod-2026-07-07.md`, PRs #112–#118):** **ANTHEM HUB COMPLETE —
 53 tracks: all 48 teams + 5 FIFA** (manifest-driven; NB: manifest teamCodes must match the
