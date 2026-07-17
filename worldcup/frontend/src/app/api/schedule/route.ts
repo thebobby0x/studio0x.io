@@ -62,6 +62,7 @@ interface AFFixture {
     away: { id: number; name: string; code: string | null };
   };
   goals: { home: number | null; away: number | null };
+  score?: { penalty?: { home: number | null; away: number | null } };
 }
 
 export interface ScheduleMatch {
@@ -77,6 +78,10 @@ export interface ScheduleMatch {
   awayTeam: { name: string; tla: string };
   homeScore: number | null;
   awayScore: number | null;
+  // Shootout scores — null unless the game was decided on penalties. Needed so
+  // a drawn-after-ET final can still name a champion (goals stay level in the feed).
+  penHome: number | null;
+  penAway: number | null;
 }
 
 interface LiveEntry {
@@ -84,6 +89,8 @@ interface LiveEntry {
   minute: number;
   homeScore: number | null;
   awayScore: number | null;
+  penHome: number | null;
+  penAway: number | null;
 }
 
 interface DbEntry {
@@ -182,6 +189,8 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
         // nulling them rendered a live 0-2 as 0-0 on the hero (7/14 FRA-ESP).
         homeScore: m.status !== "NS" ? m.homeScore : null,
         awayScore: m.status !== "NS" ? m.awayScore : null,
+        penHome: null,
+        penAway: null,
       };
     });
   } catch {
@@ -217,6 +226,8 @@ async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
         minute: f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0),
         homeScore: f.goals.home,
         awayScore: f.goals.away,
+        penHome: f.score?.penalty?.home ?? null,
+        penAway: f.score?.penalty?.away ?? null,
       });
     }
 
@@ -238,7 +249,7 @@ function applyDbOverlay(data: ScheduleMatch[], overlay: Map<number, DbEntry>): S
     // api-football reached a terminal status — never let a stale DB entry regress it back to LIVE/HT
     if (m.status === "FT") return m;
     // DB is useful when api-football still shows NS but match has actually started/finished
-    if (m.status === "NS") return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed };
+    if (m.status === "NS") return { ...m, status: db.status, homeScore: db.homeScore, awayScore: db.awayScore, minute: db.elapsed, penHome: null, penAway: null };
     // For LIVE/HT: the DB is actively maintained by the per-match live route (the
     // same rows the LiveMatchBanner shows), while our bulk feed can be a stale
     // cache or DB-synthesised snapshot when api-football flakes — the owner
@@ -321,6 +332,8 @@ export async function GET() {
               awayTeam:   { name: f.teams.away.name, tla: awayTla },
               homeScore:  f.goals.home,
               awayScore:  f.goals.away,
+              penHome:    f.score?.penalty?.home ?? null,
+              penAway:    f.score?.penalty?.away ?? null,
             };
           });
 
