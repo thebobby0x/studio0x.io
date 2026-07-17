@@ -11,16 +11,26 @@ function storyKey(text: string): string {
   return text.slice(0, 60).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+// Roundtable persona voices — ElevenLabs premade voice IDs (public, stable).
+// Personas are mapped SERVER-side; clients send a persona key, never a voice id.
+// "lorraine" (the host) keeps the configured default voice.
+const PERSONA_VOICES: Record<string, string> = {
+  gaffer: "pNInz6obpgDQGcFmaJgB", // Adam — gruff, deep (ex-pro tactician)
+  sofia:  "21m00Tcm4TlvDq8ikWAM", // Rachel — crisp, precise (stats analyst)
+  deano:  "TxGEqnHWrfWFTfGW9XjX", // Josh — young, energetic (superfan)
+};
+
 export async function POST(req: Request) {
   const elKey = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9"; // "Daniel" — deep news anchor
+  const defaultVoice = process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9"; // "Daniel" — deep news anchor
   if (!elKey) return NextResponse.json({ error: "ELEVENLABS_API_KEY not set" }, { status: 500 });
 
-  const { text, storyId } = (await req.json()) as { text: string; storyId?: string };
+  const { text, storyId, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
   if (!text) return NextResponse.json({ error: "text required" }, { status: 400 });
+  const voiceId = (persona && PERSONA_VOICES[persona]) || defaultVoice;
 
-  // Check Vercel Blob cache
-  const blobKey = `tts/${storyId ?? storyKey(text)}.mp3`;
+  // Check Vercel Blob cache — persona in the key so voices never collide
+  const blobKey = `tts/${persona && PERSONA_VOICES[persona] ? `${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });

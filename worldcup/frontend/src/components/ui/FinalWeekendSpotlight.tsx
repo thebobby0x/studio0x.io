@@ -25,7 +25,6 @@ export interface SpotlightFixture {
   awayScore: number | null;
   penHome: number | null;
   penAway: number | null;
-  matchId?: string; // DB id for the match-page link, when known
 }
 
 function useCountdown(target: string): string {
@@ -67,7 +66,9 @@ function FixtureRow({ f, label }: { f: SpotlightFixture; label: string }) {
   const countdown = useCountdown(f.utcDate);
   const isLive = f.status === "LIVE" || f.status === "HT";
   const dt = new Date(f.utcDate);
-  const href = f.matchId ? `/schedule/${f.matchId}` : "/schedule";
+  // Match pages route by FIXTURE id (the schedule feed's id), not the DB cuid —
+  // linking the cuid produced "Match not found" (owner report 7/17).
+  const href = `/schedule/${f.id}`;
 
   return (
     <Link
@@ -137,19 +138,24 @@ export default function FinalWeekendSpotlight({
     );
   }
 
-  // ── The Final Weekend showcase ─────────────────────────────────────────────
+  // ── The Final Weekend showcase — HUGE masthead (owner 7/17: "screaming") ───
   return (
-    <div className="rounded-3xl border border-brand-gold/30 bg-brand-card overflow-hidden">
-      <div className="px-5 pt-4 pb-1 flex items-center gap-2">
-        <Trophy size={14} className="text-brand-gold" />
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gold">
-          The Final Weekend
-        </span>
-        <span className="text-[10px] text-slate-600 uppercase tracking-widest ml-auto">
+    <div className="rounded-3xl border border-brand-gold/30 bg-gradient-to-b from-brand-gold/10 via-brand-card to-brand-card overflow-hidden">
+      <div className="px-5 pt-7 pb-3 text-center">
+        <Trophy size={22} className="mx-auto text-brand-gold mb-3" />
+        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">
+          {third ? `${third.home.name} · ${third.away.name} · ` : ""}
+          {final ? `${final.home.name} · ${final.away.name}` : ""}
+        </div>
+        <h2 className="mt-2 text-5xl sm:text-7xl font-black uppercase tracking-tighter leading-[0.9]">
+          <span className="text-white">The Final</span>{" "}
+          <span className="text-brand-gold">Weekend</span>
+        </h2>
+        <div className="mt-3 text-xs font-bold uppercase tracking-[0.3em] text-slate-400">
           Two games decide everything
-        </span>
+        </div>
       </div>
-      <div className="p-4 pt-3 space-y-2">
+      <div className="p-4 pt-2 space-y-2">
         {third && <FixtureRow f={third} label="3rd Place" />}
         {final && <FixtureRow f={final} label="The Final" />}
       </div>
