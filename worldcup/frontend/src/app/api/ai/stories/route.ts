@@ -203,6 +203,83 @@ async function generateStories(): Promise<Story[]> {
   }));
 }
 
+
+// ── Final-week feature stories (owner request 7/17) ───────────────────────────
+// Five pregame reads for the final matchup: goalkeeping, defense, the legacy
+// angle, projected XIs, tactics. Grounded in DB squads + real results; the
+// legacy piece may use well-established career facts qualitatively but no
+// invented numbers. Own 6h cache; renders only during final week (pre-Jul 21).
+let _featuresCache: { ts: number; stories: Story[] } | null = null;
+const FEATURES_TTL = 6 * 60 * 60 * 1000;
+
+async function generateFinalFeatures(): Promise<Story[]> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return [];
+  if (Date.now() >= new Date("2026-07-21T00:00:00Z").getTime()) return [];
+
+  const finalMatch = await prisma.match.findFirst({
+    where: { date: { gte: new Date("2026-07-19T12:00:00Z"), lte: new Date("2026-07-20T23:59:59Z") } },
+    include: { homeTeam: true, awayTeam: true },
+  });
+  if (!finalMatch || finalMatch.homeTeam.code === "TBD" || finalMatch.awayTeam.code === "TBD") return [];
+
+  const [homeSquad, awaySquad, results] = await Promise.all([
+    prisma.player.findMany({ where: { teamId: finalMatch.homeTeamId }, orderBy: { number: "asc" } }),
+    prisma.player.findMany({ where: { teamId: finalMatch.awayTeamId }, orderBy: { number: "asc" } }),
+    prisma.match.findMany({
+      where: {
+        status: "FT",
+        OR: [
+          { homeTeamId: { in: [finalMatch.homeTeamId, finalMatch.awayTeamId] } },
+          { awayTeamId: { in: [finalMatch.homeTeamId, finalMatch.awayTeamId] } },
+        ],
+      },
+      include: { homeTeam: true, awayTeam: true },
+      orderBy: { date: "desc" },
+      take: 14,
+    }),
+  ]);
+
+  const squadBlock = (label: string, sq: typeof homeSquad) =>
+    sq.length
+      ? `${label} SQUAD (only players you may name for ${label}):\n` + sq.map((p) => `#${p.number} ${p.name} — ${p.position}${p.club ? `, ${p.club}` : ""}${p.caps ? `, ${p.caps} caps` : ""}${p.goals ? `, ${p.goals} intl goals` : ""}`).join("\n")
+      : `${label} SQUAD: unavailable — name NO ${label} players.`;
+  const resultsBlock = results.map((m) => `${new Date(m.date).toISOString().slice(0, 10)}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}`).join("\n");
+
+  const client = new Anthropic({ apiKey: key });
+  const msg = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4000,
+    system: `You write pregame feature stories for the tournament final. Return ONLY valid JSON:
+{"stories":[{"slug":string,"headline":string,"body":string}]}
+Write EXACTLY five stories (~120-170 words each), slugs: "goalkeeping", "defense", "legacy", "lineups", "tactics".
+- goalkeeping: the duel between the two keepers (name them ONLY if present in squads).
+- defense: the defensive matchup, built from listed defenders and real results.
+- legacy: the all-time-great angle for the biggest name on the pitch — well-established career facts allowed qualitatively (championships, longevity), NO invented statistics or quotes.
+- lineups: projected XIs drawn ONLY from the listed squads, framed as projections ("expect", "likely"), plus a bench name or two. Never present as confirmed team news.
+- tactics: each manager's likely plan — clearly framed as speculation.
+HARD RULES: no invented players, stats, injuries, quotes, or history; cite only numbers in the data; call it "the tournament"/"the final"; punchy magazine tone.`,
+    messages: [{ role: "user", content: `THE FINAL: ${finalMatch.homeTeam.name} v ${finalMatch.awayTeam.name}, ${new Date(finalMatch.date).toUTCString()}, ${finalMatch.venue}.\n\n${squadBlock(finalMatch.homeTeam.name, homeSquad)}\n\n${squadBlock(finalMatch.awayTeam.name, awaySquad)}\n\nTOURNAMENT RESULTS:\n${resultsBlock}` }],
+  });
+
+  const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+  try {
+    const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { stories?: { slug: string; headline: string; body: string }[] };
+    return (parsed.stories ?? [])
+      .filter((f) => f.headline && f.body)
+      .map((f) => ({
+        id: `final-feature-${f.slug}`,
+        category: "ANALYSIS" as const,
+        headline: f.headline,
+        body: f.body,
+        teamsInvolved: [finalMatch.homeTeam.code, finalMatch.awayTeam.code],
+        generatedAt: new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function GET() {
   // ── 1. In-memory editorial stories (AI-generated analysis/standings) ────────
   let editorialStories: Story[] = [];
@@ -219,6 +296,20 @@ export async function GET() {
       }
     } catch {
       editorialStories = _cache?.stories ?? [];
+    }
+  }
+
+  // ── 1b. Final-week features (own cache — fail soft, serve stale) ───────────
+  let featureStories: Story[] = [];
+  if (_featuresCache && Date.now() - _featuresCache.ts < FEATURES_TTL) {
+    featureStories = _featuresCache.stories;
+  } else {
+    try {
+      const fresh = await generateFinalFeatures();
+      if (fresh.length > 0) _featuresCache = { ts: Date.now(), stories: fresh };
+      featureStories = _featuresCache?.stories ?? [];
+    } catch {
+      featureStories = _featuresCache?.stories ?? [];
     }
   }
 
@@ -245,10 +336,11 @@ export async function GET() {
     }));
   } catch { /* DB unavailable — fall through to editorial only */ }
 
-  // ── 3. Merge: newest DB stories first, editorial after; dedup by headline ───
+  // ── 3. Merge: final-week features lead, then newest DB stories, then
+  // editorial; dedup by headline ──────────────────────────────────────────────
   const seen = new Set<string>();
   const merged: Story[] = [];
-  for (const s of [...dbStories, ...editorialStories]) {
+  for (const s of [...featureStories, ...dbStories, ...editorialStories]) {
     if (!seen.has(s.headline)) {
       seen.add(s.headline);
       merged.push(s);

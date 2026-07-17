@@ -23,6 +23,7 @@ import type { ScheduleMatch } from "@/app/api/schedule/route";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/FinalWeekendSpotlight";
+import FinalRoundtable from "@/components/news/FinalRoundtable";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -468,7 +469,6 @@ export default async function DashboardPage({
   const showFinalWeekend = Date.now() < new Date("2026-07-21T00:00:00Z").getTime();
   const toSpotlight = (m: ScheduleMatch | undefined): SpotlightFixture | null => {
     if (!m) return null;
-    const db = matches.find((x) => x.fixture === m.id);
     return {
       id: m.id,
       utcDate: m.utcDate,
@@ -480,7 +480,6 @@ export default async function DashboardPage({
       awayScore: m.awayScore,
       penHome: m.penHome,
       penAway: m.penAway,
-      matchId: db?.id,
     };
   };
   const spotlightThird = showFinalWeekend ? toSpotlight(allSchedule.find((m) => m.stage === "THIRD_PLACE")) : null;
@@ -494,6 +493,9 @@ export default async function DashboardPage({
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         {(spotlightThird || spotlightFinal) && (
           <FinalWeekendSpotlight third={spotlightThird} final={spotlightFinal} />
+        )}
+        {spotlightFinal && spotlightFinal.status === "NS" && (
+          <FinalRoundtable fixture={spotlightFinal.id} />
         )}
 
         {/* ── Top Story headline — click to read the full AI story ── */}
