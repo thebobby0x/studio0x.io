@@ -37,6 +37,8 @@ async function fetchSchedule(): Promise<ScheduleMatch[]> {
       awayTeam: { name: m.awayTeam.name, tla: m.awayTeam.code },
       homeScore: m.homeScore ?? null,
       awayScore: m.awayScore ?? null,
+      penHome: null,
+      penAway: null,
     }));
   } catch {
     return [];
