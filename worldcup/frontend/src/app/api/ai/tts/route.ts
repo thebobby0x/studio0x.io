@@ -14,10 +14,12 @@ function storyKey(text: string): string {
 // Roundtable persona voices — ElevenLabs premade voice IDs (public, stable).
 // Personas are mapped SERVER-side; clients send a persona key, never a voice id.
 // "lorraine" (the host) keeps the configured default voice.
+// Env overrides let the owner swap in custom/cloned ElevenLabs voices without
+// a code change (ELEVENLABS_VOICE_GAFFER / _SOFIA / _DEANO).
 const PERSONA_VOICES: Record<string, string> = {
-  gaffer: "pNInz6obpgDQGcFmaJgB", // Adam — gruff, deep (ex-pro tactician)
-  sofia:  "21m00Tcm4TlvDq8ikWAM", // Rachel — crisp, precise (stats analyst)
-  deano:  "TxGEqnHWrfWFTfGW9XjX", // Josh — young, energetic (superfan)
+  gaffer: process.env.ELEVENLABS_VOICE_GAFFER ?? "pNInz6obpgDQGcFmaJgB", // Adam — gruff, deep (ex-pro tactician)
+  sofia:  process.env.ELEVENLABS_VOICE_SOFIA  ?? "21m00Tcm4TlvDq8ikWAM", // Rachel — crisp, precise (stats analyst)
+  deano:  process.env.ELEVENLABS_VOICE_DEANO  ?? "TxGEqnHWrfWFTfGW9XjX", // Josh — young, energetic (footy influencer)
 };
 
 export async function POST(req: Request) {

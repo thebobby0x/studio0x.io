@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import InfoTip from "@/components/ui/InfoTip";
 import { preMatchWinProbFromTournamentOdds } from "@/lib/probabilities";
 import type { LiveData } from "@/lib/types";
 
@@ -81,6 +82,7 @@ export default function UpsetMeter({ matchId }: { matchId: string }) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Upset Factor™</span>
+          <InfoTip metric="upsetFactor" />
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
         <span className="text-[9px] text-slate-700 uppercase tracking-wider">modelled from Polymarket tournament odds</span>

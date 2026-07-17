@@ -1,6 +1,7 @@
 "use client";
 
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
+import InfoTip from "@/components/ui/InfoTip";
 
 // Counter-attack window: goal scored within this many minutes of the previous goal
 const COUNTER_WINDOW_MIN = 4;
@@ -101,6 +102,7 @@ export default function TransitionDangerRating({ goals, homeTeamName, awayTeamNa
       <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Transition Danger Rating™</span>
+          <InfoTip metric="transitionDanger" />
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
         <span className="text-[9px] text-slate-500 uppercase tracking-wider">Counter-attack efficiency</span>
