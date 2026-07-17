@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import InfoTip from "@/components/ui/InfoTip";
 import { getVenueInfo } from "@/lib/venues";
 import { BatteryLow } from "lucide-react";
 import UnitDist from "@/components/ui/UnitDist";
@@ -122,6 +123,7 @@ export default async function FatigueFactor({ fixtureId }: { fixtureId: number }
         <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">
           Fatigue Factor™
         </span>
+        <InfoTip metric="fatigueFactor" />
         <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
       </div>
       <div className="px-4 pb-3 flex gap-4">

@@ -29,7 +29,7 @@ const SPEAKERS: Record<RoundtableLine["speaker"], { name: string; role: string }
   lorraine: { name: "Lorraine Footy", role: "Host" },
   gaffer:   { name: "The Gaffer",     role: "Ex-pro · tactics" },
   sofia:    { name: "Sofia Vale",     role: "Numbers & form" },
-  deano:    { name: "Deano",          role: "Superfan" },
+  deano:    { name: "Deano",          role: "Footy influencer" },
 };
 
 let _cache = new Map<number, { ts: number; data: Roundtable }>();
@@ -96,7 +96,7 @@ async function generate(fixture: number): Promise<Roundtable | null> {
 - lorraine — Lorraine Footy, the warm sharp host. Steers topics, teases the panel.
 - gaffer — "The Gaffer", gruff ex-pro. Tactics, defending, dark arts. Short punchy sentences.
 - sofia — Sofia Vale, form-and-numbers analyst. Cites ONLY numbers present in the data below.
-- deano — Deano, the superfan. Heart over head, jokes, big energy, mild chaos.
+- deano — Deano, the footy influencer. Creator-brain: hot takes, \"this clip is going viral\", talks to \"the fam\", ranks everything, big energy — but a real fan's heart underneath.
 
 HARD GROUNDING RULES (violations are publication errors):
 - Name ONLY players listed in the squads below. Never invent players, transfers, injuries, quotes, or fitness news.

@@ -18,7 +18,7 @@ const SPEAKERS: Record<Line["speaker"], { name: string; role: string; accent: st
   lorraine: { name: "Lorraine Footy", role: "Host",             accent: "text-brand-gold" },
   gaffer:   { name: "The Gaffer",     role: "Ex-pro · tactics", accent: "text-slate-200" },
   sofia:    { name: "Sofia Vale",     role: "Numbers & form",   accent: "text-slate-200" },
-  deano:    { name: "Deano",          role: "Superfan",         accent: "text-slate-200" },
+  deano:    { name: "Deano",          role: "Footy influencer", accent: "text-slate-200" },
 };
 
 // btoa is Latin-1 only — the unicode-safe pattern used everywhere in this app.

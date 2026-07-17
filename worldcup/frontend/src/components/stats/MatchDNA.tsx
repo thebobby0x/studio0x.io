@@ -1,6 +1,8 @@
 "use client";
 
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
+import InfoTip from "@/components/ui/InfoTip";
+import { teamColor } from "@/lib/teamColors";
 import type { TeamLiveStats } from "@/lib/liveStats";
 
 // ── Live Pressure (from real team stats) ──────────────────────────────────────
@@ -261,41 +263,82 @@ function MomentumTimeline({
   );
 }
 
-// ── Match DNA timeline ────────────────────────────────────────────────────────
-function DNATimeline({
-  goals, side,
+// ── Match DNA diverging goal graph ───────────────────────────────────────────
+// Owner request 7/17: a line-graph treatment in NATIONAL TEAM COLORS (a
+// sanctioned data-viz exception to the color discipline, like the flight map).
+// Cumulative goals step away from the center axis: away team rises above the
+// line, home team drops below — for the final that reads Argentina (sky blue)
+// above, Spain (red) below. Unknown teams fall back to green/gold.
+function DivergingGoalGraph({
+  homeGoals, awayGoals, homeCode, awayCode, homeName, awayName,
 }: {
-  goals: GoalEvent[];
-  side: "home" | "away";
+  homeGoals: GoalEvent[];
+  awayGoals: GoalEvent[];
+  homeCode: string;
+  awayCode?: string;
+  homeName: string;
+  awayName: string;
 }) {
   const MAX_MIN = 95;
-  const pct = (m: number) => `${Math.min((m / MAX_MIN) * 100, 100).toFixed(1)}%`;
+  const W = 100, H = 64, MID = H / 2, PAD = 6;
+  const maxSide = Math.max(homeGoals.length, awayGoals.length, 2);
+  const scale = (MID - PAD - 6) / maxSide;
+  const x = (m: number) => Math.min((m / MAX_MIN) * (W - 4), W - 4) + 2;
+
+  const homeColor = teamColor(homeCode, "#10b981");           // fallback: brand green
+  const awayColor = teamColor(awayCode, "#d9b45c");           // fallback: champagne gold
+
+  const step = (goals: GoalEvent[], dir: 1 | -1) => {
+    const sorted = [...goals].sort((a, b) => a.minute - b.minute);
+    let count = 0;
+    const pts: { x: number; y: number; minute: number }[] = [];
+    const path: string[] = [`M 2 ${MID}`];
+    for (const g of sorted) {
+      count += 1;
+      const px = x(g.minute);
+      const py = MID - dir * count * scale;
+      path.push(`L ${px.toFixed(1)} ${(MID - dir * (count - 1) * scale).toFixed(1)}`);
+      path.push(`L ${px.toFixed(1)} ${py.toFixed(1)}`);
+      pts.push({ x: px, y: py, minute: g.minute });
+    }
+    path.push(`L ${W - 2} ${(MID - dir * count * scale).toFixed(1)}`);
+    return { d: path.join(" "), pts };
+  };
+
+  const away = step(awayGoals, 1);   // above the line
+  const home = step(homeGoals, -1);  // below the line
 
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <span className="text-[10px] font-bold text-slate-500 w-6 shrink-0 text-right">
-        {side === "home" ? "H" : "A"}
-      </span>
-      <div className="relative flex-1 h-1 bg-slate-800 rounded-full overflow-visible">
-        {/* Half-time marker */}
-        <div className="absolute top-1/2 -translate-y-1/2 w-px h-2.5 bg-slate-700" style={{ left: `${(45 / MAX_MIN) * 100}%` }} />
-        {/* Goal markers */}
-        {goals.map((g, i) => (
-          <div
-            key={i}
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
-            style={{ left: pct(g.minute) }}
-          >
-            <span className="text-[11px] leading-none">{g.isOwnGoal ? "🙈" : "⚽"}</span>
-            <span className={`text-[8px] font-mono mt-0.5 whitespace-nowrap ${side === "home" ? "text-brand-green" : "text-amber-400"}`}>
-              {g.minute}&apos;{g.minute > 90 ? "+" : ""}
-            </span>
-          </div>
-        ))}
+    <div>
+      <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+        <span style={{ color: awayColor }}>{awayName} · {awayGoals.length}</span>
+        <span className="text-[8px] text-slate-600 uppercase tracking-wider">goals over time</span>
       </div>
-      <span className="text-[9px] font-bold text-white tabular-nums shrink-0 w-3 text-center">
-        {goals.length}
-      </span>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" preserveAspectRatio="none" aria-label="Diverging goal timeline">
+        {/* center axis + HT marker */}
+        <line x1="2" y1={MID} x2={W - 2} y2={MID} stroke="#334155" strokeWidth="0.6" />
+        <line x1={x(45)} y1={PAD} x2={x(45)} y2={H - PAD} stroke="#1e293b" strokeWidth="0.6" strokeDasharray="1.5 1.5" />
+        {/* team step lines */}
+        <path d={away.d} fill="none" stroke={awayColor} strokeWidth="1.4" strokeLinejoin="round" />
+        <path d={home.d} fill="none" stroke={homeColor} strokeWidth="1.4" strokeLinejoin="round" />
+        {/* goal dots + minute labels */}
+        {away.pts.map((p, i) => (
+          <g key={`a${i}`}>
+            <circle cx={p.x} cy={p.y} r="1.8" fill={awayColor} />
+            <text x={p.x} y={p.y - 3.2} textAnchor="middle" fontSize="4.4" fill={awayColor} fontFamily="monospace">{p.minute}&apos;</text>
+          </g>
+        ))}
+        {home.pts.map((p, i) => (
+          <g key={`h${i}`}>
+            <circle cx={p.x} cy={p.y} r="1.8" fill={homeColor} />
+            <text x={p.x} y={p.y + 6.4} textAnchor="middle" fontSize="4.4" fill={homeColor} fontFamily="monospace">{p.minute}&apos;</text>
+          </g>
+        ))}
+      </svg>
+      <div className="flex items-center justify-between text-[10px] font-bold mt-1">
+        <span style={{ color: homeColor }}>{homeName} · {homeGoals.length}</span>
+        <span className="text-[8px] text-slate-800 font-mono">0&apos; — 45&apos; — 90&apos;+</span>
+      </div>
     </div>
   );
 }
@@ -344,6 +387,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
       <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Match DNA™</span>
+          <InfoTip metric="matchDna" />
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
         <span className="text-[9px] text-slate-700 uppercase tracking-wider">Goal timeline · 0–95&apos;</span>
@@ -358,23 +402,21 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
 
       <div className="px-4 py-4 space-y-4">
 
-        {/* Timeline */}
-        <div className="space-y-3">
-          <DNATimeline goals={homeGoals} side="home" />
-          <div className="flex items-center gap-2">
-            <span className="w-6" />
-            <div className="flex-1 flex justify-between text-[8px] text-slate-800 font-mono px-0.5">
-              <span>0</span><span>15</span><span>30</span><span>45</span><span>60</span><span>75</span><span>90+</span>
-            </div>
-            <span className="w-3" />
-          </div>
-          <DNATimeline goals={awayGoals} side="away" />
-        </div>
+        {/* Diverging team-color goal graph */}
+        <DivergingGoalGraph
+          homeGoals={homeGoals}
+          awayGoals={awayGoals}
+          homeCode={homeTeamCode}
+          awayCode={awayTeamCode}
+          homeName={homeTeamName}
+          awayName={awayTeamName}
+        />
 
         {/* Momentum Pulse™ */}
         <div className="border-t border-brand-border/50 pt-3">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Momentum Pulse™</span>
+            <InfoTip metric="momentumPulse" />
             <span className="text-[8px] text-slate-600">{stats ? "Goals + live pressure" : "Live goal timeline"}</span>
           </div>
           <MomentumTimeline pulse={mp} matchStatus={matchStatus} currentMinute={currentMinute} />
@@ -410,6 +452,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         <div className="border-t border-brand-border/50 pt-3">
           <div className="flex items-center gap-2 mb-2.5">
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Strike Clock™</span>
+            <InfoTip metric="strikeClock" />
             <span className="text-[8px] text-slate-600">Goal timing patterns</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -440,6 +483,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         <div className="border-t border-brand-border/50 pt-3">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Score Volatility™</span>
+            <InfoTip metric="scoreVolatility" />
             <span className="text-[8px] text-slate-600">{svEmoji} {svLabel}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -463,6 +507,7 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
         <div className="border-t border-brand-border/50 pt-3">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Clutch Index™</span>
+            <InfoTip metric="clutchIndex" />
             <span className="text-[8px] text-slate-600">Lead-change weight × late-goal bonus</span>
           </div>
           {ci.length > 0 ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import InfoTip from "@/components/ui/InfoTip";
 import type { PlayerMatchStats } from "@/app/api/matches/[id]/players/route";
 
 interface TeamPressingStats {
@@ -70,6 +71,7 @@ export default function PressingIntensityIndex({ matchId, homeTeamName, awayTeam
       <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Pressing Intensity Index™</span>
+          <InfoTip metric="pressingIntensity" />
           <span className="text-[9px] text-slate-700 font-mono">studio0x</span>
         </div>
         <span className="text-[9px] text-slate-500 uppercase tracking-wider">Fouls · cards · aggression</span>
