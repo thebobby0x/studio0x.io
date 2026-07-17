@@ -199,7 +199,7 @@ async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
     setTimeout(() => ctrl.abort(), 5_000);
     const res = await fetch(
       `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}&live=all`,
-      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
+      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, next: { revalidate: 6 } }
     );
 
     if (!res.ok) {
@@ -214,7 +214,7 @@ async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
     for (const f of liveFixtures) {
       data.set(f.fixture.id, {
         status: (STATUS_MAP[f.fixture.status.short] ?? "LIVE") as ScheduleMatch["status"],
-        minute: f.fixture.status.elapsed ?? 0,
+        minute: f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0),
         homeScore: f.goals.home,
         awayScore: f.goals.away,
       });
@@ -282,7 +282,11 @@ export async function GET() {
       setTimeout(() => ctrl.abort(), 10_000);
       const res = await fetch(
         `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}`,
-        { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, cache: "no-store" }
+        // Shared Vercel data cache (revalidate) UNDER the per-instance module
+        // cache: N warm instances collapse to ~1 upstream call per TTL window,
+        // making the api-football budget traffic-independent (final-day math:
+        // per-instance no-store at 3 instances ≈ 10.7k calls > 7.5k/day quota).
+        { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, next: { revalidate: 20 } }
       );
 
       if (!res.ok) {
@@ -307,7 +311,8 @@ export async function GET() {
               id:         f.fixture.id,
               utcDate:    f.fixture.date,
               status,
-              minute:     f.fixture.status.elapsed ?? 0,
+              // elapsed is null during penalty shootouts — 120, not 0
+              minute:     f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0),
               stage,
               stageLabel: STAGE_LABELS[stage] ?? stage,
               group,
