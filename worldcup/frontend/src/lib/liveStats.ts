@@ -100,7 +100,8 @@ export async function getFixtureStatistics(
     setTimeout(() => ctrl.abort(), 4000);
     const res = await fetch(
       `https://v3.football.api-sports.io/fixtures/statistics?fixture=${fixtureId}`,
-      { headers: { "x-apisports-key": key }, signal: ctrl.signal, cache: "no-store" },
+      // Shared data cache under the module cache (traffic-independent budget)
+      { headers: { "x-apisports-key": key }, signal: ctrl.signal, next: { revalidate: isLive ? 15 : 600 } },
     );
     if (!res.ok) return cached?.data ?? null;
 
