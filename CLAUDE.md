@@ -178,6 +178,21 @@ as "FIFA World Cup Passport"). News is a SEPARATE module from live-game followin
 **`docs/sportos-modules.md`**. Keep module code/IDs vertical-neutral (owner-agreed);
 module extraction is post-tournament work — don't refactor mid-tournament.
 
+**CONTENT TRUTH — HARD RULE (owner directive 7/18, verbatim intent):** "actual facts
+and truths, with opinions based on facts and truths, NO false, NO fake, NO invented,
+NO imaginary anything." Applies to EVERY content surface, present and future:
+- Every AI prompt must carry explicit invent-bans (no players, stats, scorers,
+  minutes, injuries, quotes, odds, or history not present in the prompt data) —
+  copy the grounding block when adding any new AI surface (see gotcha #21).
+- Opinions/speculation must be grounded in provided facts and clearly framed as
+  opinion ("my guess", "I think", "likely").
+- Sim/fabricated data stays quarantined behind `dataSources` tags and is never
+  shown as real (gotcha #20).
+- The Roundtable pundits are clearly-labeled fictional CHARACTERS (disclaimed on
+  the surface) — the personas are the one sanctioned fiction, and even they may
+  only discuss real, provided facts and may never invent specifics (career
+  matches, stats, teammates, dates).
+
 **OWNER SHORTHAND:** "QCC" = "any Questions, Comments, Concerns (or suggestions)
 before we move forward?" — when the owner writes QCC, respond with genuine
 questions/feedback on the plan just described, then proceed.
@@ -507,6 +522,15 @@ Never push directly to main.
     formations, minutes, stats, injuries, or historical anecdotes not present in the prompt data.
     When adding a new AI surface, copy the grounding rules; a missing guardrail = published
     hallucinations (see docs/eod-2026-07-06.md, PR #108).
+
+24. **TTS pronunciation + accent preservation (Roundtable)** — accented character
+    voices need `eleven_multilingual_v2` (turbo flattens designed accents) AND an
+    audio-only respell lexicon (`AUDIO_RESPELL` in `api/ai/tts/route.ts`): even the
+    multilingual model reads short foreign words with English phonetics inside
+    English sentences ("dale" is an English word → [day-ul]; "Henry" → [hen-ree]).
+    Display text is never respelled. ANY change to TTS model/settings/lexicon MUST
+    bump `PERSONA_AUDIO_REV` — blob cache keys are text-derived, so old audio
+    serves forever otherwise (this bit us twice on 7/18).
 
 23. **fixtureSync can only be trusted if the /teams call succeeded** — teamCodeById is
     built from a SECOND api-football call; when it failed, every knockout fixture
