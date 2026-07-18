@@ -24,6 +24,7 @@ import LiveRefresh from "@/components/ui/LiveRefresh";
 import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/FinalWeekendSpotlight";
 import FinalRoundtable from "@/components/news/FinalRoundtable";
+import MatchdayTape from "@/components/match/MatchdayTape";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -494,9 +495,24 @@ export default async function DashboardPage({
         {(spotlightThird || spotlightFinal) && (
           <FinalWeekendSpotlight third={spotlightThird} final={spotlightFinal} />
         )}
-        {spotlightFinal && spotlightFinal.status === "NS" && (
-          <FinalRoundtable fixture={spotlightFinal.id} />
-        )}
+        {/* Matchday special (owner 7/18): TODAY'S game leads — tale of the tape
+            + The Roundtable for the next unfinished spotlight fixture (3rd
+            place until it goes FT, then the final takes over). */}
+        {(() => {
+          const featured =
+            spotlightThird && spotlightThird.status !== "FT"
+              ? { m: spotlightThird, label: "3rd Place" }
+              : spotlightFinal && spotlightFinal.status !== "FT"
+                ? { m: spotlightFinal, label: "The Final" }
+                : null;
+          if (!featured) return null;
+          return (
+            <>
+              <MatchdayTape fixture={featured.m.id} stageLabel={featured.label} />
+              <FinalRoundtable fixture={featured.m.id} />
+            </>
+          );
+        })()}
 
         {/* ── Top Story headline — click to read the full AI story ── */}
         {topStory && (

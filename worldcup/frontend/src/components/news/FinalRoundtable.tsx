@@ -12,7 +12,12 @@ import { Mic2, Play, Pause, Volume2, Loader2 } from "lucide-react";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Line { speaker: "lorraine" | "henry" | "roberto" | "ricky"; text: string }
-interface Roundtable { fixture: number; title: string; matchup: string; lines: Line[]; generatedAt: string }
+interface ItRead { label: string; feel: number; why: string }
+interface Roundtable {
+  fixture: number; title: string; matchup: string; lines: Line[];
+  itFactor?: { home: ItRead[]; away: ItRead[] } | null;
+  generatedAt: string;
+}
 
 const SPEAKERS: Record<Line["speaker"], { name: string; role: string; accent: string }> = {
   lorraine: { name: "Lorraine Footy", role: "Host · Britain",                 accent: "text-brand-gold" },
@@ -180,8 +185,38 @@ export default function FinalRoundtable({ fixture }: { fixture: number }) {
         })}
       </div>
 
+      {/* The "IT" Factor — the panel's gut read on the intangibles (owner 7/18).
+          Explicitly opinion: fictional pundits' feelings, never presented as stats.
+          Color discipline: home green · away gold (duel pattern). */}
+      {rt.itFactor && rt.itFactor.home.length > 0 && rt.itFactor.away.length > 0 && (
+        <div className="border-t border-brand-border px-4 py-4">
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-[11px] font-black uppercase tracking-widest text-brand-gold">The &ldquo;IT&rdquo; Factor</span>
+            <span className="text-[9px] text-slate-600 uppercase tracking-widest">the panel&rsquo;s gut read — pure opinion, not a stat</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {([["home", "text-brand-green", "bg-brand-green/70"], ["away", "text-brand-gold", "bg-brand-gold/70"]] as const).map(([side, tc, bc]) => (
+              <div key={side} className="space-y-2.5">
+                {rt.itFactor![side].map((r, i) => (
+                  <div key={i}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className={`text-[11px] font-black uppercase tracking-wider ${tc}`}>{r.label}</span>
+                      <span className="text-[10px] text-slate-500 tabular-nums">{r.feel}/100</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-brand-dark/80 mt-1 overflow-hidden">
+                      <div className={`h-full rounded-full ${bc}`} style={{ width: `${r.feel}%` }} />
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mt-1">{r.why}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-2 border-t border-brand-border text-[9px] text-slate-700 font-mono">
-        studio0x · AI-generated conversation with fictional pundit characters — not affiliated with any real player or club · projected lineups and tactics are speculation, not team news
+        studio0x · AI-generated conversation with fictional pundit characters — not affiliated with any real player or club · projected lineups, tactics and &ldquo;IT&rdquo; readings are panel opinion, not team news or statistics
       </div>
     </div>
   );

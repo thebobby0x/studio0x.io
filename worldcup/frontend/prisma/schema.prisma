@@ -244,6 +244,8 @@ model RoundtableEpisode {
   title       String
   matchup     String
   lines       Json               // [{ speaker, text }]
+  itFactor    Json?              // panel gut-read intangibles per team (opinion, matchday special 7/18)
+  promptRev   String   @default("v1") // pre-kickoff episodes regenerate when the script brief changes
   generatedAt DateTime @default(now())
 }
 

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getTeamTournamentProb } from "@/lib/polymarket";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Roundtable — podcast-style pregame conversation (owner request 7/17).
@@ -18,13 +19,27 @@ export interface RoundtableLine {
   speaker: "lorraine" | "henry" | "roberto" | "ricky";
   text: string;
 }
+// The panel's gut-read intangibles (owner 7/18: the "IT" factors we all FEEL).
+// Explicitly OPINION — feel is a 0-100 gut number from fictional pundits, never
+// presented as a stat. Grounded rule still applies to the "why" text.
+export interface ItRead {
+  label: string; // e.g. "Hunger", "Big-game nerve"
+  feel: number;  // 0-100 panel gut read
+  why: string;   // one grounded sentence
+}
 export interface Roundtable {
   fixture: number;
   title: string;
   matchup: string;
   lines: RoundtableLine[];
+  itFactor?: { home: ItRead[]; away: ItRead[] } | null;
   generatedAt: string;
 }
+
+// Bump when the script brief changes — pre-kickoff episodes regenerate so the
+// new coverage (tale-of-the-tape, market read, IT factors) reaches today's
+// game. Episodes already frozen at kickoff keep their archive copy.
+const PROMPT_REV = "v2";
 
 const SPEAKERS: Record<RoundtableLine["speaker"], { name: string; role: string }> = {
   lorraine: { name: "Lorraine Footy",  role: "Host · Britain" },
@@ -56,7 +71,9 @@ async function buildGrounding(fixture: number): Promise<{ matchup: string; conte
       },
       include: { homeTeam: true, awayTeam: true },
       orderBy: { date: "desc" },
-      take: 12,
+      // Entire tournament for both teams (≤8 games each) — the aggregates
+      // below must cover every game, not a recency window.
+      take: 30,
     }),
   ]);
 
@@ -70,16 +87,48 @@ async function buildGrounding(fixture: number): Promise<{ matchup: string; conte
     .map((m) => `${new Date(m.date).toISOString().slice(0, 10)}: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}`)
     .join("\n");
 
+  // Side-by-side tournament aggregates (matchday special, owner 7/18) — pure
+  // arithmetic over the real FT results above, computed per team.
+  const aggFor = (teamId: string, name: string) => {
+    const played = recent.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId);
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0, cs = 0;
+    for (const m of played) {
+      const isHome = m.homeTeamId === teamId;
+      const f = (isHome ? m.homeScore : m.awayScore) ?? 0;
+      const a = (isHome ? m.awayScore : m.homeScore) ?? 0;
+      gf += f; ga += a;
+      if (a === 0) cs++;
+      if (f > a) w++; else if (f === a) d++; else l++;
+    }
+    return `${name}: P${played.length} W${w} D${d} L${l} · ${gf} scored, ${ga} conceded · ${cs} clean sheets`;
+  };
+
+  // Prediction-market context (Polymarket) — optional; both teams may be
+  // absent from the tournament-winner market (e.g. the 3rd-place game).
+  let marketLine = "";
+  try {
+    const [pHome, pAway] = await Promise.all([
+      getTeamTournamentProb(match.homeTeam.code),
+      getTeamTournamentProb(match.awayTeam.code),
+    ]);
+    const parts: string[] = [];
+    if (pHome !== null) parts.push(`${match.homeTeam.name} ${(pHome * 100).toFixed(0)}%`);
+    if (pAway !== null) parts.push(`${match.awayTeam.name} ${(pAway * 100).toFixed(0)}%`);
+    if (parts.length) marketLine = `PREDICTION MARKET (Polymarket, tournament-winner probability): ${parts.join(" · ")}`;
+  } catch { /* market data optional */ }
+
   const kickoff = new Date(match.date).toUTCString();
 
   return {
     matchup: `${match.homeTeam.name} v ${match.awayTeam.name}`,
     context: [
       `FIXTURE: ${match.homeTeam.name} v ${match.awayTeam.name} — ${kickoff} at ${match.venue}${match.city ? `, ${match.city}` : ""}.`,
+      `TOURNAMENT TALE OF THE TAPE (from our database — the only aggregate numbers you may cite):\n${aggFor(match.homeTeamId, match.homeTeam.name)}\n${aggFor(match.awayTeamId, match.awayTeam.name)}`,
+      marketLine,
       squadLines(match.homeTeam.name, homeSquad),
       squadLines(match.awayTeam.name, awaySquad),
       `RECENT TOURNAMENT RESULTS (both teams):\n${resultLines || "none recorded"}`,
-    ].join("\n\n"),
+    ].filter(Boolean).join("\n\n"),
   };
 }
 
@@ -110,21 +159,26 @@ HARD GROUNDING RULES (violations are publication errors):
 - Tactics talk is speculation and must sound like opinion ("I think", "watch for", "if I'm the manager").
 - Refer to the competition as "the tournament" or "the final". Never claim official status.
 
-FORMAT: Return ONLY valid JSON: {"title": string, "lines": [{"speaker": "lorraine"|"henry"|"roberto"|"ricky", "text": string}]}.
+FORMAT: Return ONLY valid JSON:
+{"title": string,
+ "lines": [{"speaker": "lorraine"|"henry"|"roberto"|"ricky", "text": string}],
+ "itFactor": {"home": [{"label": string, "feel": number, "why": string}], "away": [...]}}
 16-22 lines total. Lorraine opens and closes. Every voice appears at least 3 times. Each line 1-3 sentences, natural spoken cadence — this becomes audio.
+itFactor: exactly 3 reads per team — the INTANGIBLES the panel FEELS (hunger, big-game nerve, momentum, pride, redemption…). "feel" is a 0-100 gut number that is pure panel opinion (the UI labels it as such); "label" is 1-3 words; "why" is ONE sentence grounded in the provided results/context, no invented facts.
 
 WRITE FOR PERFORMANCE — these lines are spoken aloud by TTS voices:
 - Punch it up: exclamation marks where the emotion is real, em-dashes for dramatic beats, rhetorical questions, short sentences that LAND.
 - One ALL-CAPS word per big moment is allowed for emphasis ("that save was ENORMOUS") — never more.
 - The panel reacts to each other by name, interrupts with energy, disagrees loudly, laughs in words ("ha!", "oh come on").
 - NEVER use stage directions, brackets, asterisks, or emoji — the voices will read them literally.
-COVER, conversationally (not as a checklist): the goalkeeping matchup, the defensive battle, the legacy angle for any all-time-great on the pitch, both projected XIs with a bench name or two, and each manager's likely tactical plan.`,
+COVER, conversationally (not as a checklist): the TALE OF THE TAPE — walk the side-by-side tournament numbers and argue about what they mean; the market read if prediction-market data is provided (what the money thinks vs what the panel feels — frame market numbers as "the markets say"); the goalkeeping matchup; the defensive battle; the legacy angle for any all-time-great on the pitch; both projected XIs with a bench name or two; each manager's likely plan; and the IT FACTORS — the unmeasurable things everyone FEELS (hunger, nerve, destiny, wounded pride), each panelist championing what their gut says, clearly as feeling not fact.
+MAKE IT EMOTIONAL: give each team its own emotional arc — what this game MEANS to that nation, its fans, its veterans — grounded in the real results provided (a semifinal exit is heartbreak; a title chance is history calling). The listener should feel their pulse rise for BOTH teams.`,
     messages: [{ role: "user", content: `Tonight's episode covers this fixture. All usable data follows.\n\n${grounding.context}` }],
   });
 
   const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
   const jsonStr = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-  let parsed: { title?: string; lines?: RoundtableLine[] };
+  let parsed: { title?: string; lines?: RoundtableLine[]; itFactor?: { home?: ItRead[]; away?: ItRead[] } };
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
@@ -135,11 +189,20 @@ COVER, conversationally (not as a checklist): the goalkeeping matchup, the defen
   );
   if (valid.length < 6) return null;
 
+  const validReads = (reads?: ItRead[]): ItRead[] =>
+    (reads ?? [])
+      .filter((r) => r && typeof r.label === "string" && typeof r.why === "string" && typeof r.feel === "number")
+      .map((r) => ({ label: r.label.slice(0, 30), feel: Math.max(0, Math.min(100, Math.round(r.feel))), why: r.why }))
+      .slice(0, 3);
+  const itHome = validReads(parsed.itFactor?.home);
+  const itAway = validReads(parsed.itFactor?.away);
+
   return {
     fixture,
     title: parsed.title || `The Roundtable · ${grounding.matchup}`,
     matchup: grounding.matchup,
     lines: valid,
+    itFactor: itHome.length && itAway.length ? { home: itHome, away: itAway } : null,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -161,6 +224,7 @@ export async function GET(req: Request) {
   // instance serves the same script, and episodes survive as the archive.
   let dbEpisode: Roundtable | null = null;
   let dbAge = Infinity;
+  let dbRev = PROMPT_REV;
   try {
     const row = await prisma.roundtableEpisode.findUnique({ where: { fixture } });
     if (row) {
@@ -169,13 +233,18 @@ export async function GET(req: Request) {
         title: row.title,
         matchup: row.matchup,
         lines: row.lines as unknown as RoundtableLine[],
+        itFactor: (row.itFactor as unknown as Roundtable["itFactor"]) ?? null,
         generatedAt: row.generatedAt.toISOString(),
       };
       dbAge = Date.now() - row.generatedAt.getTime();
+      dbRev = row.promptRev;
     }
   } catch { /* table may not exist until first deploy after schema push */ }
 
-  if (dbEpisode && dbAge < TTL) {
+  // Fresh + current-brief episodes serve directly; an old-rev episode falls
+  // through so the upgraded brief regenerates it (unless already frozen at
+  // kickoff below — the archive copy always wins post-kickoff).
+  if (dbEpisode && dbAge < TTL && dbRev === PROMPT_REV) {
     _cache.set(fixture, { ts: Date.now() - dbAge, data: dbEpisode });
     return NextResponse.json({ roundtable: dbEpisode, cached: true });
   }
@@ -203,10 +272,12 @@ export async function GET(req: Request) {
     _cache.set(fixture, { ts: Date.now(), data });
     try {
       const lines = data.lines as unknown as Prisma.InputJsonValue;
+      const itFactor: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+        data.itFactor ? (data.itFactor as unknown as Prisma.InputJsonValue) : Prisma.JsonNull;
       await prisma.roundtableEpisode.upsert({
         where: { fixture },
-        update: { title: data.title, matchup: data.matchup, lines },
-        create: { fixture, title: data.title, matchup: data.matchup, lines },
+        update: { title: data.title, matchup: data.matchup, lines, itFactor, promptRev: PROMPT_REV, generatedAt: new Date() },
+        create: { fixture, title: data.title, matchup: data.matchup, lines, itFactor, promptRev: PROMPT_REV },
       });
     } catch { /* persistence is best-effort — the episode still serves */ }
     return NextResponse.json({ roundtable: data, cached: false });
