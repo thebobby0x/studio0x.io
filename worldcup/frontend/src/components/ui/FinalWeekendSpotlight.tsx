@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trophy, Medal } from "lucide-react";
 import { getFlag } from "@/lib/flags";
+import StadiumBackdrop from "@/components/ui/StadiumBackdrop";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Final Weekend spotlight (owner request 7/17) — a time-boxed showcase for the
@@ -118,8 +119,9 @@ export default function FinalWeekendSpotlight({
   // ── Champions crowned ──────────────────────────────────────────────────────
   if (champion && final) {
     return (
-      <div className="rounded-3xl border border-brand-gold/40 bg-gradient-to-b from-brand-gold/15 via-brand-card to-brand-card overflow-hidden">
-        <div className="px-6 py-8 text-center space-y-3">
+      <div className="relative rounded-3xl border border-brand-gold/40 bg-gradient-to-b from-brand-gold/15 via-brand-card to-brand-card overflow-hidden">
+        <StadiumBackdrop variant="crown" />
+        <div className="relative px-6 py-8 text-center space-y-3">
           <Trophy size={40} className="mx-auto text-brand-gold" />
           <div className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gold">
             Champions of the 2026 tournament
@@ -140,8 +142,9 @@ export default function FinalWeekendSpotlight({
 
   // ── The Final Weekend showcase — HUGE masthead (owner 7/17: "screaming") ───
   return (
-    <div className="rounded-3xl border border-brand-gold/30 bg-gradient-to-b from-brand-gold/10 via-brand-card to-brand-card overflow-hidden">
-      <div className="px-5 pt-7 pb-3 text-center">
+    <div className="relative rounded-3xl border border-brand-gold/30 bg-gradient-to-b from-brand-gold/10 via-brand-card to-brand-card overflow-hidden">
+      <StadiumBackdrop variant="gold" />
+      <div className="relative px-5 pt-7 pb-3 text-center">
         <Trophy size={22} className="mx-auto text-brand-gold mb-3" />
         <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">
           {third ? `${third.home.name} · ${third.away.name} · ` : ""}
@@ -155,7 +158,7 @@ export default function FinalWeekendSpotlight({
           Two games decide everything
         </div>
       </div>
-      <div className="p-4 pt-2 space-y-2">
+      <div className="relative p-4 pt-2 space-y-2">
         {third && <FixtureRow f={third} label="3rd Place" />}
         {final && <FixtureRow f={final} label="The Final" />}
       </div>
