@@ -564,10 +564,17 @@ line-height: 1.6;
 /* ── PODIUMMETRICS FEATURE (worldcup session, 7/18 — additive block; owner
    request: feature the live product for the final weekend. pm- prefix keeps
    these styles fully isolated from the store's classes.) ── */
+.pm-feature-wrap {
+position: relative;
+z-index: 1;
+max-width: 1100px;
+margin: 0 auto;
+padding: 96px 48px 0; /* clears the fixed nav */
+}
+@media (max-width: 768px) { .pm-feature-wrap { padding: 84px 24px 0; } }
 .pm-feature {
 position: relative;
 display: block;
-margin-top: 72px;
 border-radius: 16px;
 overflow: hidden;
 background: #060b18;
@@ -689,6 +696,63 @@ footer { padding: 24px; flex-direction: column; text-align: center; }
 <li><a href="#contact">Contact</a></li>
 </ul>
 </nav>
+
+<!-- PODIUMMETRICS FEATURE — worldcup session, 7/18 (additive; owner directive
+     7/18: TOP of page to highlight the World Cup NOW. Monday: swap copy to
+     "review unique metrics for the entire World Cup, game by game". Store
+     session: pm- prefixed styles, self-contained, safe to move/trim after.) -->
+<div class="pm-feature-wrap">
+<a class="pm-feature" href="https://podiummetrics.studio0x.io" target="_blank" rel="noopener">
+<div class="pm-feature-art">
+<svg width="100%" height="100%" viewBox="0 0 900 380" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<radialGradient id="pmsky" cx="50%" cy="-10%" r="90%">
+<stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
+<stop offset="50%" stop-color="#f59e0b" stop-opacity="0.03"/>
+<stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="pmbeam" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#fde68a" stop-opacity="0.22"/>
+<stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="pmpitch" x1="0" y1="1" x2="0" y2="0">
+<stop offset="0%" stop-color="#10b981" stop-opacity="0.12"/>
+<stop offset="70%" stop-color="#10b981" stop-opacity="0"/>
+</linearGradient>
+</defs>
+<rect width="900" height="380" fill="url(#pmsky)"/>
+<polygon points="620,-20 720,-20 560,380 420,380" fill="url(#pmbeam)"/>
+<polygon points="760,-20 850,-20 780,380 640,380" fill="url(#pmbeam)"/>
+<path d="M -40 275 Q 450 170 940 275" fill="none" stroke="#182a42" stroke-width="2.5"/>
+<path d="M -40 302 Q 450 202 940 302" fill="none" stroke="#182a42" stroke-width="1.5" opacity="0.8"/>
+<rect y="270" width="900" height="110" fill="url(#pmpitch)"/>
+<circle cx="450" cy="430" r="120" fill="none" stroke="#10b981" stroke-opacity="0.25" stroke-width="2"/>
+<line x1="0" y1="430" x2="900" y2="430" stroke="#10b981" stroke-opacity="0.18" stroke-width="2"/>
+</svg>
+</div>
+<div class="pm-feature-inner">
+<span class="pm-live-badge">Live now · The final weekend</span>
+<div class="pm-feature-title brand-name">podium<em>Metrics</em></div>
+<p class="pm-feature-sub">
+The sportOS stats engine, live for the biggest weekend in football.
+Real-time match telemetry, proprietary metrics, prediction markets,
+AI news — and The Roundtable, our AI pundit panel in four voices.
+</p>
+<div class="pm-fixtures">
+<span class="pm-fixture"><strong>3rd place</strong> · France v England · Saturday</span>
+<span class="pm-fixture"><strong>The Final</strong> · Spain v Argentina · Sunday</span>
+</div>
+<div class="pm-tags">
+<span class="pm-tag">Match DNA™</span>
+<span class="pm-tag">Upset Factor™</span>
+<span class="pm-tag">The Roundtable</span>
+<span class="pm-tag">Live markets</span>
+<span class="pm-tag">AI anthems</span>
+</div>
+<span class="pm-feature-cta">Watch the final weekend live →</span>
+</div>
+</a>
+</div>
 
 <!-- HERO -->
 <section class="hero">
@@ -838,59 +902,6 @@ Live web access coming soon.
 </div>
 </div>
 </div>
-
-<!-- PODIUMMETRICS FEATURE — worldcup session, 7/18 (additive; store session:
-     time-boxed final-weekend showcase, safe to trim after Jul 20) -->
-<a class="pm-feature fade-in" href="https://podiummetrics.studio0x.io" target="_blank" rel="noopener">
-<div class="pm-feature-art">
-<svg width="100%" height="100%" viewBox="0 0 900 380" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-<defs>
-<radialGradient id="pmsky" cx="50%" cy="-10%" r="90%">
-<stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
-<stop offset="50%" stop-color="#f59e0b" stop-opacity="0.03"/>
-<stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-</radialGradient>
-<linearGradient id="pmbeam" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0%" stop-color="#fde68a" stop-opacity="0.22"/>
-<stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="pmpitch" x1="0" y1="1" x2="0" y2="0">
-<stop offset="0%" stop-color="#10b981" stop-opacity="0.12"/>
-<stop offset="70%" stop-color="#10b981" stop-opacity="0"/>
-</linearGradient>
-</defs>
-<rect width="900" height="380" fill="url(#pmsky)"/>
-<polygon points="620,-20 720,-20 560,380 420,380" fill="url(#pmbeam)"/>
-<polygon points="760,-20 850,-20 780,380 640,380" fill="url(#pmbeam)"/>
-<path d="M -40 275 Q 450 170 940 275" fill="none" stroke="#182a42" stroke-width="2.5"/>
-<path d="M -40 302 Q 450 202 940 302" fill="none" stroke="#182a42" stroke-width="1.5" opacity="0.8"/>
-<rect y="270" width="900" height="110" fill="url(#pmpitch)"/>
-<circle cx="450" cy="430" r="120" fill="none" stroke="#10b981" stroke-opacity="0.25" stroke-width="2"/>
-<line x1="0" y1="430" x2="900" y2="430" stroke="#10b981" stroke-opacity="0.18" stroke-width="2"/>
-</svg>
-</div>
-<div class="pm-feature-inner">
-<span class="pm-live-badge">Live now · The final weekend</span>
-<div class="pm-feature-title brand-name">podium<em>Metrics</em></div>
-<p class="pm-feature-sub">
-The sportOS stats engine, live for the biggest weekend in football.
-Real-time match telemetry, proprietary metrics, prediction markets,
-AI news — and The Roundtable, our AI pundit panel in four voices.
-</p>
-<div class="pm-fixtures">
-<span class="pm-fixture"><strong>3rd place</strong> · France v England · Saturday</span>
-<span class="pm-fixture"><strong>The Final</strong> · Spain v Argentina · Sunday</span>
-</div>
-<div class="pm-tags">
-<span class="pm-tag">Match DNA™</span>
-<span class="pm-tag">Upset Factor™</span>
-<span class="pm-tag">The Roundtable</span>
-<span class="pm-tag">Live markets</span>
-<span class="pm-tag">AI anthems</span>
-</div>
-<span class="pm-feature-cta">Watch the final weekend live →</span>
-</div>
-</a>
 
 <!-- ALL PRODUCTS -->
 <div class="section-label fade-in" style="margin-top:80px;">More from studio0x</div>
