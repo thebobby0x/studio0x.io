@@ -16,10 +16,21 @@ function storyKey(text: string): string {
 // "lorraine" (the host) keeps the configured default voice.
 // Env overrides let the owner swap in custom/cloned ElevenLabs voices without
 // a code change (ELEVENLABS_VOICE_GAFFER / _SOFIA / _DEANO).
+// Voices re-picked 7/17 for ENERGY (owner: the panel sounded flat next to
+// Lorraine): Arnold = strong and gruff, Domi = assertive and punchy,
+// Sam = raspy hype. Paired with expressive per-persona voice settings below.
 const PERSONA_VOICES: Record<string, string> = {
-  gaffer: process.env.ELEVENLABS_VOICE_GAFFER ?? "pNInz6obpgDQGcFmaJgB", // Adam — gruff, deep (ex-pro tactician)
-  sofia:  process.env.ELEVENLABS_VOICE_SOFIA  ?? "21m00Tcm4TlvDq8ikWAM", // Rachel — crisp, precise (stats analyst)
-  deano:  process.env.ELEVENLABS_VOICE_DEANO  ?? "TxGEqnHWrfWFTfGW9XjX", // Josh — young, energetic (footy influencer)
+  gaffer: process.env.ELEVENLABS_VOICE_GAFFER ?? "VR6AewLTigWG4xSOukaG", // Arnold — strong, gruff ex-pro
+  sofia:  process.env.ELEVENLABS_VOICE_SOFIA  ?? "AZnzlk1XvdvUeBnXmlld", // Domi — assertive, sharp analyst
+  deano:  process.env.ELEVENLABS_VOICE_DEANO  ?? "yoZ06aMxZJJ28mfd3POQ", // Sam — raspy hype (footy influencer)
+};
+
+// Expressiveness dials: lower stability = more emotional swing; higher style =
+// more performance. The host keeps the proven defaults; the panel gets heat.
+const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
+  gaffer: { stability: 0.35, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true },
+  sofia:  { stability: 0.42, similarity_boost: 0.75, style: 0.5,  use_speaker_boost: true },
+  deano:  { stability: 0.25, similarity_boost: 0.7,  style: 0.85, use_speaker_boost: true },
 };
 
 export async function POST(req: Request) {
@@ -51,7 +62,7 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       text,
       model_id: "eleven_turbo_v2_5",
-      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+      voice_settings: (persona && PERSONA_SETTINGS[persona]) ?? { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
     }),
   });
 

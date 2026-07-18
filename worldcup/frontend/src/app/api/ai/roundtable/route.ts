@@ -26,10 +26,10 @@ export interface Roundtable {
 }
 
 const SPEAKERS: Record<RoundtableLine["speaker"], { name: string; role: string }> = {
-  lorraine: { name: "Lorraine Footy", role: "Host" },
-  gaffer:   { name: "The Gaffer",     role: "Ex-pro · tactics" },
-  sofia:    { name: "Sofia Vale",     role: "Numbers & form" },
-  deano:    { name: "Deano",          role: "Footy influencer" },
+  lorraine: { name: "Lorraine Footy", role: "Host · USA" },
+  gaffer:   { name: "The Gaffer",     role: "French ex-pro · tactics" },
+  sofia:    { name: "Sofia Vale",     role: "Catalan analyst · numbers" },
+  deano:    { name: "Deano",          role: "Argentinian footy influencer" },
 };
 
 let _cache = new Map<number, { ts: number; data: Roundtable }>();
@@ -92,11 +92,12 @@ async function generate(fixture: number): Promise<Roundtable | null> {
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 3000,
-    system: `You write a pregame football roundtable podcast script for four FIXED personas:
-- lorraine — Lorraine Footy, the warm sharp host. Steers topics, teases the panel.
-- gaffer — "The Gaffer", gruff ex-pro. Tactics, defending, dark arts. Short punchy sentences.
-- sofia — Sofia Vale, form-and-numbers analyst. Cites ONLY numbers present in the data below.
-- deano — Deano, the footy influencer. Creator-brain: hot takes, \"this clip is going viral\", talks to \"the fam\", ranks everything, big energy — but a real fan's heart underneath.
+    system: `You write a pregame football roundtable podcast script for four FIXED personas — an international panel (owner 7/18):
+- lorraine — Lorraine Footy, the warm sharp AMERICAN host. Steers topics, teases the panel. English only.
+- gaffer — "The Gaffer", gruff FRENCH ex-pro. Tactics, defending, dark arts. Short punchy sentences with French inflections — sprinkles "écoutez", "voilà", "non non non", "c'est le football" naturally (a phrase or two per line MAX, meaning always clear from context).
+- sofia — Sofia Vale, CATALAN form-and-numbers analyst from Barcelona. Cites ONLY numbers present in the data below. Sprinkles Spanish/Catalan — "vale", "clar que sí", "qué locura", "escolta" — lightly and naturally.
+- deano — Deano, the ARGENTINIAN footy influencer. Creator-brain: hot takes, "this clip is going viral", talks to "the fam", big energy, and his heart is on his sleeve for this one. Sprinkles Argentinian Spanish — "che", "dale", "vamos", "qué golazo", "no lo puedo creer" — with real passion.
+Code-switch rule for all: foreign phrases are seasoning, not the meal — every line must be fully understandable to an English-only listener.
 
 HARD GROUNDING RULES (violations are publication errors):
 - Name ONLY players listed in the squads below. Never invent players, transfers, injuries, quotes, or fitness news.
@@ -108,6 +109,12 @@ HARD GROUNDING RULES (violations are publication errors):
 
 FORMAT: Return ONLY valid JSON: {"title": string, "lines": [{"speaker": "lorraine"|"gaffer"|"sofia"|"deano", "text": string}]}.
 16-22 lines total. Lorraine opens and closes. Every voice appears at least 3 times. Each line 1-3 sentences, natural spoken cadence — this becomes audio.
+
+WRITE FOR PERFORMANCE — these lines are spoken aloud by TTS voices:
+- Punch it up: exclamation marks where the emotion is real, em-dashes for dramatic beats, rhetorical questions, short sentences that LAND.
+- One ALL-CAPS word per big moment is allowed for emphasis ("that save was ENORMOUS") — never more.
+- The panel reacts to each other by name, interrupts with energy, disagrees loudly, laughs in words ("ha!", "oh come on").
+- NEVER use stage directions, brackets, asterisks, or emoji — the voices will read them literally.
 COVER, conversationally (not as a checklist): the goalkeeping matchup, the defensive battle, the legacy angle for any all-time-great on the pitch, both projected XIs with a bench name or two, and each manager's likely tactical plan.`,
     messages: [{ role: "user", content: `Tonight's episode covers this fixture. All usable data follows.\n\n${grounding.context}` }],
   });
