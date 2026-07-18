@@ -11,26 +11,22 @@ function storyKey(text: string): string {
   return text.slice(0, 60).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-// Roundtable persona voices — ElevenLabs premade voice IDs (public, stable).
-// Personas are mapped SERVER-side; clients send a persona key, never a voice id.
-// "lorraine" (the host) keeps the configured default voice.
-// Env overrides let the owner swap in custom/cloned ElevenLabs voices without
-// a code change (ELEVENLABS_VOICE_GAFFER / _SOFIA / _DEANO).
-// Voices re-picked 7/17 for ENERGY (owner: the panel sounded flat next to
-// Lorraine): Arnold = strong and gruff, Domi = assertive and punchy,
-// Sam = raspy hype. Paired with expressive per-persona voice settings below.
+// Roundtable persona voices — the owner's CUSTOM ElevenLabs voices (built
+// 7/18 in their VoiceLab; env overrides remain for future swaps). Personas are
+// mapped SERVER-side; clients send a persona key, never a voice id.
+// "lorraine" (the BRITISH host) keeps the configured default voice.
 const PERSONA_VOICES: Record<string, string> = {
-  gaffer: process.env.ELEVENLABS_VOICE_GAFFER ?? "VR6AewLTigWG4xSOukaG", // Arnold — strong, gruff ex-pro
-  sofia:  process.env.ELEVENLABS_VOICE_SOFIA  ?? "AZnzlk1XvdvUeBnXmlld", // Domi — assertive, sharp analyst
-  deano:  process.env.ELEVENLABS_VOICE_DEANO  ?? "yoZ06aMxZJJ28mfd3POQ", // Sam — raspy hype (footy influencer)
+  henry:   process.env.ELEVENLABS_VOICE_HENRY   ?? "3DF5pISMxWFbDQoLOBrj", // Henry Futois — French, ex-PSG
+  roberto: process.env.ELEVENLABS_VOICE_ROBERTO ?? "99M1da0B26r8CknfhKDi", // Roberto Madrid — Spanish, ex-Real Madrid GK
+  ricky:   process.env.ELEVENLABS_VOICE_RICKY   ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian, old Boca legend
 };
 
 // Expressiveness dials: lower stability = more emotional swing; higher style =
 // more performance. The host keeps the proven defaults; the panel gets heat.
 const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
-  gaffer: { stability: 0.35, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true },
-  sofia:  { stability: 0.42, similarity_boost: 0.75, style: 0.5,  use_speaker_boost: true },
-  deano:  { stability: 0.25, similarity_boost: 0.7,  style: 0.85, use_speaker_boost: true },
+  henry:   { stability: 0.35, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true },
+  roberto: { stability: 0.4,  similarity_boost: 0.75, style: 0.5,  use_speaker_boost: true },
+  ricky:   { stability: 0.32, similarity_boost: 0.75, style: 0.65, use_speaker_boost: true },
 };
 
 export async function POST(req: Request) {

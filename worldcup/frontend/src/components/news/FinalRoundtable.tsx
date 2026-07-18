@@ -11,14 +11,14 @@ import { Mic2, Play, Pause, Volume2, Loader2 } from "lucide-react";
 // Colors: gold host accents, slate panel text — per color discipline.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface Line { speaker: "lorraine" | "gaffer" | "sofia" | "deano"; text: string }
+interface Line { speaker: "lorraine" | "henry" | "roberto" | "ricky"; text: string }
 interface Roundtable { fixture: number; title: string; matchup: string; lines: Line[]; generatedAt: string }
 
 const SPEAKERS: Record<Line["speaker"], { name: string; role: string; accent: string }> = {
-  lorraine: { name: "Lorraine Footy", role: "Host · USA",                    accent: "text-brand-gold" },
-  gaffer:   { name: "The Gaffer",     role: "French ex-pro · tactics",       accent: "text-slate-200" },
-  sofia:    { name: "Sofia Vale",     role: "Catalan analyst · numbers",     accent: "text-slate-200" },
-  deano:    { name: "Deano",          role: "Argentinian footy influencer",  accent: "text-slate-200" },
+  lorraine: { name: "Lorraine Footy", role: "Host · Britain",                 accent: "text-brand-gold" },
+  henry:    { name: "Henry Futois",   role: "French ex-pro · flair & tactics", accent: "text-slate-200" },
+  roberto:  { name: "Roberto Madrid", role: "Spanish ex-goalkeeper",           accent: "text-slate-200" },
+  ricky:    { name: "Ricky Riquelme", role: "Argentinian legend · old school", accent: "text-slate-200" },
 };
 
 // btoa is Latin-1 only — the unicode-safe pattern used everywhere in this app.
@@ -181,7 +181,7 @@ export default function FinalRoundtable({ fixture }: { fixture: number }) {
       </div>
 
       <div className="px-4 py-2 border-t border-brand-border text-[9px] text-slate-700 font-mono">
-        studio0x · AI-generated conversation — projected lineups and tactics are speculation, not team news
+        studio0x · AI-generated conversation with fictional pundit characters — not affiliated with any real player or club · projected lineups and tactics are speculation, not team news
       </div>
     </div>
   );
