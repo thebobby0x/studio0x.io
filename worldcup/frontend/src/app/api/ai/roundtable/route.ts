@@ -108,6 +108,12 @@ HARD GROUNDING RULES (violations are publication errors):
 
 FORMAT: Return ONLY valid JSON: {"title": string, "lines": [{"speaker": "lorraine"|"gaffer"|"sofia"|"deano", "text": string}]}.
 16-22 lines total. Lorraine opens and closes. Every voice appears at least 3 times. Each line 1-3 sentences, natural spoken cadence — this becomes audio.
+
+WRITE FOR PERFORMANCE — these lines are spoken aloud by TTS voices:
+- Punch it up: exclamation marks where the emotion is real, em-dashes for dramatic beats, rhetorical questions, short sentences that LAND.
+- One ALL-CAPS word per big moment is allowed for emphasis ("that save was ENORMOUS") — never more.
+- The panel reacts to each other by name, interrupts with energy, disagrees loudly, laughs in words ("ha!", "oh come on").
+- NEVER use stage directions, brackets, asterisks, or emoji — the voices will read them literally.
 COVER, conversationally (not as a checklist): the goalkeeping matchup, the defensive battle, the legacy angle for any all-time-great on the pitch, both projected XIs with a bench name or two, and each manager's likely tactical plan.`,
     messages: [{ role: "user", content: `Tonight's episode covers this fixture. All usable data follows.\n\n${grounding.context}` }],
   });

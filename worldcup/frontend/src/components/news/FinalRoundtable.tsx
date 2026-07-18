@@ -35,6 +35,11 @@ export default function FinalRoundtable({ fixture }: { fixture: number }) {
   const [episodeMode, setEpisodeMode] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const episodeRef = useRef(false);
+  // Prefetch pipeline (owner 7/17: gaps between speakers). URL promises are
+  // memoised per line and the NEXT lines' audio is requested + preloaded while
+  // the current one plays, so first-listen TTS generation happens off-air.
+  const urlCache = useRef(new Map<number, Promise<string | null>>());
+  const preloaded = useRef(new Map<number, HTMLAudioElement>());
 
   useEffect(() => {
     let alive = true;
@@ -53,22 +58,52 @@ export default function FinalRoundtable({ fixture }: { fixture: number }) {
     setPlayingIdx(null);
   }, []);
 
+  const getUrl = useCallback((i: number): Promise<string | null> => {
+    if (!rt || i < 0 || i >= rt.lines.length) return Promise.resolve(null);
+    const existing = urlCache.current.get(i);
+    if (existing) return existing;
+    const line = rt.lines[i];
+    const promise = fetch("/api/ai/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: line.text, storyId: lineId(rt.fixture, i, line.text), persona: line.speaker }),
+    })
+      .then((r) => r.json())
+      .then((j) => (j.url as string) ?? null)
+      .catch(() => {
+        urlCache.current.delete(i); // allow retry after a failure
+        return null;
+      });
+    urlCache.current.set(i, promise);
+    return promise;
+  }, [rt]);
+
+  // Request generation AND preload the mp3 bytes for a line, without playing it.
+  const prefetch = useCallback((i: number) => {
+    getUrl(i).then((url) => {
+      if (url && !preloaded.current.has(i)) {
+        const a = new Audio(url);
+        a.preload = "auto";
+        preloaded.current.set(i, a);
+      }
+    });
+  }, [getUrl]);
+
   const playLine = useCallback(async (i: number): Promise<boolean> => {
     if (!rt) return false;
-    const line = rt.lines[i];
     setFetchingIdx(i);
     try {
-      const res = await fetch("/api/ai/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: line.text, storyId: lineId(rt.fixture, i, line.text), persona: line.speaker }),
-      });
-      const { url } = await res.json();
+      // Pipeline: while this line resolves/plays, warm the next two.
+      prefetch(i + 1);
+      prefetch(i + 2);
+      const url = await getUrl(i);
       if (!url) return false;
       setFetchingIdx(null);
       setPlayingIdx(i);
       return await new Promise<boolean>((resolve) => {
-        const audio = new Audio(url);
+        const audio = preloaded.current.get(i) ?? new Audio(url);
+        preloaded.current.delete(i);
+        audio.currentTime = 0;
         audioRef.current = audio;
         audio.onended = () => resolve(true);
         audio.onerror = () => resolve(false);
@@ -79,19 +114,21 @@ export default function FinalRoundtable({ fixture }: { fixture: number }) {
     } finally {
       setFetchingIdx(null);
     }
-  }, [rt]);
+  }, [rt, getUrl, prefetch]);
 
   const playEpisode = useCallback(async () => {
     if (!rt || episodeRef.current) return;
     episodeRef.current = true;
     setEpisodeMode(true);
+    prefetch(0);
+    prefetch(1);
     for (let i = 0; i < rt.lines.length; i++) {
       if (!episodeRef.current) break;
       const ok = await playLine(i);
       if (!ok) break;
     }
     stop();
-  }, [rt, playLine, stop]);
+  }, [rt, playLine, stop, prefetch]);
 
   if (loading) {
     return (
