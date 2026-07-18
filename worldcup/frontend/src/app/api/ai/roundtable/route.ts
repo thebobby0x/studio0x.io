@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface RoundtableLine {
-  speaker: "lorraine" | "gaffer" | "sofia" | "deano";
+  speaker: "lorraine" | "henry" | "roberto" | "ricky";
   text: string;
 }
 export interface Roundtable {
@@ -26,10 +26,10 @@ export interface Roundtable {
 }
 
 const SPEAKERS: Record<RoundtableLine["speaker"], { name: string; role: string }> = {
-  lorraine: { name: "Lorraine Footy", role: "Host · USA" },
-  gaffer:   { name: "The Gaffer",     role: "French ex-pro · tactics" },
-  sofia:    { name: "Sofia Vale",     role: "Catalan analyst · numbers" },
-  deano:    { name: "Deano",          role: "Argentinian footy influencer" },
+  lorraine: { name: "Lorraine Footy",  role: "Host · Britain" },
+  henry:    { name: "Henry Futois",    role: "French ex-pro · flair & tactics" },
+  roberto:  { name: "Roberto Madrid",  role: "Spanish ex-goalkeeper" },
+  ricky:    { name: "Ricky Riquelme",  role: "Argentinian legend · old school" },
 };
 
 let _cache = new Map<number, { ts: number; data: Roundtable }>();
@@ -92,11 +92,13 @@ async function generate(fixture: number): Promise<Roundtable | null> {
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 3000,
-    system: `You write a pregame football roundtable podcast script for four FIXED personas — an international panel (owner 7/18):
-- lorraine — Lorraine Footy, the warm sharp AMERICAN host. Steers topics, teases the panel. English only.
-- gaffer — "The Gaffer", gruff FRENCH ex-pro. Tactics, defending, dark arts. Short punchy sentences with French inflections — sprinkles "écoutez", "voilà", "non non non", "c'est le football" naturally (a phrase or two per line MAX, meaning always clear from context).
-- sofia — Sofia Vale, CATALAN form-and-numbers analyst from Barcelona. Cites ONLY numbers present in the data below. Sprinkles Spanish/Catalan — "vale", "clar que sí", "qué locura", "escolta" — lightly and naturally.
-- deano — Deano, the ARGENTINIAN footy influencer. Creator-brain: hot takes, "this clip is going viral", talks to "the fam", big energy, and his heart is on his sleeve for this one. Sprinkles Argentinian Spanish — "che", "dale", "vamos", "qué golazo", "no lo puedo creer" — with real passion.
+    system: `You write a pregame football roundtable podcast script for four FIXED fictional personas — the owner's cast, written to match their VOICE designs (7/18):
+- lorraine — Lorraine Footy, middle-aged BRITISH host in the classic football-commentary tradition — EXCITED by every aspect of the game, brilliant at banter, volleys the panel's chaos back at them with glee ("right then", "oh that's marvelous", "come on now").
+- henry — Henry Futois, FRENCH former PSG and France player. Deep, gravelly, theatrical — menacing one second, absurdly silly the next, quick erratic bursts of maniacal energy. Flair-worshipper: football is art or it is nothing. French sprinkles: "écoutez", "voilà", "magnifique", "non non non".
+- roberto — Roberto Madrid, SPANISH former Real Madrid and Spain goalkeeper, a massive man in his 30s. Smooth and rhythmic but absurdly silly, quick excited pace, erratic maniacal energy, big laughter, sharp sarcasm. THE authority on goalkeeping and defending. Catalan-accented sprinkles: "vale", "escolta", "madre mía", "qué barbaridad".
+- ricky — Ricky Riquelme, ARGENTINIAN old man, former Boca Juniors and Argentina player. Booming, smooth, theatrical, eloquent — medium pace with bursts of excitement, big laughs, and HEAVY dry sarcasm. Storytelling grandpa whose heart bleeds sky-blue-and-white: "che", "dale", "vamos", "en mis tiempos".
+The panel's comedy: Lorraine keeps order she secretly loves losing; Henry and Roberto feed each other's chaos; Ricky deadpans over the top of everyone and then erupts.
+Persona-backstory rule: they may color commentary with VAGUE nostalgia ("in my playing days", "as a keeper I hated this") but must NEVER invent specific career matches, opponents, teammates, dates, or statistics for themselves.
 Code-switch rule for all: foreign phrases are seasoning, not the meal — every line must be fully understandable to an English-only listener.
 
 HARD GROUNDING RULES (violations are publication errors):
@@ -107,7 +109,7 @@ HARD GROUNDING RULES (violations are publication errors):
 - Tactics talk is speculation and must sound like opinion ("I think", "watch for", "if I'm the manager").
 - Refer to the competition as "the tournament" or "the final". Never claim official status.
 
-FORMAT: Return ONLY valid JSON: {"title": string, "lines": [{"speaker": "lorraine"|"gaffer"|"sofia"|"deano", "text": string}]}.
+FORMAT: Return ONLY valid JSON: {"title": string, "lines": [{"speaker": "lorraine"|"henry"|"roberto"|"ricky", "text": string}]}.
 16-22 lines total. Lorraine opens and closes. Every voice appears at least 3 times. Each line 1-3 sentences, natural spoken cadence — this becomes audio.
 
 WRITE FOR PERFORMANCE — these lines are spoken aloud by TTS voices:
