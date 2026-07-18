@@ -26,10 +26,11 @@ const PERSONA_VOICES: Record<string, string> = {
 //   speed-tuned and flattens designed accents, reading Spanish/Catalan/French
 //   sprinkle-words with English phonetics. Multilingual keeps the designed
 //   accent AND pronounces embedded native phrases natively.
-// - similarity_boost is high (0.9): it pulls output toward the designed voice,
-//   which is where the accent lives. Low values let the model genericize.
-// - stability sits mid-range: too low + style exaggeration drifts the voice
-//   off its design; style stays moderate so the accent survives the heat.
+// - The panel sends NO voice_settings override (owner decision 7/18): each
+//   custom voice carries the stability/similarity/style the owner dialed in
+//   when designing it in VoiceLab, and ElevenLabs applies those stored
+//   defaults when the request omits voice_settings — so production matches
+//   what the owner approved, instead of our hand-tuned overrides.
 const PERSONA_MODEL = "eleven_multilingual_v2";
 const DEFAULT_MODEL = "eleven_turbo_v2_5";
 
@@ -38,7 +39,7 @@ const ROUNDTABLE_PERSONAS = new Set(["lorraine", "henry", "roberto", "ricky"]);
 // Bump to invalidate previously cached persona audio when the voice model,
 // settings, or the respell lexicon change — blob keys are text-derived, so old
 // renders serve forever otherwise.
-const PERSONA_AUDIO_REV = "v3";
+const PERSONA_AUDIO_REV = "v4";
 
 // ── Audio-only pronunciation lexicon (owner 7/18, round 2) ───────────────────
 // Even eleven_multilingual_v2 reads SHORT foreign words with English phonetics
@@ -65,12 +66,6 @@ const AUDIO_RESPELL: Array<[RegExp, string]> = [
   [/\bvoilà\b/gi, "vwahlah"],
   [/\bmagnifique\b/gi, "mahnyeefeek"],
 ];
-
-const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
-  henry:   { stability: 0.42, similarity_boost: 0.9, style: 0.5,  use_speaker_boost: true }, // maniacal bursts, French intact
-  roberto: { stability: 0.4,  similarity_boost: 0.9, style: 0.55, use_speaker_boost: true }, // erratic energy, Catalan intact
-  ricky:   { stability: 0.45, similarity_boost: 0.9, style: 0.5,  use_speaker_boost: true }, // theatrical, porteño intact
-};
 
 export async function POST(req: Request) {
   const elKey = process.env.ELEVENLABS_API_KEY;
@@ -111,7 +106,11 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       text,
       model_id: isPanelPersona ? PERSONA_MODEL : DEFAULT_MODEL,
-      voice_settings: (persona && PERSONA_SETTINGS[persona]) ?? { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+      // Panel personas omit voice_settings so ElevenLabs applies each custom
+      // voice's OWN stored VoiceLab settings (owner decision 7/18).
+      ...(isPanelPersona
+        ? {}
+        : { voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } }),
     }),
   });
 
