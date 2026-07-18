@@ -377,8 +377,27 @@ export async function GET() {
     ));
   }
 
+  // ── Quota guard: the kickoff window (7/18 outage) ──────────────────────────
+  // api-football flagged the 3rd-place game LIVE at ~17:00Z — FOUR HOURS before
+  // its scheduled 21:00Z kickoff. That kept every surface in live-rate polling
+  // all afternoon and exhausted the 7,500/day request budget at 22:13Z, mid
+  // second half. Upstream LIVE is only trusted inside a window around the
+  // fixture's own scheduled kickoff; outside it, statuses demote to NS and the
+  // live=all poll is skipped entirely (zero extra API spend).
+  const inKickoffWindow = (utcDate: string): boolean => {
+    const k = new Date(utcDate).getTime();
+    const now = Date.now();
+    return now >= k - 20 * 60_000 && now <= k + 4.5 * 60 * 60_000; // pre-show → ET + pens
+  };
+  baseData = baseData.map(m =>
+    (m.status === "LIVE" || m.status === "HT") && !inKickoffWindow(m.utcDate)
+      ? { ...m, status: "NS" as const, minute: 0, homeScore: null, awayScore: null, penHome: null, penAway: null }
+      : m
+  );
+  const anyWindowOpen = baseData.some(m => m.status !== "FT" && inKickoffWindow(m.utcDate));
+
   // ── Live overlay (15s TTL): real-time status for currently-playing matches ──
-  const liveOverlay = await getLiveOverlay(apiKey);
+  const liveOverlay = anyWindowOpen ? await getLiveOverlay(apiKey) : new Map<number, LiveEntry>();
   const data = applyLiveOverlay(baseData, liveOverlay);
 
   // Prevent CDN/edge from caching live match data
