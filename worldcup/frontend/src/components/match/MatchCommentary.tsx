@@ -4,20 +4,32 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Radio, RefreshCw, Play, Pause, Loader2, AlertCircle } from "lucide-react";
 import ShareButton from "@/components/ui/ShareButton";
 
-type Persona = "analyst" | "fan" | "comedian";
+// ─────────────────────────────────────────────────────────────────────────────
+// Live AI commentary. Two modes (owner 7/18 — fan/comedian replaced):
+//  · Analyst — the professional single-voice feed (default studio voice)
+//  · The Roundtable — Lorraine + Henry/Roberto/Ricky on ONE speaker-tagged
+//    feed, each line playable in that panelist's own custom voice.
+// Quiet periods: the client reports the event count it last saw; when nothing
+// new arrives the server returns grounded BANTER (never invented action).
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Persona = "analyst" | "roundtable";
+type Speaker = "lorraine" | "henry" | "roberto" | "ricky" | "analyst";
+
+interface CommentaryLine { speaker: Speaker; text: string }
 
 interface CommentaryData {
   persona: Persona;
   score: string;
   status: string;
   elapsed: number;
-  lines: string[];
+  lines: CommentaryLine[];
+  quiet?: boolean;
   eventCount: number;
   generatedAt: string;
 }
 
-interface CommentaryEntry {
-  text: string;
+interface CommentaryEntry extends CommentaryLine {
   generatedAt: string;
   elapsed: number | null;
 }
@@ -25,13 +37,22 @@ interface CommentaryEntry {
 interface CommentaryBatch {
   generatedAt: string;
   elapsed: number | null;
+  quiet: boolean;
   entries: CommentaryEntry[];
 }
 
-const PERSONA_LABELS: Record<Persona, { label: string; emoji: string; color: string }> = {
-  analyst:  { label: "Analyst",  emoji: "📊", color: "text-slate-300 border-slate-500/30 bg-white/5" },
-  fan:      { label: "Fan",      emoji: "📣", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
-  comedian: { label: "Comedian", emoji: "🎭", color: "text-slate-400 border-slate-600/40 bg-slate-500/10" },
+const PERSONA_TABS: Record<Persona, { label: string; emoji: string }> = {
+  analyst:    { label: "Analyst",        emoji: "📊" },
+  roundtable: { label: "The Roundtable", emoji: "🎙️" },
+};
+
+// Speaker chips — Lorraine gold (host), panel slate, per color discipline.
+const SPEAKERS: Record<Speaker, { name: string; short: string; accent: string }> = {
+  analyst:  { name: "Analyst",        short: "AN", accent: "text-slate-300 border-slate-500/30 bg-white/5" },
+  lorraine: { name: "Lorraine Footy", short: "LF", accent: "text-brand-gold border-brand-gold/40 bg-brand-gold/10" },
+  henry:    { name: "Henry Futois",   short: "HF", accent: "text-slate-200 border-slate-500/40 bg-slate-500/10" },
+  roberto:  { name: "Roberto Madrid", short: "RM", accent: "text-slate-200 border-slate-500/40 bg-slate-500/10" },
+  ricky:    { name: "Ricky Riquelme", short: "RR", accent: "text-slate-200 border-slate-500/40 bg-slate-500/10" },
 };
 
 function detectEmoji(text: string): string {
@@ -52,23 +73,15 @@ function detectEmoji(text: string): string {
   return "";
 }
 
-function LineItem({
-  entry,
-  matchId,
-  personaEmoji,
-  personaColor,
-}: {
-  entry: CommentaryEntry;
-  matchId: string;
-  personaEmoji: string;
-  personaColor: string;
-}) {
+function LineItem({ entry, matchId }: { entry: CommentaryEntry; matchId: string }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const sp = SPEAKERS[entry.speaker] ?? SPEAKERS.analyst;
+  const isPanel = entry.speaker !== "analyst";
   const eventEmoji = detectEmoji(entry.text);
   // Unicode-safe base64 — commentary contains emoji, and bare btoa() throws on
   // any non-Latin-1 char (CLAUDE.md gotcha #1), which would crash this render.
@@ -86,12 +99,12 @@ function LineItem({
       const res = await fetch("/api/ai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: entry.text, storyId }),
+        // Panel lines carry the speaker persona → that panelist's own custom
+        // voice (server-side mapping). Analyst keeps the default studio voice.
+        body: JSON.stringify({ text: entry.text, storyId, ...(isPanel ? { persona: entry.speaker } : {}) }),
       });
       const data = await res.json() as { url?: string; error?: string };
       if (!data.url) {
-        // Surface the failure instead of silently dead-ending (e.g. missing
-        // ELEVENLABS_API_KEY / BLOB_READ_WRITE_TOKEN in env).
         console.error("[TTS] commentary playback failed:", data.error ?? "no url returned");
         setAudioError(true);
         setTimeout(() => setAudioError(false), 4000);
@@ -115,19 +128,22 @@ function LineItem({
   return (
     <div className="flex items-start gap-2.5 group">
       <div className="flex flex-col items-center gap-1 shrink-0 mt-0.5">
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${personaColor}`}>
-          {eventEmoji || personaEmoji}
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${sp.accent}`} title={sp.name}>
+          {eventEmoji || sp.short}
         </span>
       </div>
       <div className="flex-1 min-w-0">
+        {isPanel && (
+          <span className={`text-[10px] font-black uppercase tracking-wider ${sp.accent.split(" ")[0]}`}>{sp.name}</span>
+        )}
         <p className="text-sm text-slate-300 leading-relaxed">{entry.text}</p>
       </div>
       <div className="shrink-0 mt-0.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-        <ShareButton text={`${eventEmoji ? `${eventEmoji} ` : ""}${entry.text} · Live AI commentary on studio0x.io`} />
+        <ShareButton text={`${eventEmoji ? `${eventEmoji} ` : ""}${isPanel ? `${sp.name}: ` : ""}${entry.text} · Live AI commentary on studio0x.io`} />
         <button
           onClick={handlePlay}
           disabled={audioLoading}
-          title={audioError ? "Audio unavailable" : "Listen"}
+          title={audioError ? "Audio unavailable" : `Listen${isPanel ? ` — ${sp.name}` : ""}`}
           className={`flex items-center justify-center w-6 h-6 rounded-full disabled:opacity-40 ${
             audioError ? "bg-red-500/10 text-red-400" : "bg-brand-gold/10 text-amber-400 hover:bg-brand-gold/20"
           }`}
@@ -140,33 +156,38 @@ function LineItem({
 }
 
 export default function MatchCommentary({ matchId }: { matchId: string }) {
-  const [persona, setPersona] = useState<Persona>("analyst");
+  const [persona, setPersona] = useState<Persona>("roundtable");
   const [batches, setBatches] = useState<CommentaryBatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
+  // Event count seen in the previous batch — lets the server detect quiet
+  // periods and switch the panel to grounded banter.
+  const lastEventsRef = useRef<number>(-1);
 
   const fetchCommentary = useCallback(async (p: Persona, reset = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/matches/${matchId}/commentary?persona=${p}&limit=6`);
+      const since = reset ? -1 : lastEventsRef.current;
+      const res = await fetch(`/api/matches/${matchId}/commentary?persona=${p}&limit=6${since >= 0 ? `&lastEvents=${since}` : ""}`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error((j as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       const data = await res.json() as CommentaryData;
       setLiveStatus(data.status);
+      lastEventsRef.current = data.eventCount;
 
       const newBatch: CommentaryBatch = {
         generatedAt: data.generatedAt,
         elapsed: data.elapsed ?? null,
-        entries: data.lines.map(text => ({ text, generatedAt: data.generatedAt, elapsed: data.elapsed ?? null })),
+        quiet: data.quiet ?? false,
+        entries: data.lines.map(l => ({ ...l, generatedAt: data.generatedAt, elapsed: data.elapsed ?? null })),
       };
 
       setBatches(prev => {
         if (reset) return [newBatch];
-        // Avoid duplicates: skip if same generatedAt already exists
         if (prev.some(b => b.generatedAt === newBatch.generatedAt)) return prev;
         return [newBatch, ...prev];
       });
@@ -187,8 +208,6 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
     }, 30_000);
     return () => clearInterval(id);
   }, [fetchCommentary, persona, liveStatus]);
-
-  const meta = PERSONA_LABELS[persona];
 
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
@@ -214,10 +233,10 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
         </button>
       </div>
 
-      {/* Persona switcher */}
+      {/* Mode switcher */}
       <div className="flex border-b border-brand-border">
-        {(["analyst", "fan", "comedian"] as Persona[]).map(p => {
-          const m = PERSONA_LABELS[p];
+        {(["roundtable", "analyst"] as Persona[]).map(p => {
+          const m = PERSONA_TABS[p];
           const active = p === persona;
           return (
             <button
@@ -255,8 +274,11 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-slate-600">{timeStr}</span>
                 {batch.elapsed ? (
-                  <span className="text-[10px] text-slate-700">· {batch.elapsed}'</span>
+                  <span className="text-[10px] text-slate-700">· {batch.elapsed}&apos;</span>
                 ) : null}
+                {batch.quiet && (
+                  <span className="text-[9px] uppercase tracking-widest text-slate-600">· booth banter</span>
+                )}
                 {bi === 0 && loading && (
                   <Loader2 size={10} className="text-slate-600 animate-spin" />
                 )}
@@ -265,19 +287,19 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
               {/* Lines */}
               <div className="space-y-3">
                 {batch.entries.map((entry, ei) => (
-                  <LineItem
-                    key={ei}
-                    entry={entry}
-                    matchId={matchId}
-                    personaEmoji={meta.emoji}
-                    personaColor={meta.color}
-                  />
+                  <LineItem key={ei} entry={entry} matchId={matchId} />
                 ))}
               </div>
             </div>
           );
         })}
       </div>
+
+      {persona === "roundtable" && (
+        <div className="px-4 py-2 border-t border-brand-border text-[9px] text-slate-700 font-mono">
+          studio0x · fictional pundit characters · quiet-period banter is opinion grounded in real match data — never invented action
+        </div>
+      )}
     </div>
   );
 }
