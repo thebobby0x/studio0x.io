@@ -556,7 +556,31 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-07-16)
+## Current Production State (as of 2026-07-18, pre-final)
+
+**Jul 17 evening shipped (PRs #155–#166, see `docs/eod-2026-07-17.md`):**
+- **Final Weekend package**: time-boxed spotlight (auto-expires Jul 21) with huge
+  masthead + stadium SVG art + champions-crowning state; five grounded pregame
+  final features (Sonnet); metric explainer InfoTips (no formulas); team-color
+  diverging goal graph (ARG blue above / ESP red below).
+- **The Roundtable**: podcast-style AI panel — Lorraine Footy (British host) +
+  the owner's custom ElevenLabs voices Ricky Riquelme / Roberto Madrid / Henry
+  Futois. Gapless prefetch playback. Voice stack after 3 accent rounds:
+  eleven_v3 + accent tags → multilingual_v2 fallback, VoiceLab stored settings,
+  AUDIO_RESPELL lexicon, PERSONA_AUDIO_REV=v5 (gotcha #24). Episodes are
+  DB-canonical per fixture (RoundtableEpisode), frozen at kickoff.
+- **Durable story archive**: editorial + final features archive-on-generate into
+  NewsStory (deterministic upsert ids); `/api/stories/export` (md/json + filters)
+  for socials/blogs; /news header export links. Backfill = one click of
+  "Generate News Recaps" in /admin (idempotent, dates to match day).
+- **CONTENT TRUTH hard rule** recorded (see block above MODULES) — owner 7/18.
+- **studio0x.io**: podiumMetrics feature banner (additive, pm- prefixed,
+  time-boxed — store session flagged in eod doc).
+- API budget for a full-distance final (ET + pens): ~4.6k calls vs 7.5k/day plan.
+- **Remaining tournament state**: 3rd place FRA–ENG Sat Jul 18, Final ESP–ARG
+  Sun Jul 19. Owner morning checklist in `docs/eod-2026-07-17.md`.
+
+## Previous Production State (2026-07-16)
 
 **Jul 15–16 shipped (PRs #138–#153, see `docs/eod-2026-07-15.md` + `eod-2026-07-16.md`):**
 - **podiumMetrics brand live under sportOS** (owner structure decision 7/15): wordmark,

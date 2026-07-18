@@ -561,6 +561,100 @@ line-height: 1.6;
 .flagship-grid { grid-template-columns: 1fr; gap: 40px; }
 .lab-rooms { grid-template-columns: 1fr 1fr; }
 }
+/* ── PODIUMMETRICS FEATURE (worldcup session, 7/18 — additive block; owner
+   request: feature the live product for the final weekend. pm- prefix keeps
+   these styles fully isolated from the store's classes.) ── */
+.pm-feature {
+position: relative;
+display: block;
+margin-top: 72px;
+border-radius: 16px;
+overflow: hidden;
+background: #060b18;
+border: 1px solid rgba(245,158,11,0.35);
+text-decoration: none;
+transition: border-color 0.2s, transform 0.2s;
+}
+.pm-feature:hover { border-color: rgba(245,158,11,0.7); transform: translateY(-2px); }
+.pm-feature-art { position: absolute; inset: 0; pointer-events: none; }
+.pm-feature-inner {
+position: relative;
+padding: 48px 40px;
+display: flex;
+flex-direction: column;
+gap: 18px;
+align-items: flex-start;
+}
+.pm-live-badge {
+display: inline-flex; align-items: center; gap: 8px;
+font-family: var(--font-mono);
+font-size: 0.7rem;
+letter-spacing: 0.12em;
+text-transform: uppercase;
+color: #f59e0b;
+background: rgba(245,158,11,0.12);
+border: 1px solid rgba(245,158,11,0.35);
+border-radius: 100px;
+padding: 5px 12px;
+}
+.pm-live-badge::before {
+content: '';
+width: 6px; height: 6px; border-radius: 50%;
+background: #ef4444;
+animation: pulse 1.6s ease infinite;
+}
+.pm-feature-title {
+font-size: clamp(1.9rem, 4vw, 3rem);
+font-weight: 800;
+letter-spacing: -0.03em;
+line-height: 1.05;
+color: #fff;
+}
+.pm-feature-title em { font-style: normal; color: #f59e0b; }
+.pm-feature-sub {
+color: #94a3b8;
+font-size: 0.98rem;
+line-height: 1.7;
+max-width: 560px;
+}
+.pm-fixtures {
+display: flex; flex-wrap: wrap; gap: 10px;
+font-family: var(--font-mono);
+font-size: 0.78rem;
+color: #e2e8f0;
+}
+.pm-fixture {
+background: rgba(13,24,40,0.85);
+border: 1px solid #182a42;
+border-radius: 8px;
+padding: 8px 14px;
+}
+.pm-fixture strong { color: #f59e0b; font-weight: 500; }
+.pm-feature-cta {
+display: inline-flex; align-items: center; gap: 10px;
+margin-top: 6px;
+padding: 13px 26px;
+background: #f59e0b;
+color: #060b18;
+border-radius: 8px;
+font-weight: 800;
+font-size: 0.92rem;
+letter-spacing: -0.01em;
+}
+.pm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.pm-tag {
+font-family: var(--font-mono);
+font-size: 0.66rem;
+letter-spacing: 0.05em;
+color: #94a3b8;
+border: 1px solid #182a42;
+border-radius: 100px;
+padding: 3px 10px;
+background: rgba(13,24,40,0.6);
+}
+@media (max-width: 768px) {
+.pm-feature-inner { padding: 36px 24px; }
+}
 .fade-in {
 opacity: 0;
 transform: translateY(20px);
@@ -744,6 +838,59 @@ Live web access coming soon.
 </div>
 </div>
 </div>
+
+<!-- PODIUMMETRICS FEATURE — worldcup session, 7/18 (additive; store session:
+     time-boxed final-weekend showcase, safe to trim after Jul 20) -->
+<a class="pm-feature fade-in" href="https://podiummetrics.studio0x.io" target="_blank" rel="noopener">
+<div class="pm-feature-art">
+<svg width="100%" height="100%" viewBox="0 0 900 380" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<radialGradient id="pmsky" cx="50%" cy="-10%" r="90%">
+<stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
+<stop offset="50%" stop-color="#f59e0b" stop-opacity="0.03"/>
+<stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="pmbeam" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#fde68a" stop-opacity="0.22"/>
+<stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="pmpitch" x1="0" y1="1" x2="0" y2="0">
+<stop offset="0%" stop-color="#10b981" stop-opacity="0.12"/>
+<stop offset="70%" stop-color="#10b981" stop-opacity="0"/>
+</linearGradient>
+</defs>
+<rect width="900" height="380" fill="url(#pmsky)"/>
+<polygon points="620,-20 720,-20 560,380 420,380" fill="url(#pmbeam)"/>
+<polygon points="760,-20 850,-20 780,380 640,380" fill="url(#pmbeam)"/>
+<path d="M -40 275 Q 450 170 940 275" fill="none" stroke="#182a42" stroke-width="2.5"/>
+<path d="M -40 302 Q 450 202 940 302" fill="none" stroke="#182a42" stroke-width="1.5" opacity="0.8"/>
+<rect y="270" width="900" height="110" fill="url(#pmpitch)"/>
+<circle cx="450" cy="430" r="120" fill="none" stroke="#10b981" stroke-opacity="0.25" stroke-width="2"/>
+<line x1="0" y1="430" x2="900" y2="430" stroke="#10b981" stroke-opacity="0.18" stroke-width="2"/>
+</svg>
+</div>
+<div class="pm-feature-inner">
+<span class="pm-live-badge">Live now · The final weekend</span>
+<div class="pm-feature-title brand-name">podium<em>Metrics</em></div>
+<p class="pm-feature-sub">
+The sportOS stats engine, live for the biggest weekend in football.
+Real-time match telemetry, proprietary metrics, prediction markets,
+AI news — and The Roundtable, our AI pundit panel in four voices.
+</p>
+<div class="pm-fixtures">
+<span class="pm-fixture"><strong>3rd place</strong> · France v England · Saturday</span>
+<span class="pm-fixture"><strong>The Final</strong> · Spain v Argentina · Sunday</span>
+</div>
+<div class="pm-tags">
+<span class="pm-tag">Match DNA™</span>
+<span class="pm-tag">Upset Factor™</span>
+<span class="pm-tag">The Roundtable</span>
+<span class="pm-tag">Live markets</span>
+<span class="pm-tag">AI anthems</span>
+</div>
+<span class="pm-feature-cta">Watch the final weekend live →</span>
+</div>
+</a>
 
 <!-- ALL PRODUCTS -->
 <div class="section-label fade-in" style="margin-top:80px;">More from studio0x</div>
