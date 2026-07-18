@@ -57,12 +57,24 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
     const json = await res.json();
     const f = json.response?.[0];
     if (!f) return null;
+    const rawStatus = (STATUS_MAP[f.fixture.status.short] ?? "NS") as string;
+    // Kickoff-window clamp (7/18 quota outage): api-football flagged the
+    // 3rd-place game LIVE four hours before its scheduled kickoff, which held
+    // the platform at live-rate polling all afternoon and exhausted the daily
+    // request budget mid-match. Out-of-window "live" is treated as NS — slow
+    // cache TTL, and never persisted to the DB as live.
+    const kick = new Date(f.fixture.date).getTime();
+    const inWindow =
+      !Number.isNaN(kick) &&
+      Date.now() >= kick - 20 * 60_000 &&
+      Date.now() <= kick + 4.5 * 60 * 60_000; // pre-show → ET + pens
+    const clamped = (rawStatus === "LIVE" || rawStatus === "HT") && !inWindow ? "NS" : rawStatus;
     const data: AFResult = {
       homeScore: f.goals.home as number | null,
       awayScore: f.goals.away as number | null,
-      status: (STATUS_MAP[f.fixture.status.short] ?? "NS") as string,
+      status: clamped,
       // elapsed is null during penalty shootouts — 120, not 0
-      elapsed: (f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0)) as number,
+      elapsed: clamped === "NS" ? 0 : ((f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0)) as number),
     };
     const isLive = data.status === "LIVE" || data.status === "HT";
     _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 8_000 : 300_000, data });
