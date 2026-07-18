@@ -280,6 +280,45 @@ HARD RULES: no invented players, stats, injuries, quotes, or history; cite only 
   }
 }
 
+// ── Archive-on-generate (owner 7/18) ─────────────────────────────────────────
+// Editorial + final-feature stories lived only in instance memory and died on
+// every deploy — the June archive is gone. Persist each fresh generation to
+// NewsStory so /news is the complete tournament timeline and the export API
+// can feed socials/blogs. Deterministic ids make hourly regens UPDATE their
+// row (one per category/day/teams; one per feature slug) instead of piling up
+// near-duplicates. Categories owned by the news depot are skipped — those rows
+// are written by storyRefresh / news-generate and must not be duplicated here.
+const NEWS_DEPOT_CATEGORIES = new Set<Story["category"]>(["MATCH PREVIEW", "GAME RECAP", "DAILY RECAP"]);
+
+function archiveId(s: Story): string {
+  if (s.id.startsWith("final-feature-")) return s.id;
+  const day = s.generatedAt.slice(0, 10);
+  const cat = s.category.toLowerCase().replace(/[^a-z]+/g, "-");
+  const teams = s.teamsInvolved.slice().sort().join("").toLowerCase() || "general";
+  return `ed-${cat}-${day}-${teams}`;
+}
+
+async function archiveStories(stories: Story[]): Promise<void> {
+  for (const s of stories) {
+    if (NEWS_DEPOT_CATEGORIES.has(s.category)) continue;
+    try {
+      const id = archiveId(s);
+      await prisma.newsStory.upsert({
+        where: { id },
+        update: { headline: s.headline, body: s.body },
+        create: {
+          id,
+          date: new Date(s.generatedAt),
+          category: s.category,
+          headline: s.headline,
+          body: s.body,
+          teamsInvolved: s.teamsInvolved,
+        },
+      });
+    } catch { /* archive is best-effort — never block serving stories */ }
+  }
+}
+
 export async function GET() {
   // ── 1. In-memory editorial stories (AI-generated analysis/standings) ────────
   let editorialStories: Story[] = [];
@@ -291,6 +330,7 @@ export async function GET() {
       if (fresh.length > 0) {
         _cache = { ts: Date.now(), stories: fresh };
         editorialStories = fresh;
+        await archiveStories(fresh);
       } else {
         editorialStories = _cache?.stories ?? [];
       }
@@ -306,7 +346,10 @@ export async function GET() {
   } else {
     try {
       const fresh = await generateFinalFeatures();
-      if (fresh.length > 0) _featuresCache = { ts: Date.now(), stories: fresh };
+      if (fresh.length > 0) {
+        _featuresCache = { ts: Date.now(), stories: fresh };
+        await archiveStories(fresh);
+      }
       featureStories = _featuresCache?.stories ?? [];
     } catch {
       featureStories = _featuresCache?.stories ?? [];

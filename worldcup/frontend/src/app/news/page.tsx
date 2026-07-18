@@ -62,6 +62,10 @@ export default async function NewsPage() {
         <p className="text-sm text-slate-500 mt-1">
           AI match recaps & daily round-ups · every result, archived · <span className="font-mono text-slate-700">studio0x</span>
         </p>
+        <div className="flex items-center gap-3 mt-2 text-[11px]">
+          <a href="/api/stories/export?format=md" className="text-brand-gold font-bold hover:underline">Export archive (Markdown)</a>
+          <a href="/api/stories/export" className="text-slate-500 hover:underline">JSON</a>
+        </div>
       </div>
 
       {days.length === 0 ? (
