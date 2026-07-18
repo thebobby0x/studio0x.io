@@ -67,6 +67,13 @@ function FixtureRow({ f, label }: { f: SpotlightFixture; label: string }) {
   const countdown = useCountdown(f.utcDate);
   const isLive = f.status === "LIVE" || f.status === "HT";
   const dt = new Date(f.utcDate);
+  // Kickoff time must be LOCAL. SSR renders in UTC, and because hydration
+  // keeps the server text (suppressHydrationWarning) and the countdown string
+  // is timezone-independent, the UTC time could stick on screen forever —
+  // owner saw "9pm" for a 5pm ET kickoff (7/18). Render the clock time only
+  // after mount, when the browser's timezone is authoritative.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   // Match pages route by FIXTURE id (the schedule feed's id), not the DB cuid —
   // linking the cuid produced "Match not found" (owner report 7/17).
   const href = `/schedule/${f.id}`;
@@ -95,9 +102,13 @@ function FixtureRow({ f, label }: { f: SpotlightFixture; label: string }) {
         ) : (
           <span className="text-xs text-slate-400" suppressHydrationWarning>
             {countdown && <span className="text-brand-gold font-bold">{countdown}</span>}
-            <span className="text-slate-600"> · </span>
-            {dt.toLocaleDateString("en-US", { weekday: "short" })}{" "}
-            {dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            {mounted && (
+              <>
+                <span className="text-slate-600"> · </span>
+                {dt.toLocaleDateString("en-US", { weekday: "short" })}{" "}
+                {dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              </>
+            )}
           </span>
         )}
       </div>
