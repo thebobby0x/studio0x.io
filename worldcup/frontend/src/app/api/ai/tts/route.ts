@@ -21,12 +21,25 @@ const PERSONA_VOICES: Record<string, string> = {
   ricky:   process.env.ELEVENLABS_VOICE_RICKY   ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian, old Boca legend
 };
 
-// Expressiveness dials: lower stability = more emotional swing; higher style =
-// more performance. The host keeps the proven defaults; the panel gets heat.
+// Accent preservation (owner 7/18: "all 3 lost their accents"):
+// - The panel personas render on eleven_multilingual_v2, not turbo — turbo is
+//   speed-tuned and flattens designed accents, reading Spanish/Catalan/French
+//   sprinkle-words with English phonetics. Multilingual keeps the designed
+//   accent AND pronounces embedded native phrases natively.
+// - similarity_boost is high (0.9): it pulls output toward the designed voice,
+//   which is where the accent lives. Low values let the model genericize.
+// - stability sits mid-range: too low + style exaggeration drifts the voice
+//   off its design; style stays moderate so the accent survives the heat.
+const PERSONA_MODEL = "eleven_multilingual_v2";
+const DEFAULT_MODEL = "eleven_turbo_v2_5";
+// Bump to invalidate previously cached persona audio when voice model/settings
+// change — blob keys are text-derived, so old renders serve forever otherwise.
+const PERSONA_AUDIO_REV = "v2";
+
 const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
-  henry:   { stability: 0.3,  similarity_boost: 0.75, style: 0.65, use_speaker_boost: true }, // maniacal bursts
-  roberto: { stability: 0.3,  similarity_boost: 0.75, style: 0.7,  use_speaker_boost: true }, // erratic energy + laughter
-  ricky:   { stability: 0.35, similarity_boost: 0.75, style: 0.6,  use_speaker_boost: true }, // theatrical, dry sarcasm
+  henry:   { stability: 0.42, similarity_boost: 0.9, style: 0.5,  use_speaker_boost: true }, // maniacal bursts, French intact
+  roberto: { stability: 0.4,  similarity_boost: 0.9, style: 0.55, use_speaker_boost: true }, // erratic energy, Catalan intact
+  ricky:   { stability: 0.45, similarity_boost: 0.9, style: 0.5,  use_speaker_boost: true }, // theatrical, porteño intact
 };
 
 export async function POST(req: Request) {
@@ -43,10 +56,12 @@ export async function POST(req: Request) {
   const text = rawText
     .replace(/Henry Futois/g, "Henri Foutwa")
     .replace(/\bFutois\b/g, "Foutwa");
+  const isPanelPersona = Boolean(persona && PERSONA_VOICES[persona]);
   const voiceId = (persona && PERSONA_VOICES[persona]) || defaultVoice;
 
-  // Check Vercel Blob cache — persona in the key so voices never collide
-  const blobKey = `tts/${persona && PERSONA_VOICES[persona] ? `${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
+  // Check Vercel Blob cache — persona + audio rev in the key so voices never
+  // collide and model/settings changes regenerate instead of serving stale takes.
+  const blobKey = `tts/${isPanelPersona ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });
@@ -64,7 +79,7 @@ export async function POST(req: Request) {
     },
     body: JSON.stringify({
       text,
-      model_id: "eleven_turbo_v2_5",
+      model_id: isPanelPersona ? PERSONA_MODEL : DEFAULT_MODEL,
       voice_settings: (persona && PERSONA_SETTINGS[persona]) ?? { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
     }),
   });
