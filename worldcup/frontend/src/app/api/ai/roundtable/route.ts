@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,18 +153,67 @@ export async function GET(req: Request) {
     return NextResponse.json({ roundtable: cached.data, cached: true });
   }
 
+  // ── Canonical episode lives in the DB (owner 7/18) ─────────────────────────
+  // Memory caches are per serverless instance — different instances generated
+  // DIFFERENT episodes for the same fixture, which broke the global TTS audio
+  // cache (different text = different blob keys = cold audio for each variant)
+  // and lost episodes on every deploy. The DB row is the single source: every
+  // instance serves the same script, and episodes survive as the archive.
+  let dbEpisode: Roundtable | null = null;
+  let dbAge = Infinity;
+  try {
+    const row = await prisma.roundtableEpisode.findUnique({ where: { fixture } });
+    if (row) {
+      dbEpisode = {
+        fixture,
+        title: row.title,
+        matchup: row.matchup,
+        lines: row.lines as unknown as RoundtableLine[],
+        generatedAt: row.generatedAt.toISOString(),
+      };
+      dbAge = Date.now() - row.generatedAt.getTime();
+    }
+  } catch { /* table may not exist until first deploy after schema push */ }
+
+  if (dbEpisode && dbAge < TTL) {
+    _cache.set(fixture, { ts: Date.now() - dbAge, data: dbEpisode });
+    return NextResponse.json({ roundtable: dbEpisode, cached: true });
+  }
+
+  // Pregame content freezes at kickoff: an episode recorded before the match
+  // is the canonical archive copy — never regenerate over it.
+  if (dbEpisode) {
+    try {
+      const m = await prisma.match.findFirst({ where: { fixture }, select: { date: true } });
+      if (m && m.date.getTime() <= Date.now()) {
+        _cache.set(fixture, { ts: Date.now(), data: dbEpisode });
+        return NextResponse.json({ roundtable: dbEpisode, cached: true });
+      }
+    } catch { /* fall through to regen */ }
+  }
+
   try {
     const data = await generate(fixture);
     if (!data) {
       // Serve stale rather than nothing
-      if (cached) return NextResponse.json({ roundtable: cached.data, cached: true, stale: true });
+      const stale = dbEpisode ?? cached?.data ?? null;
+      if (stale) return NextResponse.json({ roundtable: stale, cached: true, stale: true });
       return NextResponse.json({ roundtable: null }, { status: 503 });
     }
     _cache.set(fixture, { ts: Date.now(), data });
+    try {
+      const lines = data.lines as unknown as Prisma.InputJsonValue;
+      await prisma.roundtableEpisode.upsert({
+        where: { fixture },
+        update: { title: data.title, matchup: data.matchup, lines },
+        create: { fixture, title: data.title, matchup: data.matchup, lines },
+      });
+    } catch { /* persistence is best-effort — the episode still serves */ }
     return NextResponse.json({ roundtable: data, cached: false });
   } catch (e) {
     console.error("[roundtable]", e);
-    if (cached) return NextResponse.json({ roundtable: cached.data, cached: true, stale: true });
+    const stale = dbEpisode ?? cached?.data ?? null;
+    if (stale) return NextResponse.json({ roundtable: stale, cached: true, stale: true });
     return NextResponse.json({ roundtable: null }, { status: 503 });
   }
 }

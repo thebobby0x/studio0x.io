@@ -234,6 +234,19 @@ model NewsStory {
   @@index([fixture])
 }
 
+// One canonical Roundtable episode per fixture (owner 7/18): persisting the
+// script means every serverless instance serves the SAME episode (so the
+// global TTS audio cache works for all users) and episodes survive redeploys
+// as part of the tournament archive.
+model RoundtableEpisode {
+  id          String   @id @default(cuid())
+  fixture     Int      @unique // api-football fixture id
+  title       String
+  matchup     String
+  lines       Json               // [{ speaker, text }]
+  generatedAt DateTime @default(now())
+}
+
 model LiveMetric {
   id         String   @id @default(cuid())
   matchId    String
