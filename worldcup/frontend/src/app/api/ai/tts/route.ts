@@ -32,9 +32,39 @@ const PERSONA_VOICES: Record<string, string> = {
 //   off its design; style stays moderate so the accent survives the heat.
 const PERSONA_MODEL = "eleven_multilingual_v2";
 const DEFAULT_MODEL = "eleven_turbo_v2_5";
-// Bump to invalidate previously cached persona audio when voice model/settings
-// change — blob keys are text-derived, so old renders serve forever otherwise.
-const PERSONA_AUDIO_REV = "v2";
+
+// The full Roundtable cast — the three custom panel voices plus the host.
+const ROUNDTABLE_PERSONAS = new Set(["lorraine", "henry", "roberto", "ricky"]);
+// Bump to invalidate previously cached persona audio when the voice model,
+// settings, or the respell lexicon change — blob keys are text-derived, so old
+// renders serve forever otherwise.
+const PERSONA_AUDIO_REV = "v3";
+
+// ── Audio-only pronunciation lexicon (owner 7/18, round 2) ───────────────────
+// Even eleven_multilingual_v2 reads SHORT foreign words with English phonetics
+// when the surrounding sentence is English — "dale" IS an English word (a
+// valley) and "Henry" an English name, so Ricky said [day-ul] and Roberto
+// [hen-ree]. The fix: respell the panel's sprinkle vocabulary into unambiguous
+// phonetics in the SPOKEN text only. Display text is never touched. Applied
+// whenever a persona key is present (all Roundtable lines, any speaker — the
+// host says the panelists' names too).
+const AUDIO_RESPELL: Array<[RegExp, string]> = [
+  [/\bHenry Futois\b/g, "Onree Footwah"],
+  [/\bFutois\b/g, "Footwah"],
+  [/\bHenry\b/g, "Onree"],              // the panelist — [awn-ree]
+  [/\bRiquelme\b/g, "Reekelmeh"],       // [ree-kel-meh], never [ri-kwelm]
+  [/\bdale\b/gi, "dahleh"],             // [dah-leh]
+  [/\bvale\b/gi, "bahleh"],             // [bah-leh] — Spanish v
+  [/\bche\b/gi, "cheh"],
+  [/\bvamos\b/gi, "bahmohs"],
+  [/\bescolta\b/gi, "escoltah"],
+  [/\bmadre mía\b/gi, "mahdreh meeah"],
+  [/\bqué barbaridad\b/gi, "keh bahrbahreedahd"],
+  [/\ben mis tiempos\b/gi, "en mees tyempohs"],
+  [/\bécoutez\b/gi, "aycootay"],
+  [/\bvoilà\b/gi, "vwahlah"],
+  [/\bmagnifique\b/gi, "mahnyeefeek"],
+];
 
 const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
   henry:   { stability: 0.42, similarity_boost: 0.9, style: 0.5,  use_speaker_boost: true }, // maniacal bursts, French intact
@@ -49,19 +79,20 @@ export async function POST(req: Request) {
 
   const { text: rawText, storyId, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
   if (!rawText) return NextResponse.json({ error: "text required" }, { status: 400 });
-  // Audio-only pronunciation pass (owner 7/18): "Henry Futois" is meant to be
-  // heard as [awn-ree foo-twah] — the French voice gets it right from the
-  // spelling, but English-accented voices anglicize it ("HEN-ree fyoo-TOYZ").
-  // The display text is untouched; only the spoken text is respelled.
-  const text = rawText
-    .replace(/Henry Futois/g, "Henri Foutwa")
-    .replace(/\bFutois\b/g, "Foutwa");
+  // Respell applies to ALL Roundtable speakers (the host says the panelists'
+  // names too) but NOT to commentary/story TTS, where "Henry" or "dale" could
+  // be a real player or ordinary English.
+  const isRoundtable = Boolean(persona && ROUNDTABLE_PERSONAS.has(persona));
+  const text = isRoundtable
+    ? AUDIO_RESPELL.reduce((t, [re, sub]) => t.replace(re, sub), rawText)
+    : rawText;
   const isPanelPersona = Boolean(persona && PERSONA_VOICES[persona]);
   const voiceId = (persona && PERSONA_VOICES[persona]) || defaultVoice;
 
-  // Check Vercel Blob cache — persona + audio rev in the key so voices never
-  // collide and model/settings changes regenerate instead of serving stale takes.
-  const blobKey = `tts/${isPanelPersona ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
+  // Check Vercel Blob cache — persona + audio rev in the key (all Roundtable
+  // voices, host included) so voices never collide and model/settings/respell
+  // changes regenerate instead of serving stale takes.
+  const blobKey = `tts/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });
