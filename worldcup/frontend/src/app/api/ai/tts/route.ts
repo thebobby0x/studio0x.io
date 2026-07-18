@@ -34,8 +34,15 @@ export async function POST(req: Request) {
   const defaultVoice = process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9"; // "Daniel" — deep news anchor
   if (!elKey) return NextResponse.json({ error: "ELEVENLABS_API_KEY not set" }, { status: 500 });
 
-  const { text, storyId, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
-  if (!text) return NextResponse.json({ error: "text required" }, { status: 400 });
+  const { text: rawText, storyId, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
+  if (!rawText) return NextResponse.json({ error: "text required" }, { status: 400 });
+  // Audio-only pronunciation pass (owner 7/18): "Henry Futois" is meant to be
+  // heard as [awn-ree foo-twah] — the French voice gets it right from the
+  // spelling, but English-accented voices anglicize it ("HEN-ree fyoo-TOYZ").
+  // The display text is untouched; only the spoken text is respelled.
+  const text = rawText
+    .replace(/Henry Futois/g, "Henri Foutwa")
+    .replace(/\bFutois\b/g, "Foutwa");
   const voiceId = (persona && PERSONA_VOICES[persona]) || defaultVoice;
 
   // Check Vercel Blob cache — persona in the key so voices never collide
