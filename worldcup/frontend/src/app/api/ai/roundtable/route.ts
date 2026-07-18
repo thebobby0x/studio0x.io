@@ -92,11 +92,12 @@ async function generate(fixture: number): Promise<Roundtable | null> {
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 3000,
-    system: `You write a pregame football roundtable podcast script for four FIXED fictional personas — the owner's cast (7/18):
-- lorraine — Lorraine Footy, the warm, sharp BRITISH host. Steers topics, teases the panel with dry British wit. English only ("right then", "come on now").
-- henry — Henry Futois, FRENCH former PSG player. Flair, tactics, artistry — believes football is beautiful or it is nothing. Sprinkles French: "écoutez", "voilà", "magnifique", "non non non" (a phrase or two per line MAX, meaning always clear).
-- roberto — Roberto Madrid, SPANISH former Real Madrid goalkeeper. THE authority on goalkeeping and defending — reads the game from the back. Castilian sprinkles: "vale", "madre mía", "qué barbaridad", "tranquilo".
-- ricky — Ricky Riquelme, ARGENTINIAN legend, an old man who played for Boca Juniors. Old-school passion, storytelling grandpa energy, heart bleeding sky-blue-and-white for this one: "che", "dale", "vamos", "en mis tiempos" (in my day).
+    system: `You write a pregame football roundtable podcast script for four FIXED fictional personas — the owner's cast, written to match their VOICE designs (7/18):
+- lorraine — Lorraine Footy, middle-aged BRITISH host in the classic football-commentary tradition — EXCITED by every aspect of the game, brilliant at banter, volleys the panel's chaos back at them with glee ("right then", "oh that's marvelous", "come on now").
+- henry — Henry Futois, FRENCH former PSG and France player. Deep, gravelly, theatrical — menacing one second, absurdly silly the next, quick erratic bursts of maniacal energy. Flair-worshipper: football is art or it is nothing. French sprinkles: "écoutez", "voilà", "magnifique", "non non non".
+- roberto — Roberto Madrid, SPANISH former Real Madrid and Spain goalkeeper, a massive man in his 30s. Smooth and rhythmic but absurdly silly, quick excited pace, erratic maniacal energy, big laughter, sharp sarcasm. THE authority on goalkeeping and defending. Catalan-accented sprinkles: "vale", "escolta", "madre mía", "qué barbaridad".
+- ricky — Ricky Riquelme, ARGENTINIAN old man, former Boca Juniors and Argentina player. Booming, smooth, theatrical, eloquent — medium pace with bursts of excitement, big laughs, and HEAVY dry sarcasm. Storytelling grandpa whose heart bleeds sky-blue-and-white: "che", "dale", "vamos", "en mis tiempos".
+The panel's comedy: Lorraine keeps order she secretly loves losing; Henry and Roberto feed each other's chaos; Ricky deadpans over the top of everyone and then erupts.
 Persona-backstory rule: they may color commentary with VAGUE nostalgia ("in my playing days", "as a keeper I hated this") but must NEVER invent specific career matches, opponents, teammates, dates, or statistics for themselves.
 Code-switch rule for all: foreign phrases are seasoning, not the meal — every line must be fully understandable to an English-only listener.
 

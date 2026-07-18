@@ -24,9 +24,9 @@ const PERSONA_VOICES: Record<string, string> = {
 // Expressiveness dials: lower stability = more emotional swing; higher style =
 // more performance. The host keeps the proven defaults; the panel gets heat.
 const PERSONA_SETTINGS: Record<string, { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean }> = {
-  henry:   { stability: 0.35, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true },
-  roberto: { stability: 0.4,  similarity_boost: 0.75, style: 0.5,  use_speaker_boost: true },
-  ricky:   { stability: 0.32, similarity_boost: 0.75, style: 0.65, use_speaker_boost: true },
+  henry:   { stability: 0.3,  similarity_boost: 0.75, style: 0.65, use_speaker_boost: true }, // maniacal bursts
+  roberto: { stability: 0.3,  similarity_boost: 0.75, style: 0.7,  use_speaker_boost: true }, // erratic energy + laughter
+  ricky:   { stability: 0.35, similarity_boost: 0.75, style: 0.6,  use_speaker_boost: true }, // theatrical, dry sarcasm
 };
 
 export async function POST(req: Request) {
