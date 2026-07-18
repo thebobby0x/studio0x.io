@@ -21,25 +21,36 @@ const PERSONA_VOICES: Record<string, string> = {
   ricky:   process.env.ELEVENLABS_VOICE_RICKY   ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian, old Boca legend
 };
 
-// Accent preservation (owner 7/18: "all 3 lost their accents"):
-// - The panel personas render on eleven_multilingual_v2, not turbo — turbo is
-//   speed-tuned and flattens designed accents, reading Spanish/Catalan/French
-//   sprinkle-words with English phonetics. Multilingual keeps the designed
-//   accent AND pronounces embedded native phrases natively.
+// Accent preservation (owner 7/18, three rounds):
+// - eleven_turbo flattened the designed accents entirely; multilingual_v2
+//   helped pronunciation but still genericized the accents ("don't come
+//   through well" — owner, incognito-verified). The panel now renders on
+//   eleven_v3, the expressive model, which honors performance tags — each
+//   persona line is prefixed with an ACCENT_TAGS directive (audio-only,
+//   never displayed) telling the model to lean INTO the designed accent.
+// - If v3 errors (plan/availability), the route falls back to
+//   multilingual_v2 WITHOUT the tag (older models would read it aloud).
 // - The panel sends NO voice_settings override (owner decision 7/18): each
 //   custom voice carries the stability/similarity/style the owner dialed in
 //   when designing it in VoiceLab, and ElevenLabs applies those stored
-//   defaults when the request omits voice_settings — so production matches
-//   what the owner approved, instead of our hand-tuned overrides.
-const PERSONA_MODEL = "eleven_multilingual_v2";
+//   defaults when the request omits voice_settings.
+const PERSONA_MODEL = "eleven_v3";
+const PERSONA_MODEL_FALLBACK = "eleven_multilingual_v2";
 const DEFAULT_MODEL = "eleven_turbo_v2_5";
+
+// v3 performance tags — spoken-text-only accent direction per panelist.
+const ACCENT_TAGS: Record<string, string> = {
+  henry:   "[strong French accent] ",
+  roberto: "[strong Spanish accent] ",
+  ricky:   "[strong Argentinian accent] ",
+};
 
 // The full Roundtable cast — the three custom panel voices plus the host.
 const ROUNDTABLE_PERSONAS = new Set(["lorraine", "henry", "roberto", "ricky"]);
 // Bump to invalidate previously cached persona audio when the voice model,
 // settings, or the respell lexicon change — blob keys are text-derived, so old
 // renders serve forever otherwise.
-const PERSONA_AUDIO_REV = "v4";
+const PERSONA_AUDIO_REV = "v5";
 
 // ── Audio-only pronunciation lexicon (owner 7/18, round 2) ───────────────────
 // Even eleven_multilingual_v2 reads SHORT foreign words with English phonetics
@@ -96,23 +107,34 @@ export async function POST(req: Request) {
   }
 
   // Generate via ElevenLabs
-  const elRes = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
-    method: "POST",
-    headers: {
-      "xi-api-key": elKey,
-      "Content-Type": "application/json",
-      Accept: "audio/mpeg",
-    },
-    body: JSON.stringify({
+  const synth = (payload: object) =>
+    fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": elKey,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify(payload),
+    });
+
+  let elRes: Response;
+  if (isPanelPersona) {
+    // Panel personas: v3 with the accent tag, no voice_settings (the voice's
+    // stored VoiceLab settings apply). Fall back to multilingual_v2 WITHOUT
+    // the tag if v3 is unavailable — older models read tags aloud.
+    elRes = await synth({ text: (ACCENT_TAGS[persona!] ?? "") + text, model_id: PERSONA_MODEL });
+    if (!elRes.ok) {
+      console.error(`[TTS] ${PERSONA_MODEL} failed (${elRes.status}) for ${persona} — falling back to ${PERSONA_MODEL_FALLBACK}`);
+      elRes = await synth({ text, model_id: PERSONA_MODEL_FALLBACK });
+    }
+  } else {
+    elRes = await synth({
       text,
-      model_id: isPanelPersona ? PERSONA_MODEL : DEFAULT_MODEL,
-      // Panel personas omit voice_settings so ElevenLabs applies each custom
-      // voice's OWN stored VoiceLab settings (owner decision 7/18).
-      ...(isPanelPersona
-        ? {}
-        : { voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } }),
-    }),
-  });
+      model_id: DEFAULT_MODEL,
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+    });
+  }
 
   if (!elRes.ok) {
     const err = await elRes.text();

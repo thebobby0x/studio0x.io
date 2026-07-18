@@ -523,14 +523,18 @@ Never push directly to main.
     When adding a new AI surface, copy the grounding rules; a missing guardrail = published
     hallucinations (see docs/eod-2026-07-06.md, PR #108).
 
-24. **TTS pronunciation + accent preservation (Roundtable)** — accented character
-    voices need `eleven_multilingual_v2` (turbo flattens designed accents) AND an
-    audio-only respell lexicon (`AUDIO_RESPELL` in `api/ai/tts/route.ts`): even the
-    multilingual model reads short foreign words with English phonetics inside
-    English sentences ("dale" is an English word → [day-ul]; "Henry" → [hen-ree]).
-    Display text is never respelled. ANY change to TTS model/settings/lexicon MUST
-    bump `PERSONA_AUDIO_REV` — blob cache keys are text-derived, so old audio
-    serves forever otherwise (this bit us twice on 7/18).
+24. **TTS pronunciation + accent preservation (Roundtable)** — three stacked fixes,
+    all required: (1) panel renders on `eleven_v3` with an audio-only
+    `[strong X accent]` tag per persona (turbo flattened accents entirely;
+    multilingual_v2 still genericized them — owner incognito-verified 7/18); the
+    route auto-falls-back to `eleven_multilingual_v2` WITHOUT the tag (older
+    models read tags aloud). (2) audio-only respell lexicon (`AUDIO_RESPELL`):
+    models read short foreign words with English phonetics inside English
+    sentences ("dale" → [day-ul]; "Henry" → [hen-ree]); display text is never
+    respelled. (3) panel sends NO voice_settings — the custom voices' stored
+    VoiceLab settings apply. ANY change to TTS model/settings/lexicon MUST bump
+    `PERSONA_AUDIO_REV` — blob cache keys are text-derived, so old audio serves
+    forever otherwise (bit us repeatedly on 7/18).
 
 23. **fixtureSync can only be trusted if the /teams call succeeded** — teamCodeById is
     built from a SECOND api-football call; when it failed, every knockout fixture
