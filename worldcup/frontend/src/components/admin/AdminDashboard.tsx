@@ -41,17 +41,35 @@ export default function AdminDashboard({ users }: { users: User[] }) {
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [savedRole, setSavedRole] = useState<string | null>(null);
   const [seedStatus, setSeedStatus] = useState<Record<string, "idle" | "loading" | "done" | "error">>({});
+  // Response detail per tool (7/19): '✓ Done' hid the actual outcome — the
+  // stats ingest reported success while writing ZERO rows and nobody could
+  // tell. Every tool now shows the response's numbers, and they persist on
+  // screen (no auto-clear) so results can be read and reported.
+  const [seedDetail, setSeedDetail] = useState<Record<string, string>>({});
   const [showMaintenance, setShowMaintenance] = useState(false);
+
+  function summarize(json: unknown): string {
+    if (!json || typeof json !== "object") return "";
+    const obj = json as Record<string, unknown>;
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") parts.push(`${k}: ${v}`);
+      else if (Array.isArray(v)) parts.push(`${k}: ${v.length} item(s)${v.length ? ` — ${String(v[0]).slice(0, 120)}` : ""}`);
+    }
+    return parts.join(" · ").slice(0, 400);
+  }
 
   async function runSeed(key: string, url: string, method: "GET" | "POST" = "POST") {
     setSeedStatus(s => ({ ...s, [key]: "loading" }));
+    setSeedDetail(d => ({ ...d, [key]: "" }));
     try {
       const res = await fetch(url, { method });
+      const json = await res.json().catch(() => null);
       setSeedStatus(s => ({ ...s, [key]: res.ok ? "done" : "error" }));
-      setTimeout(() => setSeedStatus(s => ({ ...s, [key]: "idle" })), 4000);
-    } catch {
+      setSeedDetail(d => ({ ...d, [key]: summarize(json) || `HTTP ${res.status}` }));
+    } catch (e) {
       setSeedStatus(s => ({ ...s, [key]: "error" }));
-      setTimeout(() => setSeedStatus(s => ({ ...s, [key]: "idle" })), 4000);
+      setSeedDetail(d => ({ ...d, [key]: e instanceof Error ? e.message : "request failed" }));
     }
   }
 
@@ -79,8 +97,11 @@ export default function AdminDashboard({ users }: { users: User[] }) {
         <div className="text-[11px] text-slate-500">{desc}</div>
         {status !== "idle" && (
           <div className={`text-[10px] mt-2 font-semibold ${status === "loading" ? "text-slate-400 animate-pulse" : status === "done" ? "text-brand-green" : "text-red-400"}`}>
-            {status === "loading" ? "Running…" : status === "done" ? "✓ Done" : "✗ Failed — check Vercel logs"}
+            {status === "loading" ? "Running…" : status === "done" ? "✓ Done" : "✗ Failed"}
           </div>
+        )}
+        {seedDetail[key] && status !== "loading" && (
+          <div className="text-[10px] mt-1 font-mono text-slate-400 break-words">{seedDetail[key]}</div>
         )}
       </button>
     );
