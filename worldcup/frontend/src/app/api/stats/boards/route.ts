@@ -107,6 +107,12 @@ export async function GET() {
     for (const m of matches) {
       let events = (m.goalEvents as unknown as GoalEvent[] | null) ?? null;
       if (!events || events.length === 0) {
+        // Quota discipline (owner 7/19, pre-final): upstream has NO events for
+        // ~31 early matches, and retrying them on every rebuild burned calls
+        // forever. A match finished >3 days ago whose events never appeared is
+        // never coming — skip permanently, zero API spend.
+        const finishedLongAgo = Date.now() - new Date(m.date).getTime() > 3 * 24 * 60 * 60 * 1000;
+        if (finishedLongAgo) continue;
         events = await fetchAndStoreEvents(m.fixture, m.id);
       }
       if (!events || events.length === 0) continue;

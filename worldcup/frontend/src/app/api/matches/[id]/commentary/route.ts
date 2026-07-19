@@ -99,7 +99,9 @@ export async function GET(
 
   const isLive = match.status === "LIVE" || match.status === "HT";
   const [events, liveStats] = await Promise.all([
-    fetchEvents(match.fixture),
+    // Quota discipline (owner 7/19, pre-final): a match that hasn't started
+    // has no events — don't spend an API call per page load to learn that.
+    match.status === "NS" ? Promise.resolve([]) : fetchEvents(match.fixture),
     // Real team stats give the commentary true substance (possession, shots)
     // instead of leaving the model to invent a "tactical battle" from nothing.
     (isLive || match.status === "FT")
