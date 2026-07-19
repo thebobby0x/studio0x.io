@@ -93,7 +93,7 @@ export async function getFixtureStatistics(
   if (cached && Date.now() - cached.ts < cached.ttl) return cached.data;
 
   // Live: refresh every 15s. Finished/pre-match: stats barely change — 10 min.
-  const ttl = isLive ? 15_000 : 600_000;
+  const ttl = isLive ? 25_000 : 600_000; // live widened 15→25s pre-final (7/19 budget)
 
   try {
     const ctrl = new AbortController();
@@ -101,7 +101,7 @@ export async function getFixtureStatistics(
     const res = await fetch(
       `https://v3.football.api-sports.io/fixtures/statistics?fixture=${fixtureId}`,
       // Shared data cache under the module cache (traffic-independent budget)
-      { headers: { "x-apisports-key": key }, signal: ctrl.signal, next: { revalidate: isLive ? 15 : 600 } },
+      { headers: { "x-apisports-key": key }, signal: ctrl.signal, next: { revalidate: isLive ? 25 : 600 } },
     );
     if (!res.ok) return cached?.data ?? null;
 

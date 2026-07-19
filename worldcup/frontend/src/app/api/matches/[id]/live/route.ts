@@ -50,8 +50,8 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
     const res = await fetch(`${AF_BASE}/fixtures?id=${fixtureId}`, {
       headers: { "x-apisports-key": key },
       // Shared data cache under the module cache — see schedule route note.
-      // 8s matches the live module TTL so score latency doesn't regress.
-      next: { revalidate: 8 },
+      // 12s (widened pre-final 7/19 — budget) matches the live module TTL.
+      next: { revalidate: 12 },
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -77,7 +77,7 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
       elapsed: clamped === "NS" ? 0 : ((f.fixture.status.elapsed ?? (f.fixture.status.short === "P" ? 120 : 0)) as number),
     };
     const isLive = data.status === "LIVE" || data.status === "HT";
-    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 8_000 : 300_000, data });
+    _afCache.set(fixtureId, { ts: Date.now(), ttl: isLive ? 12_000 : 300_000, data });
     return data;
   } catch {
     return null;
