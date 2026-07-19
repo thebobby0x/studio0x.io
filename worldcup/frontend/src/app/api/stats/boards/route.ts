@@ -111,6 +111,12 @@ export async function GET(req: Request) {
   // fixtures never refetch, so a rebuild costs at most 1-2 upstream calls).
   const url = new URL(req.url);
   const fresh = url.searchParams.get("fresh") === "1";
+  // ?retryMissing=1 (one-shot ops): bypass the 3-day never-coming rule for
+  // event-less fixtures. Early fetch attempts were poisoned by a day-cached
+  // empty response; upstream may have backfilled since (FRA 3-0 IRQ hides
+  // real Mbappé goals — owner-reported total 10 vs our covered 8). Costs ≤31
+  // calls once; successful fetches persist so the retry never repeats.
+  const retryMissing = url.searchParams.get("retryMissing") === "1";
   // ?debug=<fixture> returns the raw stored row exactly as the boards query
   // sees it (7/19: totals excluded a match the coverage math said was
   // counted — read-only, public data, zero API spend).
@@ -147,7 +153,7 @@ export async function GET(req: Request) {
         // forever. A match finished >3 days ago whose events never appeared is
         // never coming — skip permanently, zero API spend.
         const finishedLongAgo = Date.now() - new Date(m.date).getTime() > 3 * 24 * 60 * 60 * 1000;
-        if (finishedLongAgo) {
+        if (finishedLongAgo && !retryMissing) {
           missingFixtures.push(m.fixture);
           continue;
         }
