@@ -6,6 +6,7 @@ import { Building2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
 import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
+import TournamentBoards from "@/components/stats/TournamentBoards";
 import TournamentXMetrics from "@/components/stats/TournamentXMetrics";
 import ClubWCImpact from "@/components/stats/ClubWCImpact";
 
@@ -80,6 +81,12 @@ export default async function LeaguesPage() {
               ? `${totalClubs} clubs from ${totalLeagues} leagues represented at the 2026 tournament`
               : "Club data not yet seeded — use the admin seed route to populate"}
           </p>
+        </div>
+
+        {/* Tournament Player Boards (owner 7/19) — the debate engine, built
+            from real goal events. Leads the page. */}
+        <div className="mb-8">
+          <TournamentBoards />
         </div>
 
         {/* Summary stat bar */}
