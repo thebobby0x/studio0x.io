@@ -109,7 +109,19 @@ async function fetchAndStoreEvents(fixture: number, matchId: string): Promise<Go
 export async function GET(req: Request) {
   // ?fresh=1 bypasses the module cache for ops verification (cheap: old
   // fixtures never refetch, so a rebuild costs at most 1-2 upstream calls).
-  const fresh = new URL(req.url).searchParams.get("fresh") === "1";
+  const url = new URL(req.url);
+  const fresh = url.searchParams.get("fresh") === "1";
+  // ?debug=<fixture> returns the raw stored row exactly as the boards query
+  // sees it (7/19: totals excluded a match the coverage math said was
+  // counted — read-only, public data, zero API spend).
+  const debugFixture = parseInt(url.searchParams.get("debug") ?? "", 10);
+  if (debugFixture) {
+    const m = await prisma.match.findMany({
+      where: { fixture: debugFixture },
+      select: { id: true, fixture: true, status: true, date: true, homeScore: true, awayScore: true, goalEvents: true },
+    });
+    return NextResponse.json({ rows: m });
+  }
   if (!fresh && _cache && Date.now() - _cache.ts < TTL) {
     return NextResponse.json({ boards: _cache.data, cached: true });
   }
