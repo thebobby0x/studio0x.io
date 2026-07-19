@@ -536,6 +536,25 @@ Never push directly to main.
     `PERSONA_AUDIO_REV` — blob cache keys are text-derived, so old audio serves
     forever otherwise (bit us repeatedly on 7/18).
 
+26. **api-football `/fixtures/players` is EMPTY for this competition on our plan** —
+    the stats ingest (button + nightly cron) "succeeded" for days while writing
+    zero rows; ratings-based PPI™ is parked until a plan upgrade. The player
+    boards run on goal EVENTS instead (`/api/stats/boards`): fetched once per
+    FT fixture, WRITTEN BACK to `Match.goalEvents` (same shape Match DNA reads)
+    so subsequent builds cost zero API calls. Pending/reconstructed goals are
+    never counted; coverage (72/103 matches have upstream events) is disclosed
+    in the UI. Related: every admin tool button now prints the response's real
+    numbers — "✓ Done" alone masked the zero-row runs (7/19).
+
+25. **Kickoff-window quota guard (7/18 outage)** — api-football flagged the 3rd-place
+    game LIVE 4 hours before its scheduled kickoff; live-rate polling all afternoon
+    exhausted the 7,500/day quota at 22:13Z mid-match (frozen at 51'; self-healed at
+    the 00:00Z reset). BOTH AF entry points (schedule route + per-match live route)
+    now trust upstream LIVE only within [kickoff−20m, kickoff+4.5h] of the fixture's
+    own scheduled time; outside it statuses demote to NS and the live=all poll is
+    skipped entirely. If the platform ever freezes mid-match again: check the
+    apiSports dashboard usage FIRST.
+
 23. **fixtureSync can only be trusted if the /teams call succeeded** — teamCodeById is
     built from a SECOND api-football call; when it failed, every knockout fixture
     resolved to the TBD sentinel and the diff-writer downgraded real, already-played
@@ -556,7 +575,30 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-07-18, pre-final)
+## Current Production State (as of 2026-07-19, FINALE DAY — ESP v ARG 19:00Z)
+
+**Jul 18 evening shipped (PRs #167–#174, see `docs/eod-2026-07-18.md`):**
+- **Quota incident + guard**: premature upstream LIVE burned the daily API budget
+  mid 3rd-place game (frozen at 51'; self-healed at 00:00Z — real result FRA 4–6
+  ENG). Kickoff-window guard live on both AF entry points (gotcha #25).
+- **Roundtable live commentary** (#171): fan/comedian replaced — one speaker-tagged
+  feed, each line in that panelist's custom voice, quiet-period "booth banter"
+  (grounded, labeled, never invented action). Default tab on match pages.
+- **Matchday Special** (#168): Tale of the Tape (facts + Polymarket strip) + the
+  Roundtable + "IT" Factor gut-read bars (labeled opinion) lead the dashboard;
+  flips to the final automatically at FT.
+- **Real photography** (#173): 3 visually-verified Unsplash photos, self-hosted
+  (spotlight, /news masthead, studio0x.io banner). Credits in public/img/CREDITS.md.
+- **Tournament Player Boards** (#174, gotcha #26): Golden Boot / Playmakers /
+  Clutch from real goal events, leading /leagues. LIVE DATA: Mbappé 8 & Messi 8
+  TIED for the Golden Boot into the final; Messi leads clutch. Admin buttons now
+  print response numbers.
+- **Timezone fix** (#170): kickoff clocks always render in the viewer's local time.
+- studio0x.io: podiumMetrics banner at TOP of page (#167; Monday copy swap noted).
+- Archive backfill DONE (103 recaps + 34 round-ups to Jun 11); exports live.
+- Owner morning checklist + Monday list: `docs/eod-2026-07-18.md`.
+
+## Previous Production State (2026-07-18, pre-final)
 
 **Jul 17 evening shipped (PRs #155–#166, see `docs/eod-2026-07-17.md`):**
 - **Final Weekend package**: time-boxed spotlight (auto-expires Jul 21) with huge
