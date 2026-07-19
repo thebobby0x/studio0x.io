@@ -47,7 +47,7 @@ async function fetchEvents(fixtureId: number): Promise<MatchEvent[]> {
   try {
     const res = await fetch(`${AF_BASE}/fixtures/events?fixture=${fixtureId}`, {
       headers: { "x-apisports-key": key },
-      next: { revalidate: 12 },
+      next: { revalidate: 18 },
     });
     if (!res.ok) return [];
     const json = await res.json();
