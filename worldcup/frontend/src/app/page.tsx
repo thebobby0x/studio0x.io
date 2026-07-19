@@ -506,10 +506,30 @@ export default async function DashboardPage({
                 ? { m: spotlightFinal, label: "The Final" }
                 : null;
           if (!featured) return null;
+          const featuredLive = featured.m.status === "LIVE" || featured.m.status === "HT";
           return (
             <>
               <MatchdayTape fixture={featured.m.id} stageLabel={featured.label} />
-              <FinalRoundtable fixture={featured.m.id} />
+              {/* Pregame: the frozen Roundtable episode. Once LIVE, the booth
+                  is calling the match on the match page — link there instead
+                  of showing a card that (by design) no longer updates
+                  (owner report, 7/19 final). */}
+              {featuredLive ? (
+                <Link
+                  href={`/schedule/${featured.m.id}`}
+                  className="flex items-center gap-3 rounded-2xl border border-brand-gold/40 bg-brand-card px-4 py-3.5 hover:border-brand-gold transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  <span className="text-sm font-black text-white">
+                    The Roundtable is calling the match LIVE
+                  </span>
+                  <span className="text-xs text-slate-500 ml-auto shrink-0">
+                    open the live booth →
+                  </span>
+                </Link>
+              ) : (
+                <FinalRoundtable fixture={featured.m.id} />
+              )}
             </>
           );
         })()}
