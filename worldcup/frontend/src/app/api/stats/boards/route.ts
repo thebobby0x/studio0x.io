@@ -56,8 +56,14 @@ async function fetchAndStoreEvents(fixture: number, matchId: string): Promise<Go
   try {
     const res = await fetch(`${AF_BASE}/fixtures/events?fixture=${fixture}`, {
       headers: { "x-apisports-key": key },
-      // Finished matches never change — cache the upstream response a full day.
-      next: { revalidate: 86400 },
+      // NO data-cache here (7/19): day-caching poisoned the boards — the
+      // events feed was still EMPTY at the post-3rd-place build and that
+      // empty answer was reused for 24h, freezing Mbappé on 8 while the real
+      // feed had his brace (true total 10). This path only runs for a recent
+      // FT match whose events aren't in our DB yet (≤1-2 fixtures, 15-min
+      // board TTL — bounded spend); once events arrive they're persisted and
+      // this fetch never runs again for that fixture.
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const json = await res.json();
