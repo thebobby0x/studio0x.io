@@ -209,6 +209,28 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
     return () => clearInterval(id);
   }, [fetchCommentary, persona, liveStatus]);
 
+  // Mobile browsers freeze timers while the page is backgrounded — the feed
+  // looked dead after returning from another app (owner, mid-final 7/19).
+  // Catch up the moment the page becomes visible again.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && (liveStatus === "LIVE" || liveStatus === "HT")) {
+        fetchCommentary(persona);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchCommentary, persona, liveStatus]);
+
+  // Ticking freshness stamp so staleness is self-evident.
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, []);
+  const newestAt = batches[0] ? new Date(batches[0].generatedAt).getTime() : null;
+  const ageSec = newestAt ? Math.max(0, Math.round((nowTick - newestAt) / 1000)) : null;
+
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       {/* Header */}
@@ -220,6 +242,11 @@ export default function MatchCommentary({ matchId }: { matchId: string }) {
           {liveStatus === "LIVE" && (
             <span className="flex items-center gap-1 text-[9px] text-red-400 font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+            </span>
+          )}
+          {ageSec !== null && (
+            <span className={`text-[9px] font-mono ${ageSec > 90 ? "text-red-400" : "text-slate-600"}`} suppressHydrationWarning>
+              updated {ageSec < 60 ? `${ageSec}s` : `${Math.floor(ageSec / 60)}m`} ago
             </span>
           )}
         </div>

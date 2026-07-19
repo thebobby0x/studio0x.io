@@ -8,6 +8,14 @@ export const dynamic = "force-dynamic";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const AF_BASE = "https://v3.football.api-sports.io";
 
+// Shared batch cache (7/19, mid-final): every viewer previously triggered
+// their OWN Haiku generation every 30s — cost and rate-limit exposure scale
+// with traffic, and a rate-limited viewer sees a frozen feed. One generation
+// per ~25s now serves everyone; quiet-period detection compares against the
+// cached batch's event count (no client param needed).
+const _batchCache = new Map<string, { ts: number; eventCount: number; payload: unknown }>();
+const BATCH_TTL = 25_000;
+
 // Owner 7/18 (mid 3rd-place game): FAN and COMEDIAN are replaced by the
 // Roundtable cast — Lorraine + the three custom voices — contributing to a
 // SINGLE speaker-tagged feed. Legacy persona params map to the roundtable.
@@ -83,9 +91,15 @@ export async function GET(
   const persona: Persona = rawPersona === "analyst" ? "analyst" : "roundtable";
   const limitParam = parseInt(searchParams.get("limit") ?? "6", 10);
   const limit = Math.min(Math.max(limitParam, 1), 12);
-  // Client sends the event count it saw in its previous batch; when nothing
-  // new has happened, the roundtable fills the quiet with grounded banter.
+  // Legacy param (pre-shared-cache clients); quiet detection now primarily
+  // compares against the shared cache's own last event count.
   const lastEvents = parseInt(searchParams.get("lastEvents") ?? "-1", 10);
+
+  const cacheKey = `${id}|${rawPersona === "analyst" ? "analyst" : "roundtable"}|${limit}`;
+  const cachedBatch = _batchCache.get(cacheKey);
+  if (cachedBatch && Date.now() - cachedBatch.ts < BATCH_TTL) {
+    return NextResponse.json(cachedBatch.payload);
+  }
 
   const match = await prisma.match.findUnique({
     where: { id },
@@ -137,7 +151,8 @@ export async function GET(
 
   // Quiet period: the match is live but nothing new arrived from the feed
   // since the client's last batch (owner 7/18: "add in notes or just banter").
-  const isQuiet = isLive && lastEvents >= 0 && events.length <= lastEvents;
+  const prevCount = cachedBatch ? cachedBatch.eventCount : lastEvents;
+  const isQuiet = isLive && prevCount >= 0 && events.length <= prevCount;
 
   const grounding = `GROUNDING RULES (strict): Only reference the events, players, and stats listed above. Do NOT invent player names, formations, tactical systems, injuries, or any statistic not shown. If no goals yet, build lines from the stats above (possession, shots, corners) and the general occasion — never from imagined specifics.`;
 
@@ -197,7 +212,7 @@ ${grounding}`;
     );
   }
 
-  return NextResponse.json({
+  const payload = {
     persona,
     score,
     status: match.status,
@@ -206,7 +221,9 @@ ${grounding}`;
     quiet: isQuiet,
     eventCount: events.length,
     generatedAt: new Date().toISOString(),
-  });
+  };
+  _batchCache.set(cacheKey, { ts: Date.now(), eventCount: events.length, payload });
+  return NextResponse.json(payload);
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Internal error" },
