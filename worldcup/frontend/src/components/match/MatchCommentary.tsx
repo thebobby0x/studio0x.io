@@ -55,6 +55,14 @@ const SPEAKERS: Record<Speaker, { name: string; short: string; accent: string }>
   ricky:    { name: "Ricky Riquelme", short: "RR", accent: "text-slate-200 border-slate-500/40 bg-slate-500/10" },
 };
 
+// Stable full-text hash (djb2 + length) — every distinct line gets a distinct
+// audio cache key. Prefix-based keys collided on the panel's catchphrases.
+function textHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}${s.length.toString(36)}`;
+}
+
 function detectEmoji(text: string): string {
   const t = text.toLowerCase();
   if (/\b(goal|scored?|scores?|back of the net|found? the net|into the net)\b/.test(t)) return "⚽";
@@ -83,9 +91,11 @@ function LineItem({ entry, matchId }: { entry: CommentaryEntry; matchId: string 
   const sp = SPEAKERS[entry.speaker] ?? SPEAKERS.analyst;
   const isPanel = entry.speaker !== "analyst";
   const eventEmoji = detectEmoji(entry.text);
-  // Unicode-safe base64 — commentary contains emoji, and bare btoa() throws on
-  // any non-Latin-1 char (CLAUDE.md gotcha #1), which would crash this render.
-  const storyId = `commentary-${matchId}-${btoa(unescape(encodeURIComponent(entry.text))).slice(0, 16)}`;
+  // FULL-text hash for the audio cache key (7/19, mid-final): the old key
+  // used only the first ~12 chars of the line, so Henry's every "Écoutez,
+  // Spain d…" opener collided onto ONE cached mp3 — displayed text said
+  // "nineteen shots" while the audio said "10 shots" (owner screenshot).
+  const storyId = `commentary-${matchId}-${textHash(entry.text)}`;
 
   async function handlePlay() {
     if (audioRef.current && audioUrl) {

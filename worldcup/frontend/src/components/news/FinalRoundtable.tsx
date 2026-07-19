@@ -26,10 +26,16 @@ const SPEAKERS: Record<Line["speaker"], { name: string; role: string; accent: st
   ricky:    { name: "Ricky Riquelme", role: "Argentinian legend · old school", accent: "text-slate-200" },
 };
 
-// btoa is Latin-1 only — the unicode-safe pattern used everywhere in this app.
+// FULL-text hash (7/19): prefix-based keys collided on the panel's shared
+// catchphrase openers, serving one line's cached audio for another
+// (owner-caught in live commentary; same bug class here).
+function textHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}${s.length.toString(36)}`;
+}
 function lineId(fixture: number, i: number, text: string): string {
-  const b64 = btoa(unescape(encodeURIComponent(text))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
-  return `roundtable-${fixture}-${i}-${b64}`;
+  return `roundtable-${fixture}-${i}-${textHash(text)}`;
 }
 
 export default function FinalRoundtable({ fixture }: { fixture: number }) {
