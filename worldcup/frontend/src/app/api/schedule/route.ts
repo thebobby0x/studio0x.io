@@ -6,7 +6,7 @@ const BASE   = "https://v3.football.api-sports.io";
 const LEAGUE = 1;    // World Cup
 const SEASON = 2026;
 const CACHE_TTL = 20_000; // 20s bulk schedule (reduced from 60s)
-const LIVE_TTL  = 10_000; // 10s live overlay — widened pre-final (7/19): 2,915 used at 17:30Z, worst-case ET+pens must fit in the 4,585 remaining
+const LIVE_TTL  = 15_000; // 10s live overlay — widened pre-final (7/19): 2,915 used at 17:30Z, worst-case ET+pens must fit in the 4,585 remaining
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -208,7 +208,7 @@ async function getLiveOverlay(apiKey: string): Promise<Map<number, LiveEntry>> {
     setTimeout(() => ctrl.abort(), 5_000);
     const res = await fetch(
       `${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}&live=all`,
-      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, next: { revalidate: 10 } }
+      { headers: { "x-apisports-key": apiKey, Accept: "application/json" }, signal: ctrl.signal, next: { revalidate: 15 } }
     );
 
     if (!res.ok) {
