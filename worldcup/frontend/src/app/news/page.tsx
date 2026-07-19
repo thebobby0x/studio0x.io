@@ -55,16 +55,23 @@ export default async function NewsPage() {
     <div className="min-h-screen bg-brand-dark text-slate-200">
       <AppNav />
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-black text-white">
-          podiumMetrics <span className="text-brand-gold">News</span>
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          AI match recaps & daily round-ups · every result, archived · <span className="font-mono text-slate-700">studio0x</span>
-        </p>
-        <div className="flex items-center gap-3 mt-2 text-[11px]">
-          <a href="/api/stories/export?format=md" className="text-brand-gold font-bold hover:underline">Export archive (Markdown)</a>
-          <a href="/api/stories/export" className="text-slate-500 hover:underline">JSON</a>
+      {/* Masthead — real floodlight photography (verified Unsplash, see
+          public/img/CREDITS.md), dark-overlaid per color discipline. */}
+      <div className="relative rounded-2xl overflow-hidden border border-brand-border">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/img/floodlight-pitch.jpg" alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-dark/90 via-brand-dark/70 to-brand-dark/40" />
+        <div className="relative px-5 py-8">
+          <h1 className="text-3xl font-black text-white">
+            podiumMetrics <span className="text-brand-gold">News</span>
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            AI match recaps & daily round-ups · every result, archived · <span className="font-mono text-slate-500">studio0x</span>
+          </p>
+          <div className="flex items-center gap-3 mt-2 text-[11px]">
+            <a href="/api/stories/export?format=md" className="text-brand-gold font-bold hover:underline">Export archive (Markdown)</a>
+            <a href="/api/stories/export" className="text-slate-400 hover:underline">JSON</a>
+          </div>
         </div>
       </div>
 

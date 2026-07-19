@@ -13,6 +13,17 @@ export default function StadiumBackdrop({ variant = "gold" }: { variant?: "gold"
   const p = crown ? "sbc" : "sbg"; // gradient id prefix — avoids collisions if both render
   return (
     <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+      {/* Real photography layer (owner 7/19 — network policy opened): a
+          verified, license-clean Unsplash stadium night shot (see
+          public/img/CREDITS.md), self-hosted, at low opacity under the SVG
+          line-art and a dark gradient so text stays legible. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/img/stadium-night.jpg"
+        alt=""
+        className={`absolute inset-0 w-full h-full object-cover ${crown ? "opacity-30" : "opacity-25"}`}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/60 via-brand-card/70 to-brand-card/90" />
       <svg className="w-full h-full" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice">
         <defs>
           {/* night-sky wash */}
