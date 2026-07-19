@@ -35,7 +35,20 @@ interface Boards {
   playmakers: BoardRow[];
   clutch: BoardRow[];
   coverage: { matches: number; withEvents: number };
+  // Transparency + ops (7/19): exactly which fixtures the boards could NOT
+  // source events for — turns "coverage 72/103" into an actionable list.
+  missingFixtures: number[];
   generatedAt: string;
+}
+
+// Stored goalEvents are written by several producers over time — accept both
+// a bare GoalEvent[] and the { goals: [...] } wrapper shape defensively.
+function asEventArray(raw: unknown): GoalEvent[] | null {
+  if (Array.isArray(raw)) return raw as GoalEvent[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { goals?: unknown }).goals)) {
+    return (raw as { goals: GoalEvent[] }).goals;
+  }
+  return null;
 }
 
 let _cache: { ts: number; data: Boards } | null = null;
@@ -93,8 +106,11 @@ async function fetchAndStoreEvents(fixture: number, matchId: string): Promise<Go
   }
 }
 
-export async function GET() {
-  if (_cache && Date.now() - _cache.ts < TTL) {
+export async function GET(req: Request) {
+  // ?fresh=1 bypasses the module cache for ops verification (cheap: old
+  // fixtures never refetch, so a rebuild costs at most 1-2 upstream calls).
+  const fresh = new URL(req.url).searchParams.get("fresh") === "1";
+  if (!fresh && _cache && Date.now() - _cache.ts < TTL) {
     return NextResponse.json({ boards: _cache.data, cached: true });
   }
 
@@ -109,19 +125,26 @@ export async function GET() {
     const assists = new Map<string, { team: string; tla: string; count: number }>();
     const clutch = new Map<string, { team: string; tla: string; count: number }>();
     let withEvents = 0;
+    const missingFixtures: number[] = [];
 
     for (const m of matches) {
-      let events = (m.goalEvents as unknown as GoalEvent[] | null) ?? null;
+      let events = asEventArray(m.goalEvents);
       if (!events || events.length === 0) {
         // Quota discipline (owner 7/19, pre-final): upstream has NO events for
         // ~31 early matches, and retrying them on every rebuild burned calls
         // forever. A match finished >3 days ago whose events never appeared is
         // never coming — skip permanently, zero API spend.
         const finishedLongAgo = Date.now() - new Date(m.date).getTime() > 3 * 24 * 60 * 60 * 1000;
-        if (finishedLongAgo) continue;
+        if (finishedLongAgo) {
+          missingFixtures.push(m.fixture);
+          continue;
+        }
         events = await fetchAndStoreEvents(m.fixture, m.id);
       }
-      if (!events || events.length === 0) continue;
+      if (!events || events.length === 0) {
+        missingFixtures.push(m.fixture);
+        continue;
+      }
       withEvents++;
 
       const tlaFor = (teamName: string): string =>
@@ -167,6 +190,7 @@ export async function GET() {
       playmakers: toRows(assists, (v) => v.count, undefined, 8),
       clutch: toRows(clutch, (v) => v.count, undefined, 8),
       coverage: { matches: matches.length, withEvents },
+      missingFixtures,
       generatedAt: new Date().toISOString(),
     };
     _cache = { ts: Date.now(), data };
