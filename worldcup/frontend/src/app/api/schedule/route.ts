@@ -189,8 +189,10 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
         // nulling them rendered a live 0-2 as 0-0 on the hero (7/14 FRA-ESP).
         homeScore: m.status !== "NS" ? m.homeScore : null,
         awayScore: m.status !== "NS" ? m.awayScore : null,
-        penHome: null,
-        penAway: null,
+        // H-6: carry the shootout result through the degraded path so a
+        // pens-decided final can still name a champion when the feed is down.
+        penHome: m.penHome ?? null,
+        penAway: m.penAway ?? null,
       };
     });
   } catch {
@@ -372,7 +374,9 @@ export async function GET() {
     Promise.all(staleInDb.map(m =>
       prisma.match.updateMany({
         where: { fixture: m.id },
-        data: { status: "FT", homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0, elapsed: 90 },
+        // H-5: heal to the feed's real minute (120 for ET/pens), never assume
+        // 90 — a knockout decided in extra time was being stamped 90'.
+        data: { status: "FT", homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0, elapsed: m.minute || 90 },
       }).catch(() => {})
     ));
   }

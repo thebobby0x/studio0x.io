@@ -364,9 +364,15 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
   // confirmed scorer and must never appear as a player row.
   const ci  = computeClutchIndex(goals.filter(g => !g.pending), homeTeamName);
   const maxCI = Math.max(...ci.map(p => p.ci), 3);
-  const sc  = computeStrikeClock(goals);
-  const sv  = computeScoreVolatility(goals, homeTeamName);
-  const mp  = computeMomentumPulse(goals, homeTeamName, matchStatus, currentMinute);
+  // H-7 (audit 7/20): Strike Clock, Score Volatility and Momentum are all
+  // MINUTE-derived. Reconstructed (pending) goals have seeded-RNG minutes, so
+  // feeding them here published invented timing as studio0x readings. Compute
+  // from CONFIRMED goals only (matching Clutch Index); the amber banner already
+  // discloses that reconstructed goals aren't yet reflected.
+  const confirmedGoals = goals.filter(g => !g.pending);
+  const sc  = computeStrikeClock(confirmedGoals);
+  const sv  = computeScoreVolatility(confirmedGoals, homeTeamName);
+  const mp  = computeMomentumPulse(confirmedGoals, homeTeamName, matchStatus, currentMinute);
   const noGoals = goals.length === 0;
   const hasPending = goals.some(g => g.pending);
   const svLabel = noGoals ? "Level" : sv.dramaLabel;

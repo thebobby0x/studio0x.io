@@ -52,6 +52,7 @@ interface AFFixture {
   league: { round: string };
   teams: { home: { id: number; name: string }; away: { id: number; name: string } };
   goals: { home: number | null; away: number | null };
+  score?: { penalty?: { home: number | null; away: number | null } };
 }
 
 interface AFTeam { team: { id: number; name: string; code: string | null } }
@@ -141,7 +142,7 @@ export async function syncFixtures(): Promise<SyncResult> {
 
   // ── 3. Diff-aware match upsert by fixture id ───────────────────────────────
   const existing = await prisma.match.findMany({
-    select: { fixture: true, status: true, homeScore: true, awayScore: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true },
+    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true },
   });
   const existingByFixture = new Map(existing.map((m) => [m.fixture, m]));
 
@@ -167,6 +168,8 @@ export async function syncFixtures(): Promise<SyncResult> {
     const status = STATUS_MAP[f.fixture.status.short] ?? "NS";
     const homeScore = f.goals.home ?? 0;
     const awayScore = f.goals.away ?? 0;
+    const penHome = f.score?.penalty?.home ?? null;
+    const penAway = f.score?.penalty?.away ?? null;
     const elapsed = f.fixture.status.elapsed ?? 0;
     const date = new Date(f.fixture.date);
     const referee = f.fixture.referee?.trim() || null;
@@ -188,6 +191,8 @@ export async function syncFixtures(): Promise<SyncResult> {
             status,
             homeScore,
             awayScore,
+            penHome,
+            penAway,
             elapsed,
             referee,
           },
@@ -202,11 +207,14 @@ export async function syncFixtures(): Promise<SyncResult> {
           cur.date.getTime() !== date.getTime() ||
           cur.homeTeamId !== effHomeTeamId || // TBD → real team upgrade (never the reverse)
           cur.awayTeamId !== effAwayTeamId ||
+          (penHome !== null && cur.penHome !== penHome) ||
+          (penAway !== null && cur.penAway !== penAway) ||
           (referee !== null && cur.referee !== referee); // don't null-out a known ref
         if (changed) {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
-            data: { status, homeScore, awayScore, elapsed, date, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(referee !== null ? { referee } : {}) },
+            // Only write pens when the feed has them (never null-out a shootout result).
+            data: { status, homeScore, awayScore, elapsed, date, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {
