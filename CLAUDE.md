@@ -575,7 +575,33 @@ Never push directly to main.
 
 ---
 
-## Current Production State (as of 2026-07-19, FINALE DAY — ESP v ARG 19:00Z)
+## Current Production State (as of 2026-07-20 — WC26 COMPLETE, postmortem night)
+
+**WC26 FINISHED: Spain 1–0 Argentina (Ferrán Torres 106', AET). Golden Boot
+Mbappé 10, Messi 8.** Deployment #1 of podiumMetrics complete.
+
+**Strategic direction locked (owner 7/20):**
+- NOT a from-scratch rebuild → **structured module-by-module extraction**
+  (`docs/extraction-plan.md`). F1 Wrapped is the forcing function.
+- Next builds (all 3): **News Depot FIRST**, then **WWC27** + **Leagues Cup
+  2026** (`docs/roadmap-nextbuilds.md`). Everything is a MODULE or CONFIG on the
+  shared core — never a fork.
+- Bandaid modules get clean rewrites that remove the bandaids (anthems = first).
+
+**Postmortem + hardening (`docs/postmortem-2026-07-20.md`, PR #186):** four
+deep-read audits (~27,650 LOC). Verdict: engine trustworthy, no undisclosed
+falsehood shipped. Shipped: security (TTS cap + server-derived key kills
+open-wallet/poisoning; admin-gated boards `?fresh/?retryMissing/?debug` +
+debug/* + POST stories); **CR-1 anthems** (no more SoundHelix stock tracks —
+seed never writes placeholders, anthems are manifest-owned, the "fix-one-thing-
+anthems-revert" bug fixed at root); data-integrity (predict venue guard; **added
+Match.penHome/penAway** — DB couldn't represent a shootout; elapsed no longer
+hardcoded 90 on ET heals; DNA metrics use confirmed goals only). **Deferred to
+supervised daylight: H-3 (VAR max-merge) + H-4 (DB-FT promotion) — live-merge
+hot path.** Owner-only actions: seed 28 missing squads + club enrichment
+(SUPER_ADMIN session). Golden Boot now 100% attributed (all 104 matches).
+
+## Previous Production State (2026-07-19, FINALE DAY — ESP v ARG 19:00Z)
 
 **Jul 18 evening shipped (PRs #167–#174, see `docs/eod-2026-07-18.md`):**
 - **Quota incident + guard**: premature upstream LIVE burned the daily API budget
