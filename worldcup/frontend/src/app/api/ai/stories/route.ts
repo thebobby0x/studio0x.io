@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { maybeScheduleRefresh } from "@/lib/storyRefresh";
+import { isAdminAuthed } from "@/lib/adminAuth";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
@@ -396,8 +397,10 @@ export async function GET() {
   return NextResponse.json({ stories: merged.slice(0, 12), cached: !!_cache });
 }
 
-// Force regenerate
-export async function POST() {
+// Force regenerate — admin-only (audit 7/20): defeats the 1h cache and drives
+// repeated Haiku/Sonnet generations if left public.
+export async function POST(req: Request) {
+  if (!(await isAdminAuthed(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   _cache = null;
   return GET();
 }
