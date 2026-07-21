@@ -17,7 +17,9 @@ export async function GET() {
     if (matches.length === 0) {
       prisma.match.updateMany({
         where: { status: { in: ["LIVE", "HT"] }, date: { lt: cutoff } },
-        data: { status: "FT", elapsed: 90 },
+        // H-5: only close the status; leave elapsed at its last feed value
+        // (was hardcoded 90, corrupting ET/pens matches to 90').
+        data: { status: "FT" },
       }).catch(() => {});
     }
 

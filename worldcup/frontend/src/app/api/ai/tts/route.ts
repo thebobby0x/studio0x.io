@@ -6,9 +6,23 @@ export const maxDuration = 30;
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 
-function storyKey(text: string): string {
-  // Stable slug for caching — first 60 chars slugified
-  return text.slice(0, 60).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+// Hard cap on synthesizable text (security audit 7/20, CR-3): the endpoint is
+// public and ElevenLabs bills per character on the expensive v3 model. Without
+// a cap, scripted max-length POSTs are attacker-controlled dollar burn. Real
+// lines are ≤28 words; 600 chars is generous headroom.
+const MAX_TTS_CHARS = 600;
+
+// Full-text hash for the blob cache key. SECURITY (CR-3): the key is derived
+// SERVER-SIDE from the trusted spoken text, NOT a client-supplied storyId.
+// The old key trusted the client's storyId with allowOverwrite:true, so an
+// attacker could overwrite the audio other users hear for a known line
+// (cache poisoning). Hashing the actual text makes the key uncontrollable and
+// collision-free: identical audio → identical key, different text → different
+// key, and an attacker can only ever write the bytes that match their own text.
+function textKey(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}${text.length.toString(36)}`;
 }
 
 // Roundtable persona voices — the owner's CUSTOM ElevenLabs voices (built
@@ -83,8 +97,13 @@ export async function POST(req: Request) {
   const defaultVoice = process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9"; // "Daniel" — deep news anchor
   if (!elKey) return NextResponse.json({ error: "ELEVENLABS_API_KEY not set" }, { status: 500 });
 
-  const { text: rawText, storyId, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
+  const { text: rawText, persona } = (await req.json()) as { text: string; storyId?: string; persona?: string };
   if (!rawText) return NextResponse.json({ error: "text required" }, { status: 400 });
+  // storyId is intentionally ignored now (see textKey) — the cache key is
+  // derived server-side from the trusted text to prevent cache poisoning.
+  if (typeof rawText !== "string" || rawText.length > MAX_TTS_CHARS) {
+    return NextResponse.json({ error: `text must be a string ≤ ${MAX_TTS_CHARS} chars` }, { status: 400 });
+  }
   // Respell applies to ALL Roundtable speakers (the host says the panelists'
   // names too) but NOT to commentary/story TTS, where "Henry" or "dale" could
   // be a real player or ordinary English.
@@ -98,7 +117,7 @@ export async function POST(req: Request) {
   // Check Vercel Blob cache — persona + audio rev in the key (all Roundtable
   // voices, host included) so voices never collide and model/settings/respell
   // changes regenerate instead of serving stale takes.
-  const blobKey = `tts/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${storyId ?? storyKey(text)}.mp3`;
+  const blobKey = `tts/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${textKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });

@@ -246,25 +246,16 @@ const SQUADS: Record<string, Array<{ id: string; number: number; name: string; p
   ],
 };
 
-// Anthem placeholders for seeded teams
-const ANTHEMS: Record<string, { id: string; title: string; url: string; durationSecs: number }> = {
-  MEX: { id: "audio-mex", title: "¡Viva México! (World Cup Anthem 2026)",             url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", durationSecs: 195 },
-  RSA: { id: "audio-rsa", title: "Amandla! South Africa Rises (World Cup Anthem 2026)", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", durationSecs: 212 },
-  KOR: { id: "audio-kor", title: "Red Devils Rise (World Cup Anthem 2026)",            url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", durationSecs: 188 },
-  CZE: { id: "audio-cze", title: "Bohemian Fire (World Cup Anthem 2026)",              url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", durationSecs: 201 },
-  USA: { id: "audio-usa", title: "Born to Play (USA World Cup Anthem 2026)",           url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3", durationSecs: 198 },
-  PAR: { id: "audio-par", title: "Guaraní Fire (Paraguay World Cup Anthem 2026)",      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3", durationSecs: 185 },
-  BRA: { id: "audio-bra", title: "Jogo Bonito (Brazil World Cup Anthem 2026)",         url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3", durationSecs: 220 },
-  ARG: { id: "audio-arg", title: "La Albiceleste Eterno (Argentina Anthem 2026)",      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", durationSecs: 205 },
-  FRA: { id: "audio-fra", title: "Les Bleus Triomphent (France Anthem 2026)",          url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3", durationSecs: 210 },
-  ENG: { id: "audio-eng", title: "Lions of England (World Cup Anthem 2026)",           url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3", durationSecs: 193 },
-  GER: { id: "audio-ger", title: "Deutsche Kraft (Germany World Cup Anthem 2026)",     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3", durationSecs: 200 },
-  ESP: { id: "audio-esp", title: "La Furia Roja (Spain World Cup Anthem 2026)",        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3", durationSecs: 197 },
-  POR: { id: "audio-por", title: "Nação Guerreira (Portugal Anthem 2026)",             url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",  durationSecs: 215 },
-  NED: { id: "audio-ned", title: "Oranje Vuur (Netherlands Anthem 2026)",              url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",  durationSecs: 188 },
-  CAN: { id: "audio-can", title: "True North Rising (Canada World Cup Anthem 2026)",   url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",  durationSecs: 202 },
-  URU: { id: "audio-uru", title: "Celeste y Blanca (Uruguay World Cup Anthem 2026)",   url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",  durationSecs: 190 },
-};
+// Anthems are NOT seeded here (audit 7/20, CR-1). They previously pointed every
+// team at a soundhelix.com stock demo track titled "¡Viva México! (World Cup
+// Anthem 2026)" etc. with a fabricated "Suno AI × studio0x" credit — random
+// stock music shipped and shareable as a real national anthem, the clearest
+// truth-rule violation in the app. Worse, re-seeds RE-WROTE the placeholder over
+// gaps. Anthems are now MANIFEST-OWNED only (lib/anthemManifest.ts → the
+// batch-anthem import writes real Blob URLs + real titles). Teams without a real
+// anthem simply have no AudioStream row and the Hub renders its "coming soon"
+// state. The seed's only anthem job is to PURGE any lingering stock placeholder
+// rows (below), never to create them.
 
 // WC 2026 official group stage venue assignments — hardcoded, never changes
 const MATCHUP_VENUES: Record<string, string> = {
@@ -550,27 +541,15 @@ async function seed(req: Request) {
     await prisma.kalshiMarket.createMany({ data: marketsData, skipDuplicates: true });
     log.push(`Upserted ${marketsData.length} Kalshi market records`);
 
-    // ── 9. Anthems LAST (non-critical, slowest) — parallelised ───────────────
-    // Teams are no longer wiped (stable IDs), so anthem links survive re-seeds.
-    // Upsert by stable anthem `id` remains for idempotency + legacy-orphan repair.
-    // Real Blob URLs are preserved; only soundhelix placeholders are (re)written.
-    const anthemResults = await Promise.all(
-      Object.entries(ANTHEMS).map(async ([tla, a]) => {
-        const teamId = teamIdByTla.get(tla);
-        if (!teamId) return "skip";
-        const existing = await prisma.audioStream.findUnique({ where: { id: a.id } });
-        const preserveUrl = !!existing && !existing.audioUrl.includes("soundhelix.com");
-        await prisma.audioStream.upsert({
-          where: { id: a.id },
-          create: { id: a.id, teamId, title: a.title, artistCredit: "Suno AI × studio0x", audioUrl: a.url, durationSecs: a.durationSecs, tiktokDeepLink: null },
-          update: { teamId, title: a.title, durationSecs: a.durationSecs, ...(preserveUrl ? {} : { audioUrl: a.url }) },
-        });
-        return preserveUrl ? "preserved" : "written";
-      })
-    );
-    const anthemsSeeded = anthemResults.filter(r => r === "written").length;
-    const anthemsSkipped = anthemResults.filter(r => r === "preserved").length;
-    log.push(`Anthems: ${anthemsSeeded} placeholder(s) written, ${anthemsSkipped} real URL(s) preserved`);
+    // ── 9. Anthem hygiene (audit 7/20, CR-1) — PURGE stock placeholders ──────
+    // The seed no longer creates anthem rows (real anthems are manifest-owned).
+    // Delete any lingering soundhelix.com stock-demo rows so no team ever plays
+    // random music credited as its national anthem. Real Blob-hosted anthems
+    // are untouched. Teams left without a row fall into the Hub's "coming soon".
+    const purged = await prisma.audioStream.deleteMany({
+      where: { audioUrl: { contains: "soundhelix.com" } },
+    });
+    log.push(`Anthems: purged ${purged.count} stock-placeholder row(s); real anthems are manifest-owned`);
 
   } catch (err) {
     const msg = err instanceof Error ? `${err.name}: ${err.message}\n\n${err.stack ?? ""}` : String(err);

@@ -4,6 +4,7 @@ export const maxDuration = 120;
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isAdminAuthed } from "@/lib/adminAuth";
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,17 +111,25 @@ export async function GET(req: Request) {
   // ?fresh=1 bypasses the module cache for ops verification (cheap: old
   // fixtures never refetch, so a rebuild costs at most 1-2 upstream calls).
   const url = new URL(req.url);
-  const fresh = url.searchParams.get("fresh") === "1";
+  // SECURITY (audit 7/20, CR-2): fresh/retryMissing/debug are OPS levers that
+  // bypass caches and fan out uncached api-football calls — an unauthenticated
+  // loop of ?retryMissing=1 could drain the daily quota in minutes. Gate them.
+  // The plain cached board stays fully public.
+  const wantsOps = url.searchParams.has("fresh") || url.searchParams.has("retryMissing") || url.searchParams.has("debug");
+  const opsAuthed = wantsOps ? await isAdminAuthed(req) : false;
+  if (wantsOps && !opsAuthed) {
+    return NextResponse.json({ error: "Unauthorized (ops params require admin)" }, { status: 401 });
+  }
+  const fresh = opsAuthed && url.searchParams.get("fresh") === "1";
   // ?retryMissing=1 (one-shot ops): bypass the 3-day never-coming rule for
   // event-less fixtures. Early fetch attempts were poisoned by a day-cached
   // empty response; upstream may have backfilled since (FRA 3-0 IRQ hides
   // real Mbappé goals — owner-reported total 10 vs our covered 8). Costs ≤31
   // calls once; successful fetches persist so the retry never repeats.
-  const retryMissing = url.searchParams.get("retryMissing") === "1";
+  const retryMissing = opsAuthed && url.searchParams.get("retryMissing") === "1";
   // ?debug=<fixture> returns the raw stored row exactly as the boards query
-  // sees it (7/19: totals excluded a match the coverage math said was
-  // counted — read-only, public data, zero API spend).
-  const debugFixture = parseInt(url.searchParams.get("debug") ?? "", 10);
+  // sees it (admin-only — reveals raw DB rows).
+  const debugFixture = opsAuthed ? parseInt(url.searchParams.get("debug") ?? "", 10) : NaN;
   if (debugFixture) {
     const m = await prisma.match.findMany({
       where: { fixture: debugFixture },

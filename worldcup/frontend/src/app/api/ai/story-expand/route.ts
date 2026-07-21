@@ -31,6 +31,17 @@ export async function POST(req: Request) {
     teamsInvolved: string[];
   };
 
+  // Input caps (audit 7/20, M-1): this endpoint is public and every unique body
+  // is a guaranteed Sonnet cache-miss, so unbounded free-form text is both a
+  // cost lever and the app's one prompt-injection surface. Real stories are a
+  // headline + a few sentences; cap hard. (Follow-up: bind to a server-known
+  // NewsStory id once editorial/archive ids are unified.)
+  if (typeof headline !== "string" || typeof body !== "string" ||
+      headline.length > 200 || body.length > 2000 ||
+      !Array.isArray(teamsInvolved) || teamsInvolved.length > 8) {
+    return NextResponse.json({ error: "invalid story payload" }, { status: 400 });
+  }
+
   const key = blobKey(headline, body);
 
   // L1 — in-memory hit

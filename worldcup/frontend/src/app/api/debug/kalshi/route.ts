@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { isAdminAuthed } from "@/lib/adminAuth";
+
+export const dynamic = "force-dynamic";
 
 const GAMMA = "https://gamma-api.polymarket.com";
 
@@ -16,7 +19,8 @@ async function get(url: string) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (!(await isAdminAuthed(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const results: Record<string, unknown> = {};
 
   // 1. Fetch ALL soccer events (more pages)

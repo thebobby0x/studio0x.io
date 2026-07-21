@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { isAdminAuthed } from "@/lib/adminAuth";
+
+export const dynamic = "force-dynamic";
 
 const BASE = "https://v3.football.api-sports.io";
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Admin-only (audit 7/20): spends 4 api-football calls/hit and leaks the
+  // account plan/usage via /status.
+  if (!(await isAdminAuthed(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return NextResponse.json({ error: "API_FOOTBALL_KEY not set" }, { status: 503 });
 

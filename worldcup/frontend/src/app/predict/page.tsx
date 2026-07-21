@@ -808,7 +808,7 @@ export default function PredictPage() {
                           </span>
                           <div className="text-right">
                             <span className="text-[10px] text-slate-600">{formatTime(m.date)}</span>
-                            {m.venue && (
+                            {m.venue && m.venue !== "World Cup Stadium" && (
                               <span className="text-[9px] text-slate-700 ml-2">
                                 {m.city || m.venue}
                               </span>

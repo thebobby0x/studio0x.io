@@ -95,7 +95,11 @@ export async function GET(
   // compares against the shared cache's own last event count.
   const lastEvents = parseInt(searchParams.get("lastEvents") ?? "-1", 10);
 
-  const cacheKey = `${id}|${rawPersona === "analyst" ? "analyst" : "roundtable"}|${limit}`;
+  // Cache key excludes `limit` (audit 7/20, M-3): keying on the client-supplied
+  // limit let an attacker enumerate limit=1..12 to force ~12× the intended one
+  // Haiku generation per 25s per match. One canonical batch per match+persona;
+  // the client slices to its own limit.
+  const cacheKey = `${id}|${rawPersona === "analyst" ? "analyst" : "roundtable"}`;
   const cachedBatch = _batchCache.get(cacheKey);
   if (cachedBatch && Date.now() - cachedBatch.ts < BATCH_TTL) {
     return NextResponse.json(cachedBatch.payload);
