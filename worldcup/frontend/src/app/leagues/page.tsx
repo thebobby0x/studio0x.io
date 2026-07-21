@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import AppNav from "@/components/ui/AppNav";
 import { prisma } from "@/lib/prisma";
+import { REAL_CLUB_WHERE } from "@/lib/clubData";
 import { Building2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import PlayerPerformanceIndex from "@/components/stats/PlayerPerformanceIndex";
@@ -26,7 +27,10 @@ function LeagueIcon({ league }: { league: string }): string {
 export default async function LeaguesPage() {
   const players = await prisma.player.findMany({
     include: { team: true },
-    where: { club: { not: "" } },
+    // H-2: only players with REAL domestic club data — excludes the
+    // "World Cup"/nation-as-club placeholder junk so the page never claims
+    // "47 clubs from 1 leagues" or "World Cup sends the most players".
+    where: REAL_CLUB_WHERE,
     orderBy: { name: "asc" },
   });
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { REAL_CLUB_WHERE } from "@/lib/clubData";
 
 const LEAGUE_FLAG: Record<string, string> = {
   "Premier League": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
@@ -91,7 +92,7 @@ function leagueTalkingPoint(l: LeagueEntry, rank: number, grandTotal: number, is
 export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
   // Fetch all players with clubs — include tournament stats + hat-trick matches when available
   const allPlayers = await prisma.player.findMany({
-    where: { club: { not: "" } },
+    where: REAL_CLUB_WHERE, // H-2: real domestic clubs only, not the WC placeholder
     include: {
       tournamentStat: true,
       matchStats: {

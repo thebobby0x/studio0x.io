@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { REAL_CLUB_WHERE } from "@/lib/clubData";
 
 interface ClubEntry {
   club: string;
@@ -10,7 +11,7 @@ interface ClubEntry {
 
 export default async function ClubContributionIndex({ limit = 10 }: { limit?: number }) {
   const players = await prisma.player.findMany({
-    where: { club: { not: "" } },
+    where: REAL_CLUB_WHERE, // H-2: real domestic clubs only, not the WC placeholder
     select: { club: true, league: true, goals: true },
   }).catch(() => []);
 

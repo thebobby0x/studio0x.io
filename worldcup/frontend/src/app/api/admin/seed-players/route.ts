@@ -313,6 +313,18 @@ async function seedMock() {
   return { updated, notFound };
 }
 
+// ⚠️ KNOWN BUG (7/20 night) — this seeds the WRONG club/league. It queries
+// api-football with `league=1` (which IS the World Cup), so `stat.team.name`
+// resolves to the player's NATIONAL TEAM and `stat.league.name` to "World Cup".
+// Result: every player got club=<nation>, league="World Cup" (owner ran it:
+// updated 880, notFound 515; the Leagues page then read "47 clubs from 1
+// leagues"). The render surfaces now guard this via lib/clubData REAL_CLUB_WHERE
+// (so no false claims display), but the DATA is still wrong.
+// TO FIX (daylight task): fetch each player's DOMESTIC club instead — e.g. for
+// each player id, GET /players?id={id}&season=2025 and pick the statistics entry
+// whose league is a real domestic competition (skip the national-team/World Cup
+// entry). ~1,248 calls; verify a sample before trusting. Then re-run + drop the
+// REAL_CLUB_WHERE guard's need. See docs/eod-2026-07-20.md.
 async function seedFromApi() {
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) {
