@@ -864,3 +864,32 @@ The stop hook (`~/.claude/stop-hook-git-check.sh`) will warn if there are uncomm
 **Stripe:** dedicated **studio0x** account (`acct_1SXQcK...`) — NOT the `STUDIO0X LLC` account (`acct_1TM9zi...`, which is singularityLab). Store edge-function secrets are namespaced: **`STRIPE_SECRET_KEY_marketEdgeFunctions`** / **`STRIPE_WEBHOOK_SECRET_marketEdgeFunctions`** (the plain `STRIPE_SECRET_KEY` in the project belongs to singularityLab — leave it).
 
 **Conventions:** product prices end in **7** ($27/$37/$47); brand names are camelCase. Store EOD reports live at **`docs/store-EOD-YYYY-MM-DD.md`** (distinct prefix to avoid case-twins with worldcup's `docs/eod-*.md`).
+
+---
+
+## EOD REPORT CONVENTION (owner-mandated 2026-07-22 · applies to EVERY session)
+
+At the end of any working session, when BK asks for an **"EOD report"**, produce a markdown file **committed to the repo at `docs/reports/`** using this exact structure — and also paste its full text in chat so BK can copy to Drive.
+
+**Filename:** `studio0x_<Project>_EODProgressReport_YYYY-MM-DD.md`
+PascalCase project name · ISO date · underscores · no spaces.
+e.g. `studio0x_HolaBeaches_EODProgressReport_2026-07-22.md`.
+*(Store session's `<Project>` token = `Market`.)*
+
+**Title line:** `# studio0x · <Project> · EOD Progress Report · YYYY-MM-DD`
+
+**Sections, in this exact order:**
+1. **TL;DR** — 3–5 sentences max, then one line: `Overall status: 🟢 Green / 🟡 Yellow / 🔴 Red` (add the reason if not green).
+2. **✅ Shipped / done today** — table `Item | Status | Notes`. Only things actually completed **and verified**.
+3. **🟡 In flight** — table `Item | Owner | State`. Started but not done.
+4. **⛔ Blocked / needs input** — table `Item | Blocking | Needed`. Name the exact input required and from whom.
+5. **🚩 Risk flags** — numbered list. Anything deviating from spec, any security/advisor findings, anything uncertain. *Flagging a concern is never penalized; hiding one is.*
+6. **📋 Tomorrow's punch list** — priority-ordered; each item actionable by a **named owner** (BK / Daiana / CC / chat-Claude).
+
+**Rules:**
+- Mark anything unverified `(unverified)`. Confirmed facts and assumptions must be distinguishable.
+- Never mark an item **Shipped** if tests/advisors weren't run — that's **In flight**.
+- Bottom-line-first, scannable, no filler prose.
+- Commit the report to the repo **AND** output its full text in chat.
+
+*Supersedes older per-session EOD file naming for reports going forward; historical store EODs remain at `docs/store-EOD-*.md`.*
