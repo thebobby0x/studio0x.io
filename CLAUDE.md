@@ -197,6 +197,35 @@ NO imaginary anything." Applies to EVERY content surface, present and future:
 before we move forward?" — when the owner writes QCC, respond with genuine
 questions/feedback on the plan just described, then proceed.
 
+**EOD REPORT CONVENTION (owner directive 7/20 — applies EVERY session):**
+When asked for an "EOD report" at the end of any working session, produce a
+markdown file in the repo at `docs/reports/` with this EXACT structure, AND
+output its full text in chat so BK can copy to Drive.
+- **Filename:** `studio0x_<Project>_EODProgressReport_YYYY-MM-DD.md` (PascalCase
+  project, ISO date, underscores, no spaces — e.g.
+  `studio0x_HolaBeaches_EODProgressReport_2026-07-22.md`).
+- **Title line:** `# studio0x · <Project> · EOD Progress Report · YYYY-MM-DD`
+- **Sections, in this order:**
+  1. **TL;DR** — 3-5 sentences max, then one line: `Overall status: 🟢 Green /
+     🟡 Yellow / 🔴 Red` (with reason if not green).
+  2. **✅ Shipped / done today** — table `Item | Status | Notes`. Only things
+     actually completed AND verified.
+  3. **🟡 In flight** — table `Item | Owner | State`. Started but not done.
+  4. **⛔ Blocked / needs input** — table `Item | Blocking | Needed`. Name the
+     exact input required and from whom.
+  5. **🚩 Risk flags** — numbered list. Anything deviating from spec, any
+     security/advisor finding, anything uncertain. Flagging a concern is never
+     penalized; hiding one is.
+  6. **📋 Tomorrow's punch list** — priority-ordered, each item actionable by a
+     named owner (BK / Daiana / CC / chat-Claude).
+- **Rules:** mark unverified claims `(unverified)`; NEVER list an item as
+  Shipped if tests/advisors weren't run (that's In flight); bottom-line-first,
+  scannable, no filler. Owners: **BK** (Robert Kelley Jr.), **Daiana**, **CC**
+  (Claude Code), **chat-Claude**.
+- This is IN ADDITION to the running narrative `docs/eod-YYYY-MM-DD.md` handoff
+  notes (which stay for cross-session continuity); the `docs/reports/` file is
+  the structured, copy-to-Drive deliverable.
+
 ---
 
 ## Key Decisions & Why
