@@ -7,10 +7,13 @@ export const maxDuration = 30;
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 
 // Hard cap on synthesizable text (security audit 7/20, CR-3): the endpoint is
-// public and ElevenLabs bills per character on the expensive v3 model. Without
-// a cap, scripted max-length POSTs are attacker-controlled dollar burn. Real
-// lines are ≤28 words; 600 chars is generous headroom.
-const MAX_TTS_CHARS = 600;
+// public and ElevenLabs bills per character, so cap per-call size to bound
+// abuse cost. 600 was too tight (7/20 night regression: story/analysis bodies
+// run 700–1,200+ chars → "audio not available"). The real defense against a
+// scripted-loop attack is the content-hash cache + per-call ceiling, not a
+// small limit — 4,000 chars covers every legitimate surface (commentary lines,
+// story bodies, Go-Deeper deep dives) while still blocking huge payloads.
+const MAX_TTS_CHARS = 4000;
 
 // Full-text hash for the blob cache key. SECURITY (CR-3): the key is derived
 // SERVER-SIDE from the trusted spoken text, NOT a client-supplied storyId.
