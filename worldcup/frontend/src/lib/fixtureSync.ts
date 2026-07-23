@@ -14,6 +14,10 @@ import { getVenueInfo } from "@/lib/venues";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AF_BASE = "https://v3.football.api-sports.io";
+// Phase 1 extraction (docs/leaguescup-build-plan.md): these should import
+// { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig" (defaults to these exact
+// values). Left inline deliberately — fixtureSync is the live/cron hot path the
+// postmortem flagged for a SUPERVISED-daylight swap, not an overnight change.
 const AF_LEAGUE = 1; // World Cup
 const AF_SEASON = 2026;
 
