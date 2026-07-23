@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
 import { isAdminAuthed } from "@/lib/adminAuth";
+// Phase 1 extraction: league/season now come from the shared deployment config
+// (defaults to WC26's league 1 / season 2026 — behavior-identical here).
+import { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig";
 
 const AF_BASE  = "https://v3.football.api-sports.io";
-const AF_LEAGUE = 1;    // World Cup
-const AF_SEASON = 2026;
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
