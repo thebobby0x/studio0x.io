@@ -35,7 +35,7 @@ async function gate() {
   if (!user) return;
   const { data: profile } = await supabase.from("profiles").select("role,email").eq("id", user.id).single();
   if (!profile || !["admin", "superadmin"].includes(profile.role)) {
-    loginMsg.textContent = "This account is not an admin. Set role='superadmin' on your profile in Supabase.";
+    loginMsg.textContent = "This account is not an admin.";
     await supabase.auth.signOut();
     return;
   }
