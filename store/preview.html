@@ -198,7 +198,7 @@ function tile(p){
 }
 
 async function load(){
-  if (!configured()){ stateEl.textContent = "Storefront not connected."; return; }
+  if (!configured()){ stateEl.textContent = "Loading store…"; return; }
   const { data, error } = await supabase
     .from("products")
     .select("name,tagline,type,engine,price_cents,compare_at_cents,photo_url,cover_image_url,is_featured")
