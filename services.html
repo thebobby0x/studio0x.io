@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>studio0x — Event production & planning, powered by eventOS</title>
+<meta name="description" content="studio0x is an event production and planning studio — corporate meetings, brand activations, sports hospitality, and phygital fan experiences. We run every project on our own AI platform, eventOS." />
+<meta property="og:title" content="studio0x — Event production & planning studio" />
+<meta property="og:description" content="We plan events. So we built the operating system for them. Now we're opening eventOS to planners like us." />
+<meta property="og:url" content="https://studio0x.io/services.html" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+--bg: #1a1718;          /* ink-derived dark base */
+--bg2: #211d1e;         /* ink */
+--bg3: #2a2526;         /* ink raised */
+--border: rgba(247,181,205,0.10);  /* faint pink hairline */
+--text: #FFFFFF;        /* white body on dark */
+--muted: #b8a9ad;       /* muted warm grey-pink */
+--accent: #F7B5CD;      /* Miami pink — primary accent */
+--accent2: #00A3E0;     /* Miami blue — accessible secondary accent */
+--mint: #98FFD9;        /* easy mint — sparing highlight */
+--ink: #231F20;         /* primary black */
+--danger: #FF671F;      /* Miami orange — energy/alert */
+--font-display: 'Syne', sans-serif;
+--font-mono: 'DM Mono', monospace;
+}
+html { scroll-behavior: smooth; }
+body {
+background: var(--bg);
+color: var(--text);
+font-family: var(--font-display);
+line-height: 1.6;
+-webkit-font-smoothing: antialiased;
+overflow-x: hidden;
+}
+/* ── NOISE OVERLAY ── */
+body::before {
+content: '';
+position: fixed; inset: 0;
+background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+pointer-events: none;
+z-index: 0;
+opacity: 0.4;
+}
+/* ── NAV ── */
+nav {
+position: fixed; top: 0; left: 0; right: 0;
+z-index: 100;
+display: flex; align-items: center; justify-content: space-between;
+padding: 20px 48px;
+background: rgba(7,8,10,0.85);
+backdrop-filter: blur(20px);
+border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+font-size: 1.1rem;
+font-weight: 700;
+letter-spacing: -0.02em;
+color: var(--text);
+text-decoration: none;
+}
+.nav-logo span { color: var(--accent); }
+/* Force zero to render as zero, not letter-o, across all brand name instances */
+.brand-name {
+font-family: var(--font-mono);
+font-variant-numeric: slashed-zero;
+letter-spacing: -0.02em;
+}
+.nav-links {
+display: flex; gap: 32px; list-style: none;
+}
+.nav-links a {
+color: var(--muted);
+text-decoration: none;
+font-size: 0.875rem;
+font-weight: 500;
+letter-spacing: 0.02em;
+transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-links a.current { color: var(--accent); }
+/* ── HERO ── */
+.hero {
+position: relative;
+min-height: 92vh;
+display: flex; align-items: center; justify-content: center;
+padding: 140px 48px 80px;
+text-align: center;
+overflow: hidden;
+}
+.hero-grid {
+position: absolute; inset: 0;
+background-image:
+linear-gradient(rgba(247,181,205,0.05) 1px, transparent 1px),
+linear-gradient(90deg, rgba(247,181,205,0.05) 1px, transparent 1px);
+background-size: 64px 64px;
+mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+.hero-glow {
+position: absolute;
+width: 600px; height: 600px;
+background: radial-gradient(circle, rgba(247,181,205,0.16) 0%, transparent 70%);
+top: -100px; left: 50%; transform: translateX(-50%);
+pointer-events: none;
+}
+.hero-inner {
+position: relative; z-index: 1;
+max-width: 860px;
+}
+.hero-badge {
+display: inline-flex; align-items: center; gap: 8px;
+padding: 6px 14px;
+background: rgba(247,181,205,0.12);
+border: 1px solid rgba(247,181,205,0.30);
+border-radius: 100px;
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--accent);
+letter-spacing: 0.08em;
+text-transform: uppercase;
+margin-bottom: 32px;
+}
+.hero-badge::before {
+content: '';
+width: 6px; height: 6px;
+background: var(--accent);
+border-radius: 50%;
+animation: pulse 2s ease infinite;
+}
+@keyframes pulse {
+0%, 100% { opacity: 1; transform: scale(1); }
+50% { opacity: 0.4; transform: scale(0.8); }
+}
+.hero h1 {
+font-size: clamp(2.6rem, 6vw, 4.6rem);
+font-weight: 800;
+line-height: 1.06;
+letter-spacing: -0.04em;
+margin-bottom: 24px;
+}
+.hero h1 em {
+font-style: normal;
+background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+}
+.hero-sub {
+font-size: 1.15rem;
+color: var(--muted);
+max-width: 640px;
+margin: 0 auto 40px;
+line-height: 1.7;
+font-weight: 400;
+}
+.hero-cta {
+display: inline-flex; align-items: center; gap: 10px;
+padding: 14px 28px;
+background: var(--accent);
+color: var(--ink);
+border: none;
+cursor: pointer;
+border-radius: 8px;
+text-decoration: none;
+font-family: var(--font-display);
+font-weight: 700;
+font-size: 0.95rem;
+letter-spacing: -0.01em;
+transition: opacity 0.2s, transform 0.2s;
+}
+.hero-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+.cta-subline {
+display: block;
+margin-top: 14px;
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+letter-spacing: 0.03em;
+}
+/* ── IMAGE PLACEHOLDER (no stock imagery — labeled slots for a designer) ── */
+.img-placeholder {
+position: relative;
+border: 1px dashed rgba(247,181,205,0.35);
+border-radius: 16px;
+background:
+repeating-linear-gradient(45deg, rgba(247,181,205,0.04) 0 12px, transparent 12px 24px),
+var(--bg3);
+display: flex; align-items: center; justify-content: center;
+text-align: center;
+color: var(--muted);
+overflow: hidden;
+}
+.img-placeholder .ph-label {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+padding: 16px 20px;
+line-height: 1.6;
+}
+.img-placeholder .ph-label strong { color: var(--accent); font-weight: 500; }
+.hero-visual {
+margin: 8px auto 0;
+max-width: 720px;
+height: 200px;
+}
+/* ── SECTION BASE ── */
+section {
+position: relative; z-index: 1;
+padding: 96px 48px;
+}
+.section-inner {
+max-width: 1100px;
+margin: 0 auto;
+}
+.section-label {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+letter-spacing: 0.14em;
+text-transform: uppercase;
+color: var(--accent);
+margin-bottom: 16px;
+}
+.section-title {
+font-size: clamp(2rem, 4vw, 3rem);
+font-weight: 800;
+letter-spacing: -0.03em;
+line-height: 1.1;
+margin-bottom: 20px;
+}
+.section-body {
+color: var(--muted);
+font-size: 1.05rem;
+line-height: 1.75;
+max-width: 680px;
+}
+.section-body + .section-body { margin-top: 18px; }
+/* ── DIVIDER ── */
+.divider {
+height: 1px;
+background: var(--border);
+margin: 0 48px;
+}
+/* ── CREDIBILITY STRIP ── */
+.credibility {
+background: var(--bg2);
+padding: 44px 48px;
+}
+.credibility-inner {
+max-width: 1000px;
+margin: 0 auto;
+text-align: center;
+}
+.credibility-label {
+font-family: var(--font-mono);
+font-size: 0.68rem;
+letter-spacing: 0.16em;
+text-transform: uppercase;
+color: var(--muted);
+margin-bottom: 14px;
+}
+.credibility-line {
+font-size: 1.02rem;
+line-height: 1.8;
+color: var(--text);
+max-width: 820px;
+margin: 0 auto;
+}
+.credibility-line .brands { color: var(--accent); font-weight: 700; }
+/* ── SERVICES GRID ── */
+.services { background: var(--bg); }
+.services-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+gap: 24px;
+margin-top: 56px;
+}
+.service-card {
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 32px;
+transition: border-color 0.2s, transform 0.2s;
+display: flex; flex-direction: column; gap: 14px;
+}
+.service-card:hover {
+border-color: rgba(247,181,205,0.35);
+transform: translateY(-2px);
+}
+.service-num {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+letter-spacing: 0.1em;
+color: var(--accent2);
+}
+.service-name {
+font-size: 1.3rem;
+font-weight: 800;
+letter-spacing: -0.03em;
+color: var(--text);
+line-height: 1.2;
+}
+.service-desc {
+font-size: 0.92rem;
+color: var(--muted);
+line-height: 1.7;
+}
+/* ── STORY ── */
+.story { background: var(--bg2); }
+.story-visual { margin-top: 48px; height: 220px; }
+/* ── EVENTOS PRODUCT / CTA ── */
+.eventos { background: var(--bg); }
+.eventos-card {
+position: relative;
+background: var(--bg3);
+border: 1px solid rgba(247,181,205,0.22);
+border-radius: 20px;
+padding: 56px 48px;
+overflow: hidden;
+margin-top: 24px;
+}
+.eventos-card .hero-glow {
+top: -300px; opacity: 0.7;
+}
+.eventos-inner {
+position: relative; z-index: 1;
+display: flex; flex-direction: column;
+align-items: flex-start;
+gap: 20px;
+max-width: 720px;
+}
+.eventos-badge {
+display: inline-flex; align-items: center; gap: 8px;
+padding: 5px 12px;
+background: rgba(0,163,224,0.14);
+border: 1px solid rgba(0,163,224,0.30);
+border-radius: 100px;
+font-family: var(--font-mono);
+font-size: 0.7rem;
+color: var(--accent2);
+letter-spacing: 0.08em;
+text-transform: uppercase;
+}
+.eventos-title {
+font-size: clamp(1.9rem, 4vw, 2.8rem);
+font-weight: 800;
+letter-spacing: -0.03em;
+line-height: 1.1;
+}
+.eventos-title em {
+font-style: normal;
+background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+}
+.eventos-body { color: var(--muted); font-size: 1.05rem; line-height: 1.75; }
+.eventos-launch {
+font-family: var(--font-mono);
+font-size: 0.78rem;
+color: var(--mint);
+letter-spacing: 0.04em;
+}
+/* ── FOOTER ── */
+footer {
+position: relative; z-index: 1;
+padding: 32px 48px;
+border-top: 1px solid var(--border);
+display: flex;
+align-items: center;
+justify-content: space-between;
+flex-wrap: wrap;
+gap: 16px;
+}
+.footer-copy {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+}
+.footer-copy strong { color: var(--text); }
+.footer-right {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+}
+.footer-right a {
+color: var(--accent);
+text-decoration: none;
+}
+/* ── INTAKE MODAL ── */
+.modal-overlay {
+position: fixed; inset: 0;
+z-index: 200;
+display: none;
+align-items: center; justify-content: center;
+padding: 24px;
+background: rgba(6,6,8,0.72);
+backdrop-filter: blur(6px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+position: relative;
+width: 100%;
+max-width: 560px;
+max-height: 90vh;
+overflow-y: auto;
+background: var(--bg2);
+border: 1px solid rgba(247,181,205,0.20);
+border-radius: 18px;
+padding: 36px 34px 30px;
+}
+.modal-close {
+position: absolute; top: 16px; right: 18px;
+background: none; border: none;
+color: var(--muted);
+font-size: 1.4rem;
+cursor: pointer;
+line-height: 1;
+transition: color 0.2s;
+}
+.modal-close:hover { color: var(--text); }
+.modal-kicker {
+font-family: var(--font-mono);
+font-size: 0.7rem;
+letter-spacing: 0.12em;
+text-transform: uppercase;
+color: var(--accent);
+margin-bottom: 6px;
+}
+.modal-progress {
+display: flex; gap: 6px;
+margin: 18px 0 26px;
+}
+.modal-progress .pip {
+height: 4px; flex: 1;
+border-radius: 100px;
+background: var(--bg3);
+transition: background 0.3s;
+}
+.modal-progress .pip.done { background: var(--accent); }
+.modal-progress .pip.active { background: var(--accent2); }
+.step { display: none; }
+.step.active { display: block; animation: stepIn 0.35s ease; }
+@keyframes stepIn {
+from { opacity: 0; transform: translateY(8px); }
+to { opacity: 1; transform: translateY(0); }
+}
+.step-q {
+font-size: 1.35rem;
+font-weight: 800;
+letter-spacing: -0.02em;
+line-height: 1.25;
+margin-bottom: 6px;
+}
+.step-hint {
+font-family: var(--font-mono);
+font-size: 0.72rem;
+color: var(--muted);
+letter-spacing: 0.03em;
+margin-bottom: 20px;
+}
+.opt-grid { display: flex; flex-direction: column; gap: 10px; }
+.opt {
+text-align: left;
+padding: 14px 18px;
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 10px;
+color: var(--text);
+font-family: var(--font-display);
+font-size: 0.98rem;
+font-weight: 600;
+cursor: pointer;
+transition: border-color 0.2s, background 0.2s;
+}
+.opt:hover { border-color: rgba(247,181,205,0.4); }
+.opt.selected {
+border-color: var(--accent);
+background: rgba(247,181,205,0.10);
+}
+.field {
+width: 100%;
+padding: 14px 16px;
+background: var(--bg3);
+border: 1px solid var(--border);
+border-radius: 10px;
+color: var(--text);
+font-family: var(--font-display);
+font-size: 1rem;
+transition: border-color 0.2s;
+}
+.field::placeholder { color: rgba(184,169,173,0.6); }
+.field:focus { outline: none; border-color: var(--accent); }
+textarea.field { resize: vertical; min-height: 110px; line-height: 1.6; }
+.field + .field { margin-top: 12px; }
+.field-error {
+color: var(--danger);
+font-family: var(--font-mono);
+font-size: 0.72rem;
+margin-top: 10px;
+min-height: 1em;
+}
+.modal-nav {
+display: flex; align-items: center; justify-content: space-between;
+gap: 12px;
+margin-top: 26px;
+}
+.btn {
+padding: 12px 24px;
+border-radius: 8px;
+font-family: var(--font-display);
+font-weight: 700;
+font-size: 0.92rem;
+cursor: pointer;
+border: 1px solid var(--border);
+transition: opacity 0.2s, transform 0.2s, border-color 0.2s;
+}
+.btn-primary {
+background: var(--accent);
+color: var(--ink);
+border-color: var(--accent);
+}
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-ghost {
+background: transparent;
+color: var(--muted);
+}
+.btn-ghost:hover { color: var(--text); border-color: rgba(247,181,205,0.3); }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; transform: none; }
+/* Success state */
+.modal-success { display: none; text-align: center; padding: 12px 4px; }
+.modal-success.show { display: block; }
+.success-mark {
+width: 56px; height: 56px;
+margin: 0 auto 18px;
+border-radius: 50%;
+background: rgba(152,255,217,0.14);
+border: 1px solid rgba(152,255,217,0.4);
+display: flex; align-items: center; justify-content: center;
+color: var(--mint);
+font-size: 1.6rem;
+}
+.modal-success h3 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+.modal-success p { color: var(--muted); font-size: 0.95rem; line-height: 1.7; max-width: 400px; margin: 0 auto 8px; }
+.modal-success .success-mail {
+font-family: var(--font-mono);
+font-size: 0.75rem;
+color: var(--muted);
+margin-top: 14px;
+}
+.modal-success .success-mail a { color: var(--accent); text-decoration: none; }
+.fade-in {
+opacity: 0;
+transform: translateY(20px);
+transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in.visible {
+opacity: 1;
+transform: translateY(0);
+}
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+nav { padding: 16px 24px; }
+.nav-links { display: none; }
+section { padding: 64px 24px; }
+.hero { padding: 120px 24px 56px; min-height: auto; }
+.credibility { padding: 36px 24px; }
+.divider { margin: 0 24px; }
+.eventos-card { padding: 40px 24px; }
+.modal { padding: 30px 22px 24px; }
+footer { padding: 24px; flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+<!-- NAV — mirrors apex index.html; "Services" added + marked current -->
+<nav>
+<a href="/" class="nav-logo brand-name">studio<span>0x</span></a>
+<ul class="nav-links">
+<li><a href="/#mission">About</a></li>
+<li><a href="/#products">Products</a></li>
+<li><a href="/services.html" class="current">Services</a></li>
+<li><a href="/#company">Company</a></li>
+<li><a href="/#contact">Contact</a></li>
+</ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+<div class="hero-grid"></div>
+<div class="hero-glow"></div>
+<div class="hero-inner fade-in visible">
+<div class="hero-badge">Event production &amp; planning</div>
+<h1>We plan events. So we built the<br/><em>operating system for them.</em></h1>
+<p class="hero-sub">
+<span class="brand-name">studio0x</span> is an event production and planning studio — corporate
+meetings, brand activations, sports hospitality, and phygital fan experiences. We run every
+project on our own AI platform, <strong style="color:var(--text);font-weight:700;">eventOS</strong>
+— and now we're opening it to planners like us.
+</p>
+<button class="hero-cta" type="button" data-open-intake>Start your event brief →</button>
+<span class="cta-subline">No contact form. Answer a few questions and eventOS builds your framework.</span>
+<!-- VISUAL PLACEHOLDER: hero -->
+<div class="img-placeholder hero-visual">
+<span class="ph-label"><strong>[ HERO VISUAL ]</strong><br/>Event production floor / show-caller at the desk — wide, cinematic. 1600×900.</span>
+</div>
+</div>
+</section>
+
+<!-- CREDIBILITY STRIP -->
+<div class="credibility">
+<div class="credibility-inner fade-in">
+<div class="credibility-label">Experience you can stand on</div>
+<p class="credibility-line">
+Experience across work with and for brands including
+<span class="brands">Tesla · IMAX · Visa · SAP · PGA</span>
+— and a portfolio of branded fan activations built for the FIFA World Cup cycle.
+</p>
+</div>
+</div>
+
+<!-- SERVICES -->
+<section class="services">
+<div class="section-inner">
+<div class="section-label fade-in">What we do</div>
+<h2 class="section-title fade-in">Full-service event production —<br/>run on our own platform.</h2>
+<p class="section-body fade-in">
+From the first brief to the final load-out, every engagement is produced by our team and managed
+inside eventOS. Five ways we plug in.
+</p>
+<div class="services-grid">
+<div class="service-card fade-in">
+<span class="service-num">01</span>
+<h3 class="service-name">Event production &amp; planning</h3>
+<p class="service-desc">Concept to load-out: programming, budgets, vendors, venues, staffing, show-calling.</p>
+</div>
+<div class="service-card fade-in">
+<span class="service-num">02</span>
+<h3 class="service-name">Meetings &amp; corporate events</h3>
+<p class="service-desc">Sourcing, logistics, and execution, managed through eventOS from the first brief.</p>
+</div>
+<div class="service-card fade-in">
+<span class="service-num">03</span>
+<h3 class="service-name">Brand activations &amp; phygital experiences</h3>
+<p class="service-desc">Interactive fan-zone games, touchscreen experiences, live leaderboards, photo installations — white-labeled to your brand.</p>
+</div>
+<div class="service-card fade-in">
+<span class="service-num">04</span>
+<h3 class="service-name">Sports hospitality &amp; VIP programs</h3>
+<p class="service-desc">Travel intelligence, hospitality packages, concierge-level guest handling.</p>
+</div>
+<div class="service-card fade-in">
+<span class="service-num">05</span>
+<h3 class="service-name">Event technology</h3>
+<p class="service-desc">We build event tech for ourselves every day. If your event needs custom software, we're the producers who can also ship it.</p>
+</div>
+</div>
+</div>
+</section>
+
+<div class="divider"></div>
+
+<!-- STORY -->
+<section class="story">
+<div class="section-inner">
+<div class="section-label fade-in">The origin</div>
+<h2 class="section-title fade-in">Every event we run, runs on eventOS.</h2>
+<p class="section-body fade-in">
+We got tired of planning events across ten disconnected tools — so we built one. Every module
+inside eventOS started as something we built for a real job: budgets we tracked, floor plans we
+mapped, exhibitor intelligence we mined, schedules we ran.
+</p>
+<p class="section-body fade-in">
+They earned their place one production at a time. eventOS is what happened when we finally put
+them together. It got too good to keep to ourselves.
+</p>
+<!-- VISUAL PLACEHOLDER: story -->
+<div class="img-placeholder story-visual fade-in">
+<span class="ph-label"><strong>[ SECTION VISUAL — STORY ]</strong><br/>eventOS modules stitched into one canvas: budget · floor plan · exhibitor intel · run-of-show. 1400×700.</span>
+</div>
+</div>
+</section>
+
+<div class="divider"></div>
+
+<!-- EVENTOS AS PRODUCT + CTA -->
+<section class="eventos">
+<div class="section-inner">
+<div class="eventos-card fade-in">
+<div class="hero-glow"></div>
+<div class="eventos-inner">
+<span class="eventos-badge">eventOS · now open to planners</span>
+<h2 class="eventos-title">The platform we built for our own events is <em>opening up.</em></h2>
+<p class="eventos-body">
+The platform we built for our own events is opening to meeting planners, event producers, and
+corporate teams. Don't fill out a contact form — start planning. Answer a few questions the way
+you'd brief a producer, and eventOS builds your event framework in front of you.
+</p>
+<p class="eventos-launch">Launching at IMEX America, October 2026.</p>
+<button class="hero-cta" type="button" data-open-intake style="margin-top:6px;">Start your event brief →</button>
+</div>
+</div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+<div class="footer-copy">
+© 2026 <strong class="brand-name">studio0x LLC</strong> · All rights reserved ·
+EIN 42-1902785 · Sarasota, FL 34235
+</div>
+<div class="footer-right">
+<a href="/">studio0x.io</a>
+&nbsp;·&nbsp;
+<a href="mailto:yo@studio0x.io">yo@studio0x.io</a>
+</div>
+</footer>
+
+<!-- ── INTAKE MODAL — 6-step event brief ── -->
+<div class="modal-overlay" id="intake" role="dialog" aria-modal="true" aria-labelledby="intake-kicker">
+<div class="modal">
+<button class="modal-close" type="button" data-close-intake aria-label="Close">×</button>
+<div class="modal-kicker" id="intake-kicker">Your event brief</div>
+
+<!-- FORM -->
+<form id="intake-form" novalidate>
+<div class="modal-progress" aria-hidden="true">
+<span class="pip"></span><span class="pip"></span><span class="pip"></span>
+<span class="pip"></span><span class="pip"></span><span class="pip"></span>
+</div>
+
+<!-- Step 1: event type -->
+<div class="step" data-step="1">
+<div class="step-q">What kind of event?</div>
+<div class="step-hint">Pick the closest fit.</div>
+<div class="opt-grid" data-single-select="eventType">
+<button type="button" class="opt" data-value="Meeting">Meeting</button>
+<button type="button" class="opt" data-value="Conference">Conference</button>
+<button type="button" class="opt" data-value="Brand activation">Brand activation</button>
+<button type="button" class="opt" data-value="Sports hospitality">Sports hospitality</button>
+<button type="button" class="opt" data-value="Other">Other</button>
+</div>
+</div>
+
+<!-- Step 2: attendees -->
+<div class="step" data-step="2">
+<div class="step-q">Roughly how many attendees?</div>
+<div class="step-hint">A ballpark is fine.</div>
+<input class="field" type="text" name="attendees" inputmode="numeric" autocomplete="off" placeholder="e.g. 250, or 5,000+" />
+</div>
+
+<!-- Step 3: when and where -->
+<div class="step" data-step="3">
+<div class="step-q">When and where?</div>
+<div class="step-hint">Dates and city/venue — even approximate.</div>
+<input class="field" type="text" name="whenWhere" autocomplete="off" placeholder="e.g. Q2 2026 · Miami, FL — venue TBD" />
+</div>
+
+<!-- Step 4: success outcome -->
+<div class="step" data-step="4">
+<div class="step-q">What outcome would make it a success?</div>
+<div class="step-hint">The one thing that has to go right.</div>
+<textarea class="field" name="outcome" placeholder="e.g. 40 qualified partner meetings and a launch moment people post about."></textarea>
+</div>
+
+<!-- Step 5: biggest headache -->
+<div class="step" data-step="5">
+<div class="step-q">Biggest headache planning it right now?</div>
+<div class="step-hint">Where it hurts most today.</div>
+<textarea class="field" name="headache" placeholder="e.g. Vendor sprawl and a budget I can't keep current."></textarea>
+</div>
+
+<!-- Step 6: name + email -->
+<div class="step" data-step="6">
+<div class="step-q">Where do we send your framework?</div>
+<div class="step-hint">Name and email. No login, no spam.</div>
+<input class="field" type="text" name="name" autocomplete="name" placeholder="Your name" />
+<input class="field" type="email" name="email" autocomplete="email" placeholder="you@company.com" />
+</div>
+
+<div class="field-error" id="intake-error" aria-live="polite"></div>
+
+<div class="modal-nav">
+<button class="btn btn-ghost" type="button" id="btn-back" disabled>← Back</button>
+<button class="btn btn-primary" type="button" id="btn-next">Next →</button>
+</div>
+</form>
+
+<!-- SUCCESS -->
+<div class="modal-success" id="intake-success">
+<div class="success-mark">✓</div>
+<h3>Brief received.</h3>
+<p>Thanks — your answers are saved and on their way to our producers. We'll come back with an eventOS framework, not a boilerplate reply.</p>
+<p class="success-mail">If your email app didn't open, send the brief to <a href="mailto:yo@studio0x.io">yo@studio0x.io</a>.</p>
+<div class="modal-nav" style="justify-content:center;">
+<button class="btn btn-ghost" type="button" data-close-intake>Close</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+/* ── Scroll-triggered fade-ins (same behavior as apex index.html) ── */
+const observer = new IntersectionObserver((entries) => {
+entries.forEach((entry, i) => {
+if (entry.isIntersecting) {
+setTimeout(() => entry.target.classList.add('visible'), i * 80);
+observer.unobserve(entry.target);
+}
+});
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(el => {
+if (!el.classList.contains('visible')) observer.observe(el);
+});
+
+/* ── Intake questionnaire ── */
+(function () {
+const RECIPIENT = 'yo@studio0x.io';
+const STORAGE_KEY = 'studio0x_event_briefs';
+/* Optional server endpoint. When set (e.g. a Formspree/Supabase-edge URL),
+   the brief is POSTed for real server-side email + storage. Left empty so the
+   static apex page works with no backend: it still saves locally and opens a
+   pre-filled email to RECIPIENT. Wire a URL here to go fully server-side. */
+const BRIEF_ENDPOINT = '';
+
+const TOTAL = 6;
+let current = 1;
+const answers = { eventType: '' };
+
+const overlay = document.getElementById('intake');
+const form = document.getElementById('intake-form');
+const successEl = document.getElementById('intake-success');
+const errorEl = document.getElementById('intake-error');
+const btnBack = document.getElementById('btn-back');
+const btnNext = document.getElementById('btn-next');
+const pips = overlay.querySelectorAll('.modal-progress .pip');
+const steps = overlay.querySelectorAll('.step');
+
+function openModal() {
+current = 1;
+render();
+overlay.classList.add('open');
+document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+overlay.classList.remove('open');
+document.body.style.overflow = '';
+}
+
+document.querySelectorAll('[data-open-intake]').forEach(b => b.addEventListener('click', openModal));
+document.querySelectorAll('[data-close-intake]').forEach(b => b.addEventListener('click', closeModal));
+overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
+
+/* single-select option buttons (step 1) */
+overlay.querySelectorAll('[data-single-select]').forEach(group => {
+const key = group.getAttribute('data-single-select');
+group.querySelectorAll('.opt').forEach(opt => {
+opt.addEventListener('click', () => {
+group.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+opt.classList.add('selected');
+answers[key] = opt.getAttribute('data-value');
+errorEl.textContent = '';
+});
+});
+});
+
+function render() {
+steps.forEach(s => s.classList.toggle('active', Number(s.getAttribute('data-step')) === current));
+pips.forEach((p, i) => {
+p.classList.toggle('done', i < current - 1);
+p.classList.toggle('active', i === current - 1);
+});
+btnBack.disabled = current === 1;
+btnNext.textContent = current === TOTAL ? 'Submit brief →' : 'Next →';
+errorEl.textContent = '';
+}
+
+function validateStep() {
+if (current === 1) {
+if (!answers.eventType) return 'Pick an event type to continue.';
+return '';
+}
+if (current === 6) {
+const name = form.name.value.trim();
+const email = form.email.value.trim();
+if (!name) return 'Please add your name.';
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email.';
+return '';
+}
+/* Steps 2–5 are free-text and optional — a producer can chase detail later. */
+return '';
+}
+
+btnBack.addEventListener('click', () => {
+if (current > 1) { current--; render(); }
+});
+
+btnNext.addEventListener('click', () => {
+const err = validateStep();
+if (err) { errorEl.textContent = err; return; }
+if (current < TOTAL) { current++; render(); return; }
+submitBrief();
+});
+
+function collect() {
+return {
+eventType: answers.eventType || '',
+attendees: form.attendees.value.trim(),
+whenWhere: form.whenWhere.value.trim(),
+outcome: form.outcome.value.trim(),
+headache: form.headache.value.trim(),
+name: form.name.value.trim(),
+email: form.email.value.trim(),
+page: 'studio0x.io/services',
+submittedAt: new Date().toISOString()
+};
+}
+
+/* Persist locally so a brief is never lost even with no backend. */
+function storeLocal(data) {
+try {
+const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+all.push(data);
+localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+} catch (e) { /* storage may be unavailable; email still goes out */ }
+}
+
+function buildMailto(d) {
+const subject = 'New event brief — ' + (d.eventType || 'Event') + (d.name ? ' · ' + d.name : '');
+const body =
+'New event brief from studio0x.io/services\n' +
+'--------------------------------------------\n' +
+'Event type:      ' + (d.eventType || '—') + '\n' +
+'Attendees:       ' + (d.attendees || '—') + '\n' +
+'When & where:    ' + (d.whenWhere || '—') + '\n' +
+'Success outcome: ' + (d.outcome || '—') + '\n' +
+'Biggest headache:' + (d.headache || '—') + '\n' +
+'--------------------------------------------\n' +
+'Name:  ' + (d.name || '—') + '\n' +
+'Email: ' + (d.email || '—') + '\n' +
+'Submitted: ' + d.submittedAt + '\n';
+return 'mailto:' + RECIPIENT + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+
+function showSuccess() {
+form.style.display = 'none';
+overlay.querySelector('.modal-kicker').textContent = 'Brief received';
+successEl.classList.add('show');
+}
+
+function submitBrief() {
+const data = collect();
+storeLocal(data);
+/* Server path (only if an endpoint is configured) */
+if (BRIEF_ENDPOINT) {
+try {
+fetch(BRIEF_ENDPOINT, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(data)
+}).catch(() => {});
+} catch (e) { /* non-blocking */ }
+}
+/* Email path — always works on the static apex: opens the user's mail client
+   with a fully pre-filled message to yo@studio0x.io. */
+try {
+const link = buildMailto(data);
+const w = window.open(link, '_blank');
+if (!w) window.location.href = link;
+} catch (e) { /* ignore — data is already stored */ }
+showSuccess();
+}
+})();
+</script>
+</body>
+</html>
