@@ -12,7 +12,23 @@ export const dynamic = "force-dynamic";
 // empty, it says so (count 0) so we can STOP rather than paper over a gap.
 //   GET /api/admin/lc-probe   (SUPER_ADMIN or ?secret=)
 export async function GET(req: Request) {
-  if (!(await isAdminAuthed(req))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!(await isAdminAuthed(req))) {
+    // Self-diagnosing 403 (read-only probe, no secrets exposed): tells us which
+    // secret THIS env expects, so the preview-vs-prod SEED_SECRET scoping can't
+    // trap us. seedSecretConfigured reveals only whether the var is set, never
+    // its value. When false, the accepted secret is the legacy "wc2026studio0x".
+    const seedSecretConfigured = Boolean(process.env.SEED_SECRET);
+    return NextResponse.json(
+      {
+        error: "Forbidden",
+        seedSecretConfigured,
+        hint: seedSecretConfigured
+          ? "Pass ?secret=<this env's SEED_SECRET>. Note preview and production can have different SEED_SECRET scoping."
+          : "SEED_SECRET is NOT set in this env → pass ?secret=wc2026studio0x (the legacy secret).",
+      },
+      { status: 403 },
+    );
+  }
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return NextResponse.json({ error: "API_FOOTBALL_KEY not set" }, { status: 500 });
   if (!isConfigured(LEAGUES_CUP)) return NextResponse.json({ error: "LEAGUES_CUP not configured (leagueId<=0)" }, { status: 400 });
