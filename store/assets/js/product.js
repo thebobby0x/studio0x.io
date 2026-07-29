@@ -7,8 +7,22 @@ const slug = qs("slug");
 const contentEl = document.getElementById("content");
 
 // Active brand: ?brand= param (or set inline by a per-brand page).
-const BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get("brand") || null;
-const brandQ = BRAND_KEY ? `?brand=${encodeURIComponent(BRAND_KEY)}` : "";
+let BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get("brand") || null;
+let brandQ = BRAND_KEY ? `?brand=${encodeURIComponent(BRAND_KEY)}` : "";
+
+// eComKiller → eComEdge rename cutover: resolve to whichever twin key exists in
+// the DB so old and new brand links both work across the static/DB rollout.
+const BRAND_TWINS = ["ecomkiller", "ecomedge"];
+async function resolveBrandKey() {
+  if (!BRAND_KEY || !BRAND_TWINS.includes(BRAND_KEY)) return;
+  try {
+    const { data } = await supabase.from("brands").select("key").in("key", BRAND_TWINS);
+    const keys = (data || []).map((r) => r.key);
+    if (keys.includes("ecomedge")) BRAND_KEY = "ecomedge";
+    else if (keys.length) BRAND_KEY = keys[0];
+  } catch { /* keep the requested key */ }
+  brandQ = BRAND_KEY ? `?brand=${encodeURIComponent(BRAND_KEY)}` : "";
+}
 
 // Engine key → display name for the provenance badge.
 const ENGINE_NAMES = { contentos: "contentOS", templatevault: "templateVault" };
@@ -18,6 +32,7 @@ mountThemeToggle(document.querySelector(".nav-links"));
 
 // Brand-aware nav: theme accent + logo, and keep ?brand= on back links.
 async function applyBrand() {
+  await resolveBrandKey();
   document.querySelectorAll('a[href="./index.html"]').forEach((a) => { a.href = `./index.html${brandQ}`; });
   if (!BRAND_KEY) return;
   try {
