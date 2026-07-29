@@ -54,6 +54,8 @@ export interface DeploymentConfig {
   /** Ambient audio bed for the live experience. */
   audioBed: AudioBed;
   branding: Branding;
+  /** Optional deployment display/mono fonts (defaults to Inter when omitted). */
+  fonts?: { display: string; mono: string };
 
   // ── feed ──
   feedProvider: FeedProvider;
@@ -129,12 +131,15 @@ export const LEAGUES_CUP: DeploymentConfig = {
   momentTypes: FOOTBALL_MOMENTS,
   audioBed: "stadium",
   branding: {
-    // TODO(BK): replace with Leagues Cup style-guide colors. Placeholders only.
-    primary: "#10b981",
-    secondary: "#0d1828",
-    accent: "#f59e0b",
+    // studio0x brand tokens for LC26 (owner 7/29): Miami-pink accent, electric-blue
+    // accent2, near-black base, Syne/DM Mono. NOT the licensed Leagues Cup marks —
+    // styleGuideConfirmed stays false (SUM owns the marks; editorial-only, no logos).
+    primary: "#ff2d78", // Miami pink — accent
+    secondary: "#0a0a0f", // near-black base
+    accent: "#2d9bff", // electric blue — accent2
     styleGuideConfirmed: false,
   },
+  fonts: { display: "Syne", mono: "DM Mono" },
   feedProvider: "api-football",
   leagueId: Number(process.env.LEAGUES_CUP_LEAGUE_ID ?? 0),
   season: Number(process.env.LEAGUES_CUP_SEASON ?? 2026),

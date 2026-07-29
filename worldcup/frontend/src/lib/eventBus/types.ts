@@ -71,8 +71,9 @@ export interface MatchMoment {
   /** Which deployment/tournament produced it (DeploymentConfig.id). Lets the bus
    *  be shared even if multiple tournaments ever run in one store. */
   tournamentId: string;
-  /** Internal Match id (or race id). */
-  matchId: string;
+  /** Internal Match id (or race id). Optional — publishers often hold only the
+   *  fixture id; the store backfills matchId when known. */
+  matchId?: string;
   /** Upstream fixture id (api-football) — natural key most publishers already hold. */
   fixture: number;
   type: MomentType;
@@ -94,8 +95,9 @@ export interface MatchMoment {
   /** One-line why, for transparency in the feed ("late equaliser in a knockout"). */
   significanceReason: string;
   source: MomentSource;
-  /** When it happened in the match (ISO). */
-  occurredAt: string;
+  /** When it happened in the match (ISO). Optional — publishers that only know
+   *  the match minute omit it; the store falls back to firstSeenAt. */
+  occurredAt?: string;
   /** When the bus recorded it (ISO). */
   publishedAt: string;
 }
@@ -110,8 +112,10 @@ export type MatchMomentInput = Omit<
  *  stream (that's the 0x360 feed). Filter matchIds → a single match view. */
 export interface MomentQuery {
   tournamentId?: string;
-  /** Restrict to these matches. Omit for ALL matches (0x360). */
+  /** Restrict to these matches by internal Match.id. Omit for ALL matches (0x360). */
   matchIds?: string[];
+  /** Restrict to these upstream fixture ids — the natural key most publishers hold. */
+  fixtures?: number[];
   /** Restrict to currently-live matches only (0x360 default). */
   liveOnly?: boolean;
   types?: MomentType[];

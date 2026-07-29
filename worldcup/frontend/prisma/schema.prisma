@@ -365,6 +365,41 @@ model MatchEventLog {
   @@index([fixture])
 }
 
+// The event bus's durable moment stream — the sport-agnostic generalization of
+// MatchEventLog (the GoalEvent→MomentEvent migration flagged as highest-value).
+// EVERY live event (any sport) publishes a scored MatchMoment here; every
+// consumer (a match view, the Roundtable, the future 0x360 multiview) is a query
+// over this one table. `type` is a String on purpose: football moments publish
+// now, and F1 moment types (OVERTAKE/PIT_STOP/FASTEST_LAP) are a config swap with
+// NO schema change. `momentKey` keeps MatchEventLog's stable-dedup contract so
+// polling re-observation upserts instead of duplicating. tournamentId scopes rows
+// per deployment (worldcup/leaguescup/f1-2026).
+model MatchMoment {
+  id                 String    @id @default(cuid())
+  tournamentId       String
+  fixture            Int
+  matchId            String? // internal Match.id once resolved (optional)
+  momentKey          String // stable dedup: `${type}|${period}|${minute}|${detail}`
+  type               String // MomentType (union stored as string — F1-ready)
+  period             String?
+  minute             Int
+  clockLabel         String?
+  team               String?
+  entity             String? // player / driver
+  payload            Json? // type-specific, grounded-only detail
+  significance       Int       @default(0)
+  significanceReason String?
+  source             String    @default("real") // real | reconstructed
+  occurredAt         DateTime?
+  firstSeenAt        DateTime  @default(now())
+  publishedAt        DateTime  @default(now())
+
+  @@unique([tournamentId, fixture, momentKey])
+  @@index([tournamentId, fixture])
+  @@index([tournamentId, publishedAt])
+  @@index([tournamentId, significance])
+}
+
 // Heat vs. Outcomes (Cramp Watch™ aggregate, backlog §16): one row per fixture
 // with the REAL kickoff-hour weather (Open-Meteo hourly archive — retrieval of
 // archived fact, honest to backfill) plus outcome facts computed from the
