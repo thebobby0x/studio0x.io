@@ -7,7 +7,21 @@ const cfg = window.STORE_CONFIG;
 document.getElementById("tagline").textContent = cfg.tagline || document.getElementById("tagline").textContent;
 
 // Active brand: set inline by a per-brand folder page, or via ?brand= param.
-const BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get("brand") || null;
+let BRAND_KEY = window.STORE_BRAND || new URLSearchParams(location.search).get("brand") || null;
+
+// eComKiller → eComEdge rename cutover: resolve the brand param to whichever
+// twin key actually exists in the DB, so old ?brand=ecomkiller bookmarks and
+// new ?brand=ecomedge links both work regardless of static/DB rollout order.
+const BRAND_TWINS = ["ecomkiller", "ecomedge"];
+async function resolveBrandKey() {
+  if (!BRAND_KEY || !BRAND_TWINS.includes(BRAND_KEY)) return;
+  try {
+    const { data } = await supabase.from("brands").select("key").in("key", BRAND_TWINS);
+    const keys = (data || []).map((r) => r.key);
+    if (keys.includes("ecomedge")) BRAND_KEY = "ecomedge";       // prefer the new key once it exists
+    else if (keys.length) BRAND_KEY = keys[0];                    // else fall back to whichever exists
+  } catch { /* keep the requested key */ }
+}
 
 // Mount the cart toggle into the nav.
 mountCartToggle(document.getElementById("cart-mount"));
@@ -123,6 +137,7 @@ async function load() {
     stateEl.remove();
     return;
   }
+  await resolveBrandKey();
   await applyBrand();
   await renderBrandDirectory();
   try {

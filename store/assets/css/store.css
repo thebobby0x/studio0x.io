@@ -569,7 +569,10 @@ html[data-brand="agentedge"] .hero {
     linear-gradient(180deg, var(--bg2), var(--bg));
 }
 
-/* eComKiller — ecommerce: hot, high-energy, conversion (dual punch) */
+/* eComEdge — ecommerce: hot, high-energy, conversion (dual punch).
+   Dual selector during the eComKiller→eComEdge rename cutover — the ecomkiller
+   selector stays until the DB flip lands so the hero theme never breaks. */
+html[data-brand="ecomedge"] .hero,
 html[data-brand="ecomkiller"] .hero {
   background:
     radial-gradient(820px 420px at 14% -12%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 56%),
