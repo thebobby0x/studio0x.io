@@ -141,7 +141,10 @@ export const LEAGUES_CUP: DeploymentConfig = {
   },
   fonts: { display: "Syne", mono: "DM Mono" },
   feedProvider: "api-football",
-  leagueId: Number(process.env.LEAGUES_CUP_LEAGUE_ID ?? 0),
+  // api-football V3 league id, verified from the dashboard (owner 7/29): 772
+  // (season 2026, Current=True). NOTE: 8157 is the V2 legacy per-season id — do
+  // NOT use it; this codebase targets v3.football.api-sports.io. env can override.
+  leagueId: Number(process.env.LEAGUES_CUP_LEAGUE_ID ?? 772),
   season: Number(process.env.LEAGUES_CUP_SEASON ?? 2026),
   eventName: "Leagues Cup 2026",
   brandSubtitle: "podiumMetrics – Leagues Cup 2026",
