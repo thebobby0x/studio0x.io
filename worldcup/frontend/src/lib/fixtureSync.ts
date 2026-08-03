@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
+// league/season from the active deployment config (Stage 3): worldcup → 1/2026
+// (unchanged, behavior-preserving); leaguescup → 772/2026.
+import { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Non-destructive fixture sync — the permanent fix for the stale-DB class of
@@ -14,12 +17,7 @@ import { getVenueInfo } from "@/lib/venues";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AF_BASE = "https://v3.football.api-sports.io";
-// Phase 1 extraction (docs/leaguescup-build-plan.md): these should import
-// { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig" (defaults to these exact
-// values). Left inline deliberately — fixtureSync is the live/cron hot path the
-// postmortem flagged for a SUPERVISED-daylight swap, not an overnight change.
-const AF_LEAGUE = 1; // World Cup
-const AF_SEASON = 2026;
+// AF_LEAGUE / AF_SEASON now come from @/lib/sportConfig (imported at top).
 
 export const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
