@@ -85,3 +85,5 @@ export async function GET(req: Request) {
     { headers: NO_INDEX },
   );
 }
+
+// redeploy: pick up LC_PROBE_SECRET / API_FOOTBALL_KEY env (Aug 3)
