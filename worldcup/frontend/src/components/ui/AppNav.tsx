@@ -29,17 +29,21 @@ function GroupMenu({ group, path }: { group: NavGroup; path: string }) {
     <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors ${
-          isActive ? "font-bold text-brand-gold" : "font-semibold text-slate-500 hover:text-slate-300"
+        className={`s0x-mono flex items-center gap-1.5 px-3 py-2 text-[11px] transition-colors ${
+          isActive
+            ? "font-bold text-s0x-accent s0x-neon-rosa"
+            : "font-medium text-s0x-muted hover:text-s0x-accent"
         }`}
       >
         {group.label}
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {isActive && <span className="absolute -bottom-[13px] left-3 right-3 h-px bg-brand-gold/70" />}
+      {isActive && (
+        <span className="absolute -bottom-[13px] left-3 right-3 h-px bg-s0x-ink shadow-glow-rosa" />
+      )}
       {open && (
         <div className="absolute left-0 top-full pt-1 z-50">
-          <div className="w-44 rounded-xl border border-brand-border bg-brand-card shadow-2xl shadow-black/50 overflow-hidden py-1">
+          <div className="w-44 rounded-s0x border border-s0x-border bg-s0x-surface shadow-2xl shadow-black/50 overflow-hidden py-1">
             {group.items.map((item) => {
               const itemActive = item.exact ? path === item.href : path.startsWith(item.href) && item.href !== "/";
               return (
@@ -47,10 +51,10 @@ function GroupMenu({ group, path }: { group: NavGroup; path: string }) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className={`block px-4 py-2.5 text-xs transition-colors ${
+                  className={`s0x-mono block px-4 py-2.5 text-[10px] transition-colors ${
                     itemActive
-                      ? "font-bold text-brand-gold bg-brand-gold/10"
-                      : "font-medium text-slate-400 hover:text-white hover:bg-white/5"
+                      ? "font-bold text-s0x-accent bg-s0x-ink/15"
+                      : "font-medium text-s0x-muted hover:text-s0x-accent hover:bg-s0x-ink/10"
                   }`}
                 >
                   {item.label}
@@ -87,23 +91,23 @@ function UserMenu({ session }: { session: NonNullable<ReturnType<typeof useSessi
         }
       </button>
       {open && (
-        <div className="absolute right-0 top-8 w-44 rounded-xl border border-brand-border bg-brand-card shadow-xl z-50 overflow-hidden py-1">
-          <div className="px-3 py-2 border-b border-brand-border">
-            <div className="text-[11px] font-semibold text-white truncate">{session.user?.name}</div>
-            <div className="text-[10px] text-slate-500 truncate">{session.user?.email}</div>
+        <div className="absolute right-0 top-8 w-44 rounded-s0x border border-s0x-border bg-s0x-surface shadow-xl z-50 overflow-hidden py-1">
+          <div className="px-3 py-2 border-b border-s0x-border">
+            <div className="text-[11px] font-semibold text-s0x-text truncate">{session.user?.name}</div>
+            <div className="s0x-data text-[10px] text-s0x-muted truncate">{session.user?.email}</div>
           </div>
           {isSuperAdmin && (
             <Link
               href="/admin"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-brand-gold hover:bg-brand-gold/10 transition-colors"
+              className="s0x-mono flex items-center gap-2 px-3 py-2 text-[10px] text-s0x-accent hover:bg-s0x-ink/15 transition-colors"
             >
               <Shield size={12} /> Admin Panel
             </Link>
           )}
           <button
             onClick={() => signOut()}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="s0x-mono w-full flex items-center gap-2 px-3 py-2 text-[10px] text-s0x-muted hover:text-s0x-text hover:bg-s0x-ink/10 transition-colors"
           >
             <LogOut size={12} /> Sign out
           </button>
@@ -122,15 +126,17 @@ export default function AppNav() {
 
   return (
     <div className="sticky top-0 z-50">
-      <nav className="border-b border-brand-border bg-brand-dark/80 backdrop-blur-xl">
+      {/* Noir 900 command bar — a hairline Rosa rule under it reads as the HUD chrome. */}
+      <nav className="relative border-b border-s0x-border bg-s0x-bg/85 backdrop-blur-xl">
+        <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-s0x-ink/60 to-transparent" />
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
-            <Trophy size={17} className="text-brand-gold" />
+            <Trophy size={17} className="text-s0x-ink" />
             <div className="leading-none">
-              <div className="font-black text-white text-sm tracking-tight group-hover:text-brand-gold transition-colors">
-                podium<span className="text-brand-gold">Metrics</span>
+              <div className="s0x-display font-black text-s0x-text text-sm tracking-tight transition-colors group-hover:text-s0x-accent">
+                podium<span className="text-s0x-accent">Metrics</span>
               </div>
-              <div className="text-[8px] text-slate-700 tracking-widest uppercase">studio0x.io</div>
+              <div className="s0x-mono text-[8px] text-s0x-muted/70 mt-0.5">studio0x.io</div>
             </div>
           </Link>
 
@@ -144,7 +150,7 @@ export default function AppNav() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={toggleUnits}
-              className="text-[10px] font-mono text-slate-500 hover:text-slate-300 border border-brand-border hover:border-slate-600 rounded px-1.5 py-0.5 transition-colors shrink-0"
+              className="s0x-data text-[10px] text-s0x-muted hover:text-s0x-teal border border-s0x-border hover:border-s0x-teal/60 rounded px-1.5 py-0.5 transition-colors shrink-0"
               title="Toggle metric / imperial"
             >
               <span className="hidden sm:inline">{units === "metric" ? "°C · km" : "°F · mi"}</span>
@@ -155,7 +161,7 @@ export default function AppNav() {
             <ThemeToggle className="hidden sm:flex" />
 
             <div className="hidden lg:flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-s0x-teal animate-pulse shadow-glow-teal" />
               <LiveClock />
             </div>
 
@@ -165,7 +171,7 @@ export default function AppNav() {
               ) : (
                 <button
                   onClick={() => signIn("google")}
-                  className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-brand-gold hover:opacity-80 transition-opacity"
+                  className="s0x-mono shrink-0 flex items-center gap-1 text-[10px] font-semibold text-s0x-accent hover:opacity-80 transition-opacity"
                 >
                   <LogIn size={11} />
                   <span className="hidden sm:inline">Sign in</span>
@@ -186,22 +192,23 @@ export default function AppNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                  className={`s0x-mono shrink-0 px-3 py-1.5 rounded-full text-[10px] transition-colors ${
                     itemActive
-                      ? "font-bold text-brand-dark bg-brand-gold"
-                      : "font-medium text-slate-400 bg-white/5 hover:text-white"
+                      ? "font-bold text-s0x-text bg-s0x-ink shadow-glow-rosa"
+                      : "font-medium text-s0x-muted bg-s0x-surface border border-s0x-border hover:text-s0x-accent"
                   }`}
                 >
                   {item.label}
                 </Link>
               );
             })}
+            {/* Anthems shortcut — the audio surface is Riptide territory. */}
             <Link
               href="/anthems"
-              className={`ml-auto shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
+              className={`s0x-mono ml-auto shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] transition-colors ${
                 path.startsWith("/anthems")
-                  ? "font-bold text-brand-dark bg-brand-gold"
-                  : "font-semibold text-brand-gold bg-brand-gold/10 border border-brand-gold/20"
+                  ? "font-bold text-s0x-onink bg-s0x-teal shadow-glow-teal"
+                  : "font-semibold text-s0x-teal bg-s0x-teal/10 border border-s0x-teal/40"
               }`}
             >
               <Music2 size={12} />

@@ -3,43 +3,103 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Theme tokens (RGB triples so Tailwind alpha modifiers like /10 keep working).
-   Dark is the default — luxury: deep warm near-black, champagne gold, rich
-   emerald. [data-theme="light"] flips to a warm-ivory "lite mode".
-   Tailwind's brand.* colors read these vars (see tailwind.config.ts), so the
-   whole app re-skins from here.
+   studio0x · LC26 GAMING-UI / DARK-HUD SKIN
+   ─────────────────────────────────────────
+   Every color below comes from the official studio0x brand palette. Nothing is
+   invented, nothing is a stock Tailwind hue.
+
+     Noir 900  #0F0C0E   page background
+     Noir 800  #1D191C   cards, panels
+     Noir 700  #312C2F   borders, dividers
+     Bone 50   #FAF5F7   primary text
+     Muted     #9A8F95   metadata
+     Rosa 200  #F8BDD8   hover/highlight — the readable pink
+     Rosa 700  #CA358B   primary CTA fill + the neon glow source
+     Riptide   #5DCBD1   data / stats / live values
+
+   The app's ~130 components were authored against six legacy vars
+   (--bg/--card/--border/--gold/--green/--blue). Rather than touch every file,
+   those vars now RESOLVE to the palette above, so the whole surface re-skins
+   from here. New markup should use the explicit `s0x-*` Tailwind colors and the
+   HUD utilities at the bottom of this file.
 ──────────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: 5 7 14;            /* deep warm near-black (was #060b18) */
-  --card: 11 18 32;
-  --border: 28 37 54;
-  --green: 16 185 129;
-  --gold: 217 180 92;      /* champagne gold (was amber #f59e0b) */
-  --blue: 59 130 246;
-  --ink: #e2e8f0;          /* body text */
+  /* ── Official studio0x tokens (RGB triples so /alpha modifiers work) ── */
+  --s0x-bg:         15 12 14;    /* Noir 900  #0F0C0E */
+  --s0x-surface:    29 25 28;    /* Noir 800  #1D191C */
+  --s0x-border:     49 44 47;    /* Noir 700  #312C2F */
+  --s0x-text:      250 245 247;  /* Bone 50   #FAF5F7 */
+  --s0x-muted:     154 143 149;  /* muted     #9A8F95 */
+  --s0x-accent:    248 189 216;  /* Rosa 200  #F8BDD8 */
+  --s0x-accent-ink: 202 53 139;  /* Rosa 700  #CA358B */
+  --s0x-teal:       93 203 209;  /* Riptide   #5DCBD1 */
+
+  /* Fixed anchors — these two never flip with the theme, because they are what
+     goes ON a Rosa 700 / Riptide fill (which is the same color in both modes). */
+  --s0x-on-accent: 250 245 247;  /* Bone 50 text on a Rosa 700 fill */
+  --s0x-noir:       15 12 14;    /* Noir 900 text on a Rosa 200 / Riptide fill */
+
+  /* Neutral hairline used by the scan-line texture. */
+  --s0x-scan: 250 245 247 / .045;
+
+  --s0x-glow-rosa: 0 0 9px rgb(248 189 216 / .95), 0 0 30px rgb(238 116 179 / .65);
+  --s0x-glow-teal: 0 0 9px rgb(93 203 209 / .85), 0 0 30px rgb(93 203 209 / .45);
+  --s0x-radius: 12px;
+  --s0x-radius-pill: 999px;
+
+  /* ── Legacy brand vars → studio0x palette (tailwind.config.ts reads these).
+        They read THROUGH the s0x tokens, so flipping the theme below re-skins
+        the legacy `brand-*` utilities and the explicit `s0x-*` ones together. ── */
+  --bg:     var(--s0x-bg);
+  --card:   var(--s0x-surface);
+  --border: var(--s0x-border);
+  --gold:   var(--s0x-accent);      /* the old brand accent is now Rosa */
+  --green:  var(--s0x-teal);        /* live / positive / "good" → Riptide */
+  --blue:   var(--s0x-teal);        /* info / data-viz → Riptide */
+  --ink: #FAF5F7;
+
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-body: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
+/* Lite mode stays on-palette: Bone 50 paper, Noir ink, Rosa 700 accent.
+   Only the NEUTRAL ramp flips — Rosa 700 and the fixed on-accent anchors are
+   identical in both modes, so buttons/badges/glow need no per-theme markup. */
 [data-theme="light"] {
-  --bg: 246 244 238;       /* warm ivory — luxe light, not stark white */
-  --card: 255 255 255;
-  --border: 227 222 210;
-  --green: 12 143 102;
-  --gold: 160 127 44;      /* darkened champagne for contrast on ivory */
-  --blue: 37 99 235;
-  --ink: #232019;
+  --s0x-bg:      250 245 247;   /* Bone 50 paper */
+  --s0x-surface: 255 255 255;
+  --s0x-border:  226 214 220;
+  --s0x-text:     26 21 23;     /* Noir ink */
+  --s0x-muted:   107 93 99;
+  --s0x-accent:  202 53 139;    /* Rosa 700 — Rosa 200 is invisible on Bone */
+  --s0x-teal:     34 128 133;   /* Riptide darkened for AA on Bone */
+  --s0x-scan:     26 21 23 / .04;
+  --ink: #1A1517;
 }
 
 body {
   background-color: rgb(var(--bg));
   color: var(--ink);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-body);
   min-height: 100vh;
+  /* Ambient HUD wash — two Rosa/Riptide radial bleeds over Noir 900. Fixed so
+     it reads as a command-center backdrop rather than scrolling wallpaper. */
+  background-image:
+    radial-gradient(900px 520px at 12% -8%, rgb(202 53 139 / .10), transparent 62%),
+    radial-gradient(760px 460px at 92% 4%, rgb(93 203 209 / .07), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
+[data-theme="light"] body { background-image: none; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: rgb(var(--bg)); }
 ::-webkit-scrollbar-thumb { background: rgb(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--s0x-accent-ink)); }
+
+::selection { background: rgb(202 53 139 / .35); color: #FAF5F7; }
 
 /* Pulse animation for live indicator */
 @keyframes livePulse {
@@ -48,31 +108,488 @@ body {
 }
 .live-dot { animation: livePulse 1.4s ease-in-out infinite; }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   LITE MODE utility remaps. Components are authored dark-first with hardcoded
-   slate/white utilities; these attribute-scoped overrides flip the most-used
-   ones so the whole app reads correctly on ivory without touching every file.
-   (Deliberately curated — accent colors like red/amber stay as-is; brand.*
-   utilities re-theme automatically via the vars above.)
-──────────────────────────────────────────────────────────────────────────── */
-[data-theme="light"] .text-white { color: #1d1a14; }
-[data-theme="light"] .text-slate-200 { color: #2a261e; }
-[data-theme="light"] .text-slate-300 { color: #3d382e; }
-[data-theme="light"] .text-slate-400 { color: #5c5546; }
-[data-theme="light"] .text-slate-500 { color: #6f675a; }
-[data-theme="light"] .text-slate-600 { color: #8a8171; }
-[data-theme="light"] .text-slate-700 { color: #a89f8d; }
+/* ═════════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY — Archivo (display) · Instrument Sans (body) · IBM Plex Mono (data)
+   Archivo is loaded with its `wdth` axis so headings can run EXPANDED: 125 for
+   the hero, stepping down to 105 for card titles.
+   ══════════════════════════════════════════════════════════════════════════ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 105;
+  letter-spacing: -0.005em;
+}
+
+.s0x-display,
+.s0x-display-hero { font-family: var(--font-display); }
+/* Hero scale — maximum expansion. */
+.s0x-display-hero { font-variation-settings: "wdth" 125; letter-spacing: -0.01em; }
+/* Card / panel scale. */
+.s0x-display      { font-variation-settings: "wdth" 105; }
+
+/* Labels, data, scores, timers — mono, uppercase, +14% tracking. */
+.s0x-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+/* Same face + tracking, but case-preserving (for values, not labels). */
+.s0x-data {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section eyebrow — Rosa 700, mono, uppercase, tracked, neon-lifted.
+   NOTE: Rosa 700 on Noir 900 measures ~3.2:1; the glow is what carries it.
+   Reserve it for decorative eyebrow labels above a real heading — never for
+   body copy or the only copy in a region. */
+.s0x-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--s0x-accent-ink));
+  text-shadow: 0 0 12px rgb(202 53 139 / .85);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Leading tick so the eyebrow reads as a HUD marker. */
+.s0x-eyebrow::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(var(--s0x-accent-ink));
+  box-shadow: var(--s0x-glow-rosa);
+}
+[data-theme="light"] .s0x-eyebrow { text-shadow: none; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   HUD TEXTURES — pure CSS, no image assets.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Grid plate: 1px Rosa/Riptide graticule fading out toward the edges. */
+.s0x-hud-grid { position: relative; isolation: isolate; overflow: hidden; }
+.s0x-hud-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right,  rgb(248 189 216 / .07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(248 189 216 / .07) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(ellipse 78% 88% at 50% 45%, #000 35%, transparent 100%);
+          mask-image: radial-gradient(ellipse 78% 88% at 50% 45%, #000 35%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Scan lines: 3px repeating rule + one slow sweeping band. */
+.s0x-hud-scan { position: relative; isolation: isolate; overflow: hidden; }
+.s0x-hud-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(var(--s0x-scan)) 0px,
+    rgb(var(--s0x-scan)) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+
+/* The travelling scan band — sits inside a .s0x-hud-scan / .s0x-hud-grid box. */
+.s0x-scanline {
+  position: absolute;
+  inset-inline: 0;
+  height: 22%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(248 189 216 / .10),
+    rgb(93 203 209 / .06),
+    transparent
+  );
+  animation: hudSweep 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes hudSweep {
+  0%   { transform: translateY(-120%); }
+  100% { transform: translateY(520%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s0x-scanline { animation: none; opacity: .35; }
+}
+
+/* Corner brackets — the "targeting reticle" frame on HUD panels. */
+.s0x-brackets { position: relative; }
+.s0x-brackets::before,
+.s0x-brackets::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: rgb(var(--s0x-accent-ink));
+  pointer-events: none;
+}
+.s0x-brackets::before { top: 8px; left: 8px; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 4px; }
+.s0x-brackets::after { bottom: 8px; right: 8px; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 4px; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   NEON
+   ══════════════════════════════════════════════════════════════════════════ */
+.s0x-neon-rosa { text-shadow: var(--s0x-glow-rosa); }
+.s0x-neon-teal { text-shadow: var(--s0x-glow-teal); }
+.s0x-glow-rosa { box-shadow: 0 0 12px rgb(202 53 139 / .55), 0 0 34px rgb(202 53 139 / .28); }
+.s0x-glow-teal { box-shadow: 0 0 12px rgb(93 203 209 / .45), 0 0 34px rgb(93 203 209 / .22); }
+[data-theme="light"] .s0x-neon-rosa,
+[data-theme="light"] .s0x-neon-teal { text-shadow: none; }
+[data-theme="light"] .s0x-glow-rosa,
+[data-theme="light"] .s0x-glow-teal { box-shadow: none; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   COMPONENTS — cards, buttons, badges, tables
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Card: Noir 800 surface, Noir 700 border, 12px radius, Rosa 700 left accent
+   that lights up on hover. */
+.s0x-card {
+  position: relative;
+  background-color: rgb(var(--s0x-surface));
+  border: 1px solid rgb(var(--s0x-border));
+  border-radius: var(--s0x-radius);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.s0x-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: rgb(var(--s0x-accent-ink));
+  box-shadow: var(--s0x-glow-rosa);
+  opacity: 0;
+  transform: scaleY(.35);
+  transition: opacity .22s ease, transform .22s ease;
+  pointer-events: none;
+}
+.s0x-card:hover { border-color: rgb(202 53 139 / .45); }
+.s0x-card:hover::before { opacity: 1; transform: scaleY(1); }
+
+/* Buttons */
+.s0x-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  border-radius: var(--s0x-radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: .55rem 1.05rem;
+  border: 1px solid transparent;
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease;
+}
+.s0x-btn-primary {
+  background-color: rgb(var(--s0x-accent-ink));
+  color: rgb(var(--s0x-on-accent));
+  box-shadow: 0 0 18px rgb(202 53 139 / .35);
+}
+.s0x-btn-primary:hover {
+  background-color: #F8BDD8;
+  color: rgb(var(--s0x-noir));
+  box-shadow: 0 0 14px rgb(248 189 216 / .6), 0 0 34px rgb(238 116 179 / .4);
+}
+.s0x-btn-secondary {
+  background-color: rgb(var(--s0x-surface));
+  border-color: rgb(var(--s0x-border));
+  color: rgb(var(--s0x-text));
+}
+.s0x-btn-secondary:hover {
+  border-color: rgb(var(--s0x-accent-ink));
+  color: rgb(var(--s0x-accent));
+}
+/* Riptide variant — reserved for the anthem / audio surfaces. */
+.s0x-btn-teal {
+  background-color: rgb(93 203 209 / .10);
+  border-color: rgb(93 203 209 / .45);
+  color: rgb(var(--s0x-teal));
+}
+.s0x-btn-teal:hover {
+  background-color: rgb(93 203 209 / .18);
+  border-color: rgb(var(--s0x-teal));
+  box-shadow: var(--s0x-glow-teal);
+}
+.s0x-btn-teal[data-active="true"] {
+  background-color: rgb(var(--s0x-teal));
+  border-color: rgb(var(--s0x-teal));
+  color: rgb(var(--s0x-on-accent));
+  box-shadow: var(--s0x-glow-teal);
+}
+
+/* LIVE badge — Rosa 700 fill, Bone text, neon halo. */
+.s0x-live {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .15rem .55rem;
+  border-radius: var(--s0x-radius-pill);
+  background: rgb(var(--s0x-accent-ink));
+  color: rgb(var(--s0x-on-accent));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgb(202 53 139 / .7), 0 0 26px rgb(238 116 179 / .45);
+}
+.s0x-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(var(--s0x-on-accent));
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+
+/* Odds / stats tables — full mono, alternating Noir 800 / Noir 900 rows. */
+.s0x-table { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.s0x-table .s0x-row:nth-child(odd)  { background-color: rgb(var(--s0x-surface)); }
+.s0x-table .s0x-row:nth-child(even) { background-color: rgb(var(--s0x-bg)); }
+.s0x-table .s0x-row:hover           { background-color: rgb(202 53 139 / .08); }
+.s0x-pos { color: rgb(var(--s0x-teal)); }                 /* positive / in-progress */
+.s0x-feat { color: rgb(var(--s0x-accent)); }              /* featured */
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   DARK SKIN LAYER
+   The app is authored dark-first with hardcoded slate/white/amber/red/green
+   utilities. These attribute-scoped rules repaint every one of them onto the
+   studio0x palette, so no stock Tailwind hue survives on a user-facing surface.
+   Scoped with :not([data-theme="light"]) so lite mode is untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Card geometry: the codebase's rounded-2xl becomes the 12px brand radius ── */
+.rounded-2xl { border-radius: var(--s0x-radius); }
+
+/* ── Neutral text ramp: cool slate → warm Noir/Bone ── */
+html:not([data-theme="light"]) .text-white           { color: #FAF5F7; }
+html:not([data-theme="light"]) .text-slate-200       { color: #EFE4EA; }
+html:not([data-theme="light"]) .text-slate-300       { color: #DCCCD4; }
+html:not([data-theme="light"]) .text-slate-400       { color: #B9A9B0; }
+html:not([data-theme="light"]) .text-slate-500       { color: #9A8F95; }
+html:not([data-theme="light"]) .text-slate-600       { color: #7F757B; }
+html:not([data-theme="light"]) .text-slate-700       { color: #635A60; }
+html:not([data-theme="light"]) .text-slate-800       { color: #4B4348; }
+html:not([data-theme="light"]) .hover\:text-white:hover        { color: #FAF5F7; }
+html:not([data-theme="light"]) .hover\:text-slate-200:hover    { color: #EFE4EA; }
+html:not([data-theme="light"]) .hover\:text-slate-300:hover    { color: #DCCCD4; }
+html:not([data-theme="light"]) .hover\:text-slate-400:hover    { color: #B9A9B0; }
+html:not([data-theme="light"]) .group:hover .group-hover\:text-white { color: #FAF5F7; }
+
+/* ── Neutral surfaces ── */
+html:not([data-theme="light"]) .bg-black             { background-color: #0F0C0E; }
+html:not([data-theme="light"]) .bg-slate-900         { background-color: #0F0C0E; }
+html:not([data-theme="light"]) .bg-slate-900\/60     { background-color: rgb(15 12 14 / .60); }
+html:not([data-theme="light"]) .bg-slate-900\/50     { background-color: rgb(15 12 14 / .50); }
+html:not([data-theme="light"]) .bg-slate-900\/40     { background-color: rgb(15 12 14 / .40); }
+html:not([data-theme="light"]) .bg-slate-800         { background-color: #1D191C; }
+html:not([data-theme="light"]) .bg-slate-800\/50     { background-color: rgb(29 25 28 / .50); }
+html:not([data-theme="light"]) .bg-slate-800\/40     { background-color: rgb(29 25 28 / .40); }
+html:not([data-theme="light"]) .bg-slate-700         { background-color: #312C2F; }
+html:not([data-theme="light"]) .bg-slate-700\/50     { background-color: rgb(49 44 47 / .50); }
+html:not([data-theme="light"]) .bg-slate-700\/40     { background-color: rgb(49 44 47 / .40); }
+html:not([data-theme="light"]) .bg-slate-600         { background-color: #3E383C; }
+html:not([data-theme="light"]) .bg-slate-600\/60     { background-color: rgb(62 56 60 / .60); }
+html:not([data-theme="light"]) .bg-slate-500         { background-color: #635A60; }
+html:not([data-theme="light"]) .bg-slate-500\/70     { background-color: rgb(99 90 96 / .70); }
+html:not([data-theme="light"]) .bg-slate-500\/10     { background-color: rgb(154 143 149 / .10); }
+html:not([data-theme="light"]) .bg-slate-500\/5      { background-color: rgb(154 143 149 / .05); }
+html:not([data-theme="light"]) .bg-slate-400         { background-color: #9A8F95; }
+html:not([data-theme="light"]) .hover\:bg-slate-600:hover { background-color: #3E383C; }
+html:not([data-theme="light"]) .hover\:bg-slate-800:hover { background-color: #1D191C; }
+
+/* White overlays become Bone overlays (warm, never a cold grey wash). */
+html:not([data-theme="light"]) .bg-white\/2          { background-color: rgb(250 245 247 / .02); }
+html:not([data-theme="light"]) .bg-white\/3          { background-color: rgb(250 245 247 / .03); }
+html:not([data-theme="light"]) .bg-white\/5          { background-color: rgb(250 245 247 / .05); }
+html:not([data-theme="light"]) .bg-white\/10         { background-color: rgb(250 245 247 / .09); }
+html:not([data-theme="light"]) .hover\:bg-white\/5:hover  { background-color: rgb(202 53 139 / .10); }
+html:not([data-theme="light"]) .hover\:bg-white\/10:hover { background-color: rgb(202 53 139 / .16); }
+html:not([data-theme="light"]) .hover\:bg-white\/3:hover  { background-color: rgb(202 53 139 / .07); }
+/* Solid `bg-white` is the app's "selected pill" (paired with text-brand-dark) —
+   Rosa 200 on Noir ink is the brand equivalent. */
+html:not([data-theme="light"]) .bg-white             { background-color: #F8BDD8; }
+
+/* ── Old brand accent (amber / yellow / orange) → Rosa ── */
+html:not([data-theme="light"]) .text-amber-200,
+html:not([data-theme="light"]) .text-amber-300       { color: #FBD5E6; }
+html:not([data-theme="light"]) .text-amber-400,
+html:not([data-theme="light"]) .text-amber-500       { color: #F8BDD8; }
+html:not([data-theme="light"]) .text-amber-600       { color: #CA358B; }
+html:not([data-theme="light"]) .text-amber-500\/80   { color: rgb(248 189 216 / .80); }
+html:not([data-theme="light"]) .text-amber-500\/70   { color: rgb(248 189 216 / .70); }
+html:not([data-theme="light"]) .text-amber-700\/70   { color: rgb(202 53 139 / .70); }
+html:not([data-theme="light"]) .text-orange-400      { color: #F8BDD8; }
+html:not([data-theme="light"]) .hover\:text-amber-300:hover { color: #FBD5E6; }
+html:not([data-theme="light"]) .group:hover .group-hover\:text-amber-300 { color: #FBD5E6; }
+
+html:not([data-theme="light"]) .bg-amber-400,
+html:not([data-theme="light"]) .bg-amber-500,
+html:not([data-theme="light"]) .bg-orange-500,
+html:not([data-theme="light"]) .bg-yellow-400        { background-color: #CA358B; }
+html:not([data-theme="light"]) .bg-amber-500\/80     { background-color: rgb(202 53 139 / .80); }
+html:not([data-theme="light"]) .bg-amber-400\/70     { background-color: rgb(202 53 139 / .70); }
+html:not([data-theme="light"]) .bg-amber-500\/40     { background-color: rgb(202 53 139 / .40); }
+html:not([data-theme="light"]) .bg-amber-500\/20     { background-color: rgb(202 53 139 / .20); }
+html:not([data-theme="light"]) .bg-amber-500\/15     { background-color: rgb(202 53 139 / .15); }
+html:not([data-theme="light"]) .bg-amber-500\/10,
+html:not([data-theme="light"]) .bg-orange-500\/10    { background-color: rgb(202 53 139 / .10); }
+html:not([data-theme="light"]) .bg-amber-500\/5,
+html:not([data-theme="light"]) .bg-amber-400\/5      { background-color: rgb(202 53 139 / .06); }
+html:not([data-theme="light"]) .bg-amber-500\/3      { background-color: rgb(202 53 139 / .04); }
+html:not([data-theme="light"]) .bg-amber-900\/10     { background-color: rgb(202 53 139 / .08); }
+html:not([data-theme="light"]) .bg-amber-900\/20     { background-color: rgb(202 53 139 / .13); }
+html:not([data-theme="light"]) .bg-amber-950\/20     { background-color: rgb(202 53 139 / .10); }
+html:not([data-theme="light"]) .hover\:bg-amber-300:hover,
+html:not([data-theme="light"]) .hover\:bg-amber-400:hover { background-color: #F8BDD8; }
+html:not([data-theme="light"]) .hover\:bg-amber-500\/7:hover { background-color: rgb(202 53 139 / .09); }
+
+html:not([data-theme="light"]) .border-amber-400\/30,
+html:not([data-theme="light"]) .border-amber-500\/30 { border-color: rgb(202 53 139 / .35); }
+html:not([data-theme="light"]) .border-amber-500\/50 { border-color: rgb(202 53 139 / .55); }
+html:not([data-theme="light"]) .border-amber-500\/40 { border-color: rgb(202 53 139 / .45); }
+html:not([data-theme="light"]) .border-amber-500\/10 { border-color: rgb(202 53 139 / .12); }
+html:not([data-theme="light"]) .border-amber-900\/30,
+html:not([data-theme="light"]) .border-amber-900\/40 { border-color: rgb(202 53 139 / .28); }
+html:not([data-theme="light"]) .border-orange-500\/30 { border-color: rgb(202 53 139 / .35); }
+html:not([data-theme="light"]) .divide-amber-900\/30 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(202 53 139 / .25); }
+
+html:not([data-theme="light"]) .from-amber-500       { --tw-gradient-from: #CA358B var(--tw-gradient-from-position); --tw-gradient-to: rgb(202 53 139 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html:not([data-theme="light"]) .from-amber-950\/30,
+html:not([data-theme="light"]) .from-amber-950\/40   { --tw-gradient-from: rgb(202 53 139 / .18) var(--tw-gradient-from-position); --tw-gradient-to: rgb(202 53 139 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html:not([data-theme="light"]) .to-amber-300,
+html:not([data-theme="light"]) .to-amber-400,
+html:not([data-theme="light"]) .to-yellow-400,
+html:not([data-theme="light"]) .to-orange-400,
+html:not([data-theme="light"]) .to-rose-300          { --tw-gradient-to: #F8BDD8 var(--tw-gradient-to-position); }
+html:not([data-theme="light"]) .to-amber-600         { --tw-gradient-to: #CA358B var(--tw-gradient-to-position); }
+html:not([data-theme="light"]) .to-amber-500\/20     { --tw-gradient-to: rgb(202 53 139 / .20) var(--tw-gradient-to-position); }
+html:not([data-theme="light"]) .to-amber-500\/10     { --tw-gradient-to: rgb(202 53 139 / .10) var(--tw-gradient-to-position); }
+html:not([data-theme="light"]) .shadow-amber-500\/10 { --tw-shadow-color: rgb(202 53 139 / .10); --tw-shadow: var(--tw-shadow-colored); }
+html:not([data-theme="light"]) .shadow-amber-900\/20 { --tw-shadow-color: rgb(202 53 139 / .20); --tw-shadow: var(--tw-shadow-colored); }
+
+/* ── Live / hot / negative (red · rose · pink) → Rosa 700, the LIVE color ── */
+html:not([data-theme="light"]) .text-red-400,
+html:not([data-theme="light"]) .text-rose-400        { color: #F06BAF; }
+html:not([data-theme="light"]) .text-red-300\/60     { color: rgb(248 189 216 / .60); }
+html:not([data-theme="light"]) .text-pink-300        { color: #F8BDD8; }
+html:not([data-theme="light"]) .bg-red-500           { background-color: #CA358B; }
+html:not([data-theme="light"]) .bg-red-500\/20       { background-color: rgb(202 53 139 / .20); }
+html:not([data-theme="light"]) .bg-red-500\/15       { background-color: rgb(202 53 139 / .15); }
+html:not([data-theme="light"]) .bg-red-500\/10,
+html:not([data-theme="light"]) .bg-pink-500\/10      { background-color: rgb(202 53 139 / .10); }
+html:not([data-theme="light"]) .bg-red-900\/40       { background-color: rgb(202 53 139 / .22); }
+html:not([data-theme="light"]) .bg-red-950\/30       { background-color: rgb(202 53 139 / .12); }
+html:not([data-theme="light"]) .hover\:bg-red-500\/15:hover { background-color: rgb(202 53 139 / .15); }
+html:not([data-theme="light"]) .hover\:bg-red-500\/25:hover { background-color: rgb(202 53 139 / .25); }
+html:not([data-theme="light"]) .border-red-500\/40,
+html:not([data-theme="light"]) .border-pink-500\/40  { border-color: rgb(202 53 139 / .45); }
+html:not([data-theme="light"]) .border-red-500\/30   { border-color: rgb(202 53 139 / .35); }
+html:not([data-theme="light"]) .border-red-500\/20   { border-color: rgb(202 53 139 / .25); }
+html:not([data-theme="light"]) .border-red-800\/40,
+html:not([data-theme="light"]) .border-red-900\/50,
+html:not([data-theme="light"]) .border-red-900\/40,
+html:not([data-theme="light"]) .border-red-900\/30   { border-color: rgb(202 53 139 / .28); }
+html:not([data-theme="light"]) .from-red-500,
+html:not([data-theme="light"]) .from-rose-500        { --tw-gradient-from: #CA358B var(--tw-gradient-from-position); --tw-gradient-to: rgb(202 53 139 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html:not([data-theme="light"]) .to-red-500           { --tw-gradient-to: #CA358B var(--tw-gradient-to-position); }
+/* The live dot gets its neon halo for free, everywhere it appears. */
+html:not([data-theme="light"]) .bg-red-500.animate-pulse,
+html:not([data-theme="light"]) .bg-red-500.live-dot  { box-shadow: 0 0 8px rgb(202 53 139 / .9), 0 0 20px rgb(238 116 179 / .55); }
+
+/* ── Positive / data / in-progress (green · emerald) → Riptide ── */
+html:not([data-theme="light"]) .text-green-400,
+html:not([data-theme="light"]) .text-emerald-400     { color: #5DCBD1; }
+html:not([data-theme="light"]) .bg-green-400         { background-color: #5DCBD1; }
+html:not([data-theme="light"]) .hover\:bg-green-400:hover { background-color: #7FDADF; }
+html:not([data-theme="light"]) .bg-green-500\/10,
+html:not([data-theme="light"]) .bg-green-900\/10     { background-color: rgb(93 203 209 / .10); }
+html:not([data-theme="light"]) .bg-emerald-900\/40   { background-color: rgb(93 203 209 / .16); }
+html:not([data-theme="light"]) .from-emerald-500     { --tw-gradient-from: #5DCBD1 var(--tw-gradient-from-position); --tw-gradient-to: rgb(93 203 209 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html:not([data-theme="light"]) .from-green-950\/30   { --tw-gradient-from: rgb(93 203 209 / .14) var(--tw-gradient-from-position); --tw-gradient-to: rgb(93 203 209 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html:not([data-theme="light"]) .to-emerald-300,
+html:not([data-theme="light"]) .to-emerald-400       { --tw-gradient-to: #5DCBD1 var(--tw-gradient-to-position); }
+html:not([data-theme="light"]) .shadow-green-900\/20 { --tw-shadow-color: rgb(93 203 209 / .20); --tw-shadow: var(--tw-shadow-colored); }
+html:not([data-theme="light"]) .shadow-green-900\/40 { --tw-shadow-color: rgb(93 203 209 / .35); --tw-shadow: var(--tw-shadow-colored); }
+
+/* ── Info / data-viz (blue · sky · indigo · purple) → Riptide ── */
+html:not([data-theme="light"]) .text-blue-300,
+html:not([data-theme="light"]) .text-blue-400,
+html:not([data-theme="light"]) .text-sky-400,
+html:not([data-theme="light"]) .text-indigo-400,
+html:not([data-theme="light"]) .text-purple-300      { color: #5DCBD1; }
+html:not([data-theme="light"]) .text-indigo-600      { color: rgb(93 203 209 / .75); }
+html:not([data-theme="light"]) .bg-blue-500\/10,
+html:not([data-theme="light"]) .bg-indigo-500\/10,
+html:not([data-theme="light"]) .bg-purple-500\/10    { background-color: rgb(93 203 209 / .10); }
+html:not([data-theme="light"]) .bg-blue-500\/5,
+html:not([data-theme="light"]) .bg-sky-400\/5        { background-color: rgb(93 203 209 / .06); }
+html:not([data-theme="light"]) .bg-blue-950\/30      { background-color: rgb(93 203 209 / .12); }
+html:not([data-theme="light"]) .hover\:bg-blue-500\/10:hover { background-color: rgb(93 203 209 / .12); }
+html:not([data-theme="light"]) .border-blue-500\/50,
+html:not([data-theme="light"]) .border-purple-500\/40 { border-color: rgb(93 203 209 / .50); }
+html:not([data-theme="light"]) .border-blue-500\/40,
+html:not([data-theme="light"]) .border-blue-500\/30,
+html:not([data-theme="light"]) .border-sky-400\/30,
+html:not([data-theme="light"]) .border-purple-500\/30,
+html:not([data-theme="light"]) .border-indigo-500\/20 { border-color: rgb(93 203 209 / .35); }
+html:not([data-theme="light"]) .border-blue-900\/30,
+html:not([data-theme="light"]) .border-blue-900\/20  { border-color: rgb(93 203 209 / .22); }
+html:not([data-theme="light"]) .from-blue-950\/30    { --tw-gradient-from: rgb(93 203 209 / .14) var(--tw-gradient-from-position); --tw-gradient-to: rgb(93 203 209 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+
+/* ── Every card gets the Rosa left-accent on hover, without touching 130 files.
+      Uses an inset shadow (no pseudo-element) so nothing can break a layout. ── */
+html:not([data-theme="light"]) a.bg-brand-card:hover,
+html:not([data-theme="light"]) a .bg-brand-card:hover,
+html:not([data-theme="light"]) .group:hover > .bg-brand-card,
+html:not([data-theme="light"]) button.bg-brand-card:hover {
+  box-shadow: inset 2px 0 0 0 rgb(var(--s0x-accent-ink)), 0 0 26px -10px rgb(202 53 139 / .75);
+  border-color: rgb(202 53 139 / .40);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   LITE MODE utility remaps. Components are authored dark-first; these
+   attribute-scoped overrides flip the most-used ones so the whole app reads
+   correctly on Bone paper without touching every file.
+   ══════════════════════════════════════════════════════════════════════════ */
+[data-theme="light"] .text-white { color: #1A1517; }
+[data-theme="light"] .text-slate-200 { color: #241D20; }
+[data-theme="light"] .text-slate-300 { color: #362C31; }
+[data-theme="light"] .text-slate-400 { color: #574A50; }
+[data-theme="light"] .text-slate-500 { color: #6B5D63; }
+[data-theme="light"] .text-slate-600 { color: #857077; }
+[data-theme="light"] .text-slate-700 { color: #A08D94; }
 
 [data-theme="light"] .bg-white\/5,
-[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(0, 0, 0, 0.045); }
-[data-theme="light"] .hover\:bg-white\/3:hover { background-color: rgba(0, 0, 0, 0.03); }
-[data-theme="light"] .bg-slate-700 { background-color: #e8e3d7; }
-[data-theme="light"] .hover\:bg-slate-600:hover { background-color: #ddd7c8; }
-[data-theme="light"] .hover\:bg-slate-800:hover { background-color: #efebe0; }
+[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(26, 21, 23, 0.045); }
+[data-theme="light"] .hover\:bg-white\/3:hover { background-color: rgba(26, 21, 23, 0.03); }
+[data-theme="light"] .bg-slate-700 { background-color: #E7DCE1; }
+[data-theme="light"] .hover\:bg-slate-600:hover { background-color: #DCCED5; }
+[data-theme="light"] .hover\:bg-slate-800:hover { background-color: #F0E7EB; }
 
 /* Inverted "selected pill" pattern (bg-white + text-brand-dark) */
-[data-theme="light"] .bg-white { background-color: #1d1a14; }
-[data-theme="light"] .text-brand-dark { color: #f6f4ee; }
+[data-theme="light"] .bg-white { background-color: #1A1517; }
+[data-theme="light"] .text-brand-dark { color: #FAF5F7; }
 
-/* Dark drop-shadows read heavy on ivory */
-[data-theme="light"] .shadow-black\/50 { --tw-shadow-color: rgba(90, 80, 60, 0.2); }
+/* Dark drop-shadows read heavy on Bone */
+[data-theme="light"] .shadow-black\/50 { --tw-shadow-color: rgba(49, 44, 47, 0.2); }

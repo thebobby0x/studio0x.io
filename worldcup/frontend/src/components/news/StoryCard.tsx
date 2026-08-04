@@ -6,14 +6,16 @@ import FlagImg from "@/components/ui/FlagImg";
 import ShareButton from "@/components/ui/ShareButton";
 import { registerStoryStop, stopAllStories, startAmbient, stopAmbient } from "@/lib/storyAudio";
 
+// Riptide = ordinary editorial categories; Rosa = the studio0x proprietary /
+// featured ones. Both straight off the brand palette.
 export const CATEGORY_COLORS: Record<string, string> = {
-  "MATCH REPORT":     "bg-white/10 text-slate-300",
-  "MATCH PREVIEW":    "bg-white/10 text-slate-300",
-  "ANALYSIS":         "bg-white/10 text-slate-300",
-  "STANDINGS":        "bg-white/10 text-slate-300",
-  "METRIC SPOTLIGHT": "bg-brand-gold/20 text-brand-gold",
-  "GAME RECAP":       "bg-white/10 text-slate-300",
-  "DAILY RECAP":      "bg-brand-gold/20 text-brand-gold",
+  "MATCH REPORT":     "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "MATCH PREVIEW":    "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "ANALYSIS":         "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "STANDINGS":        "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "METRIC SPOTLIGHT": "bg-s0x-ink/20 border border-s0x-ink/45 text-s0x-accent",
+  "GAME RECAP":       "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "DAILY RECAP":      "bg-s0x-ink/20 border border-s0x-ink/45 text-s0x-accent",
 };
 
 export interface StoryCardData {
@@ -70,7 +72,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   // Short story audio error state
   const [audioError, setAudioError] = useState(false);
 
-  const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
+  const catColor = CATEGORY_COLORS[story.category] ?? "bg-s0x-surface border border-s0x-border text-s0x-muted";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
   const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
 
@@ -195,29 +197,29 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   }, [deepDive, story]);
 
   return (
-    <div className="rounded-xl bg-brand-card border border-brand-border p-4 flex flex-col gap-2 transition-all">
+    <div className="s0x-card p-4 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${catColor}`}>
+        <span className={`s0x-mono text-[9px] font-semibold px-2 py-0.5 rounded-full ${catColor}`}>
           {story.category}
         </span>
         <div className="flex items-center gap-1.5">
           {story.teamsInvolved.slice(0, 2).map((tla) => (
             <FlagImg key={tla} tla={tla} size={18} />
           ))}
-          {showAge && <span className="text-[10px] text-slate-600 ml-1">{ageStr}</span>}
+          {showAge && <span className="s0x-data text-[10px] text-s0x-muted ml-1">{ageStr}</span>}
         </div>
       </div>
 
-      <h3 className="font-black text-white text-base leading-snug">{story.headline}</h3>
+      <h3 className="s0x-display font-black text-s0x-text text-base leading-snug">{story.headline}</h3>
 
-      <p className={`text-sm text-slate-400 leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>
+      <p className={`text-sm text-s0x-text/70 leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>
         {story.body}
       </p>
 
       <div className="flex items-center justify-between mt-0.5">
         <button
           onClick={() => setExpanded((e) => !e)}
-          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          className="s0x-mono flex items-center gap-1.5 text-[10px] text-s0x-muted hover:text-s0x-accent transition-colors"
         >
           {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           {expanded ? "Less" : "Read more"}
@@ -232,7 +234,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
           <button
             onClick={handleDeepDive}
             disabled={deepDiveLoading}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-brand-gold/30 text-brand-gold hover:bg-brand-gold/10 disabled:opacity-40"
+            className="s0x-btn s0x-btn-secondary !px-3 !py-1.5 !text-[10px] disabled:opacity-40"
           >
             {deepDiveLoading ? <Loader2 size={12} className="animate-spin" /> : <Telescope size={12} />}
             {deepDiveLoading ? "Analysing…" : deepDiveOpen ? "Close" : "Go Deeper"}

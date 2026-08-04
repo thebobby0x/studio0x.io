@@ -47,11 +47,17 @@ function teamContext(tla: string, schedule: ScheduleMatch[]): string | null {
   return null;
 }
 
-function ProbBar({ prob, max }: { prob: number; max: number }) {
+function ProbBar({ prob, max, featured }: { prob: number; max: number; featured: boolean }) {
   const w = max > 0 ? (prob / max) * 100 : 0;
   return (
-    <div className="h-1 bg-brand-border rounded-full overflow-hidden flex-1">
-      <div className="h-full rounded-full bg-brand-gold/70 transition-all duration-500" style={{ width: `${w}%` }} />
+    <div className="h-1 bg-s0x-border rounded-full overflow-hidden flex-1">
+      {/* Riptide is the default data color; the featured team's bar goes Rosa. */}
+      <div
+        className={`h-full rounded-full transition-all duration-500 ${
+          featured ? "bg-s0x-ink shadow-glow-rosa" : "bg-s0x-teal/80"
+        }`}
+        style={{ width: `${w}%` }}
+      />
     </div>
   );
 }
@@ -91,9 +97,9 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-brand-card border border-brand-border p-4 space-y-2 animate-pulse">
+      <div className="s0x-card p-4 space-y-2 animate-pulse">
         {[1,2,3,4,5,6].map(i => (
-          <div key={i} className="h-8 rounded-lg bg-brand-border/40" />
+          <div key={i} className="h-8 rounded-lg bg-s0x-border/50" />
         ))}
       </div>
     );
@@ -107,42 +113,52 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
   const highlightSet = new Set(highlightTlas.map(t => t.toUpperCase()));
 
   return (
-    <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border">
-        <div className="flex items-center gap-2">
-          <Trophy size={13} className="text-brand-gold" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            Tournament Winner Odds
-          </span>
+    // Odds table: full monospace, alternating Noir 800 / Noir 900 rows,
+    // Riptide for the data values, Rosa for the featured (highlighted) team.
+    <div className="s0x-card s0x-table overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-s0x-border">
+        <div className="flex items-center gap-2.5">
+          <Trophy size={13} className="text-s0x-ink" />
+          <span className="s0x-eyebrow">Tournament Winner Odds</span>
         </div>
-        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400 font-semibold">
+        <span className="s0x-mono flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal font-semibold">
           <Wifi size={9} /> Polymarket
         </span>
       </div>
 
-      <div className="divide-y divide-brand-border/30">
+      <div>
         {visible.map((m, i) => {
           const isHighlighted = m.tla ? highlightSet.has(m.tla.toUpperCase()) : false;
           const flag = m.tla ? getFlag(m.tla) : "🏳";
           return (
             <div
               key={m.team}
-              className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${isHighlighted ? "bg-brand-gold/5" : ""}`}
+              className={`s0x-row flex items-center gap-3 px-4 py-2.5 transition-colors ${
+                isHighlighted ? "!bg-s0x-ink/12" : ""
+              }`}
             >
-              <span className="text-slate-600 text-xs w-5 text-right tabular-nums">{i + 1}</span>
+              <span className="s0x-data text-s0x-muted text-xs w-5 text-right">{i + 1}</span>
               <span className="text-base w-6 text-center">{flag}</span>
               <span className="flex-1 min-w-0">
-                <span className={`block text-sm font-semibold truncate ${isHighlighted ? "text-white" : "text-slate-300"}`}>
+                <span
+                  className={`s0x-data block text-[13px] font-semibold truncate ${
+                    isHighlighted ? "text-s0x-accent" : "text-s0x-text/85"
+                  }`}
+                >
                   {m.team}
                 </span>
                 {m.tla && teamContext(m.tla.toUpperCase(), schedule) && (
-                  <span className="block text-[9px] text-slate-600 truncate">
+                  <span className="s0x-mono block text-[8px] text-s0x-muted truncate mt-0.5">
                     {teamContext(m.tla.toUpperCase(), schedule)}
                   </span>
                 )}
               </span>
-              <ProbBar prob={m.probability} max={maxProb} />
-              <span className={`w-12 text-right text-sm font-black tabular-nums ${isHighlighted ? "text-brand-gold" : "text-slate-400"}`}>
+              <ProbBar prob={m.probability} max={maxProb} featured={isHighlighted} />
+              <span
+                className={`s0x-data w-12 text-right text-sm font-bold ${
+                  isHighlighted ? "s0x-feat s0x-neon-rosa" : "s0x-pos"
+                }`}
+              >
                 {Math.round(m.probability * 100)}%
               </span>
             </div>
@@ -153,13 +169,13 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
       {data.markets.length > limit && (
         <button
           onClick={() => setExpanded(e => !e)}
-          className="w-full px-4 py-2.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors border-t border-brand-border/50 text-center"
+          className="s0x-mono w-full px-4 py-2.5 text-[9px] text-s0x-muted hover:text-s0x-accent transition-colors border-t border-s0x-border text-center"
         >
           {expanded ? `Show fewer` : `Show all ${data.markets.length} teams ↓`}
         </button>
       )}
 
-      <div className="px-4 py-2 border-t border-brand-border/50 text-[10px] text-slate-600">
+      <div className="s0x-mono px-4 py-2 border-t border-s0x-border text-[8px] text-s0x-muted">
         {data.markets.length} teams · polymarket.com · updates every 5 min
       </div>
     </div>

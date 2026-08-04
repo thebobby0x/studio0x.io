@@ -43,71 +43,74 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
   return (
     <Link
       href={`/schedule/${m.fixture || m.id}`}
-      className={`group relative flex flex-col justify-center rounded-2xl border bg-brand-card px-5 py-6 sm:py-8 transition-all hover:shadow-2xl ${
+      className={`s0x-hud-grid s0x-hud-scan group relative flex flex-col justify-center rounded-s0x border bg-s0x-surface px-5 py-6 sm:py-8 transition-all ${
         isLive
-          ? "border-brand-green/50 shadow-lg shadow-brand-green/10"
+          ? "border-s0x-ink/60 shadow-[0_0_28px_-8px_rgb(202_53_139/0.6)]"
           : isResult
-          ? "border-brand-border"
-          : "border-brand-gold/30 shadow-md shadow-brand-gold/5"
+          ? "border-s0x-border hover:border-s0x-ink/40"
+          : "border-s0x-ink/35 hover:border-s0x-ink/60"
       }`}
     >
+      {/* Travelling scan band — the HUD "sweep" behind the numbers. */}
+      <span className="s0x-scanline" aria-hidden="true" />
+
       {/* top label */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+      <div className="relative flex items-center justify-between mb-4">
+        <span className="s0x-mono text-[10px] font-semibold text-s0x-muted">
           {m.stage ?? (m.group ? `Group ${m.group}` : "Tournament")}
         </span>
         {isLive ? (
-          <span className="flex items-center gap-1.5 text-[11px] font-black text-red-400">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="s0x-live">
+            <span className="s0x-live-dot" />
             {minute || "LIVE"}
           </span>
         ) : isResult ? (
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Full Time</span>
+          <span className="s0x-mono text-[10px] font-semibold text-s0x-muted">Full Time</span>
         ) : (
-          <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Next Up</span>
+          <span className="s0x-eyebrow">Next Up</span>
         )}
       </div>
 
       {/* teams + score/countdown */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
+      <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
         {/* home */}
         <div className="flex flex-col items-center text-center gap-2 min-w-0">
           <FlagImg tla={m.home.code} size={56} className="shadow-lg" />
-          <div className="text-sm sm:text-base font-bold text-white truncate max-w-full group-hover:text-brand-gold transition-colors">
+          <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text truncate max-w-full transition-colors group-hover:text-s0x-accent">
             {m.home.name}
           </div>
         </div>
 
-        {/* center */}
-        <div className="text-center min-w-[92px]">
+        {/* center — the HUD readout: mono, neon, tracked */}
+        <div className="text-center min-w-[104px]">
           {mode === "next" ? (
             <>
               <div
                 suppressHydrationWarning
-                className={`font-black tabular-nums tracking-tight leading-none ${
-                  ct?.urgent ? "text-3xl sm:text-4xl font-mono text-amber-400" : "text-2xl sm:text-3xl text-white"
+                className={`s0x-data font-bold leading-none ${
+                  ct?.urgent
+                    ? "text-3xl sm:text-4xl text-s0x-accent s0x-neon-rosa"
+                    : "text-2xl sm:text-3xl text-s0x-text"
                 }`}
               >
                 {ct?.label}
               </div>
-              <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">
+              <div className="s0x-mono text-[9px] text-s0x-muted mt-2.5">
                 {ct?.urgent ? "kicks off" : "countdown"}
               </div>
             </>
           ) : (
             <>
               <div
-                className={`text-4xl sm:text-6xl font-black tabular-nums tracking-tighter leading-none ${
-                  isResult ? "text-slate-300" : "text-white"
+                className={`s0x-data text-4xl sm:text-6xl font-bold leading-none ${
+                  isResult ? "text-s0x-text/75" : "text-s0x-text s0x-neon-rosa"
                 }`}
               >
                 {m.homeScore ?? 0}
-                <span className="text-brand-border mx-1.5 sm:mx-2.5">–</span>
+                <span className="text-s0x-border mx-1.5 sm:mx-2.5">–</span>
                 {m.awayScore ?? 0}
               </div>
-              {isResult && (
-                <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Full Time</div>
-              )}
+              {isResult && <div className="s0x-mono text-[9px] text-s0x-muted mt-2.5">Full Time</div>}
             </>
           )}
         </div>
@@ -115,7 +118,7 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
         {/* away */}
         <div className="flex flex-col items-center text-center gap-2 min-w-0">
           <FlagImg tla={m.away.code} size={56} className="shadow-lg" />
-          <div className="text-sm sm:text-base font-bold text-white truncate max-w-full group-hover:text-brand-gold transition-colors">
+          <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text truncate max-w-full transition-colors group-hover:text-s0x-accent">
             {m.away.name}
           </div>
         </div>
@@ -131,23 +134,27 @@ function SideRow({ m, now, kind }: { m: HeroMatch; now: number; kind: "upcoming"
   return (
     <Link
       href={isTbd ? "/bracket" : `/schedule/${m.fixture || m.id}`}
-      className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
+      className="s0x-row flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors hover:bg-s0x-ink/10"
     >
       <FlagImg tla={m.home.code} size={18} className="shrink-0" />
-      <span className="text-xs font-bold text-slate-300 w-9 shrink-0">{m.home.code}</span>
+      <span className="s0x-mono text-[11px] font-semibold text-s0x-text/85 w-10 shrink-0">{m.home.code}</span>
       {kind === "result" ? (
-        <span className="text-xs font-black tabular-nums text-white shrink-0">
+        <span className="s0x-data text-xs font-bold text-s0x-text shrink-0">
           {m.homeScore}–{m.awayScore}
         </span>
       ) : (
-        <span className="text-[10px] text-slate-600 shrink-0">v</span>
+        <span className="s0x-mono text-[9px] text-s0x-muted shrink-0">v</span>
       )}
-      <span className="text-xs font-bold text-slate-300 w-9 shrink-0">{m.away.code}</span>
+      <span className="s0x-mono text-[11px] font-semibold text-s0x-text/85 w-10 shrink-0">{m.away.code}</span>
       <FlagImg tla={m.away.code} size={18} className="shrink-0" />
       <span
         suppressHydrationWarning
-        className={`ml-auto text-[11px] tabular-nums shrink-0 ${
-          kind === "result" ? "text-slate-600 font-semibold uppercase" : ct?.urgent ? "text-amber-400 font-mono" : "text-slate-500"
+        className={`s0x-data ml-auto text-[11px] shrink-0 ${
+          kind === "result"
+            ? "text-s0x-muted font-semibold uppercase"
+            : ct?.urgent
+            ? "text-s0x-accent font-semibold s0x-neon-rosa"
+            : "text-s0x-teal"
         }`}
       >
         {kind === "result" ? "FT" : ct?.label}
@@ -157,11 +164,7 @@ function SideRow({ m, now, kind }: { m: HeroMatch; now: number; kind: "upcoming"
 }
 
 function ColumnHeader({ label }: { label: string }) {
-  return (
-    <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-      {label}
-    </div>
-  );
+  return <div className="px-3 pb-2.5"><span className="s0x-eyebrow">{label}</span></div>;
 }
 
 // ── The 3-zone hero ──────────────────────────────────────────────────────────
@@ -234,7 +237,7 @@ export default function LiveHero({
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-brand-border bg-brand-card px-5 py-10 text-center text-sm text-slate-600">
+          <div className="s0x-card px-5 py-10 text-center text-sm text-s0x-muted">
             No matches scheduled.
           </div>
         )}
@@ -242,25 +245,25 @@ export default function LiveHero({
       )}
 
       {/* LEFT: Upcoming */}
-      <div className="order-2 lg:order-1 rounded-2xl border border-brand-border bg-brand-card/60 py-3">
+      <div className="s0x-card order-2 lg:order-1 py-3">
         <ColumnHeader label="Upcoming Matches" />
         <div className="space-y-0.5">
           {upcomingList.length ? (
             upcomingList.map((m) => <SideRow key={m.id} m={m} now={now} kind="upcoming" />)
           ) : (
-            <div className="px-3 py-4 text-xs text-slate-600">Nothing upcoming.</div>
+            <div className="px-3 py-4 text-xs text-s0x-muted">Nothing upcoming.</div>
           )}
         </div>
       </div>
 
       {/* RIGHT: Results */}
-      <div className="order-3 rounded-2xl border border-brand-border bg-brand-card/60 py-3">
+      <div className="s0x-card order-3 py-3">
         <ColumnHeader label="Results" />
         <div className="space-y-0.5">
           {resultsList.length ? (
             resultsList.map((m) => <SideRow key={m.id} m={m} now={now} kind="result" />)
           ) : (
-            <div className="px-3 py-4 text-xs text-slate-600">No results yet.</div>
+            <div className="px-3 py-4 text-xs text-s0x-muted">No results yet.</div>
           )}
         </div>
       </div>

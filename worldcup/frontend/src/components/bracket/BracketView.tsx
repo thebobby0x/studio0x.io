@@ -167,7 +167,7 @@ function MatchCard({ match, anthems = {}, silencedSet }: { match: BracketMatch; 
     <div
       className={`rounded-xl border overflow-hidden transition-all ${
         live
-          ? "border-brand-green/40 bg-brand-card shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+          ? "border-s0x-ink/50 bg-s0x-surface shadow-[0_0_14px_rgba(202,53,139,0.30)]"
           : isTbd
           ? "border-brand-border bg-brand-card/60 opacity-60"
           : "border-brand-border bg-brand-card hover:border-slate-600"

@@ -550,26 +550,32 @@ export default async function DashboardPage({
         )}
 
         {/* Compact header row */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-black text-slate-400 uppercase tracking-widest">Dashboard</h1>
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="s0x-eyebrow">Live Command Center</span>
+              <h1 className="s0x-display-hero text-2xl sm:text-3xl font-black text-s0x-text leading-none">
+                Dashboard
+              </h1>
+            </div>
             {liveMatches.length > 0 && (
-              <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full border border-red-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="s0x-live mb-1">
+                <span className="s0x-live-dot" />
                 {liveMatches.length} live
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* View toggle */}
-            <div className="flex items-center bg-brand-card border border-brand-border rounded-xl overflow-hidden">
+            {/* View toggle — secondary (Noir 800 + Noir 700 border); the
+                selected face is the Rosa 700 primary. */}
+            <div className="flex items-center bg-s0x-surface border border-s0x-border rounded-s0x overflow-hidden">
               <Link
                 href="/?view=tile"
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`s0x-mono flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold transition-colors ${
                   viewMode === "tile"
-                    ? "bg-white text-brand-dark"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-s0x-ink text-s0x-onink"
+                    : "text-s0x-muted hover:text-s0x-accent"
                 }`}
               >
                 <LayoutGrid size={12} />
@@ -577,10 +583,10 @@ export default async function DashboardPage({
               </Link>
               <Link
                 href="/?view=list"
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`s0x-mono flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold transition-colors ${
                   viewMode === "list"
-                    ? "bg-white text-brand-dark"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-s0x-ink text-s0x-onink"
+                    : "text-s0x-muted hover:text-s0x-accent"
                 }`}
               >
                 <List size={12} />
@@ -588,10 +594,7 @@ export default async function DashboardPage({
               </Link>
             </div>
 
-            <Link
-              href="/schedule"
-              className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-brand-border rounded-xl px-3 py-2 hover:border-slate-500 transition-all"
-            >
+            <Link href="/schedule" className="s0x-btn s0x-btn-secondary hidden sm:flex !rounded-s0x">
               <CalendarDays size={12} />
               Schedule
               <ChevronRight size={11} />
@@ -608,12 +611,12 @@ export default async function DashboardPage({
               <>
                 {isMatchLiveNow && (
                   <div className="flex items-center gap-3 -mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <span className="text-sm font-black text-white uppercase tracking-wider">
+                    <span className="w-2.5 h-2.5 rounded-full bg-s0x-ink animate-pulse shrink-0 shadow-glow-rosa" />
+                    <span className="s0x-display text-sm font-black text-s0x-text uppercase tracking-wider">
                       Match In Progress
                     </span>
-                    <div className="flex-1 h-px bg-red-900/40" />
-                    <span className="text-xs text-red-400 font-semibold">
+                    <div className="flex-1 h-px bg-gradient-to-r from-s0x-ink/60 to-transparent" />
+                    <span className="s0x-data text-xs text-s0x-teal font-semibold">
                       {featuredMatch.elapsed}&apos; played
                     </span>
                   </div>
@@ -636,9 +639,10 @@ export default async function DashboardPage({
             <LiveHero live={[]} upcoming={heroUpcoming} results={heroResults} hideCenter={isAnyMatchLive} />
 
             {/* All matches list */}
-            <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
-                All Matches
+            <div className="s0x-card overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-s0x-border flex flex-col gap-1.5">
+                <span className="s0x-eyebrow">Fixtures</span>
+                <span className="s0x-display text-sm font-bold text-s0x-text">All Matches</span>
               </div>
               {matches.length === 0 ? (
                 <div className="px-4 py-8 text-center text-slate-600 text-sm">
@@ -889,7 +893,7 @@ export default async function DashboardPage({
                   />
                 )}
 
-                <CollapsibleSection title="Tournament Odds">
+                <CollapsibleSection eyebrow="Markets" title="Tournament Odds">
                   <TournamentOddsPanel
                     highlightTlas={[featuredMatch.homeTeam.code, featuredMatch.awayTeam.code]}
                     limit={12}
@@ -897,7 +901,7 @@ export default async function DashboardPage({
                 </CollapsibleSection>
 
                 {/* AI-generated tournament news */}
-                <CollapsibleSection title="Tournament News">
+                <CollapsibleSection eyebrow="Newsroom" title="Tournament News">
                   <Suspense fallback={<div className="h-48 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
                     <TournamentStories />
                   </Suspense>
@@ -905,7 +909,7 @@ export default async function DashboardPage({
 
                 {/* All matches compact list */}
                 {matches.length > 1 && (
-                  <CollapsibleSection title="All Matches">
+                  <CollapsibleSection eyebrow="Fixtures" title="All Matches">
                     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
                       <div className="p-2 space-y-1">
                         {matches.map((m) => (

@@ -10,10 +10,13 @@ const COLLAPSED_PREVIEW_HEIGHT = 220; // px — roughly one standings card
 
 export default function CollapsibleSection({
   title,
+  eyebrow = "studio0x",
   defaultExpanded = false,
   children,
 }: {
   title: string;
+  /** Rosa 700 mono kicker above the title (studio0x section-header pattern). */
+  eyebrow?: string;
   defaultExpanded?: boolean;
   children: ReactNode;
 }) {
@@ -24,12 +27,16 @@ export default function CollapsibleSection({
       {/* Title row */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-4 py-2 mb-2 text-left group"
+        className="w-full flex items-end justify-between gap-3 px-4 py-2 mb-2 text-left group"
       >
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-300 transition-colors">
-          {title}
+        {/* Rosa 700 mono eyebrow above the Archivo-expanded section title. */}
+        <span className="flex flex-col gap-1.5 min-w-0">
+          <span className="s0x-eyebrow">{eyebrow}</span>
+          <span className="s0x-display text-sm font-bold text-s0x-text transition-colors group-hover:text-s0x-accent truncate">
+            {title}
+          </span>
         </span>
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-gold group-hover:text-amber-300 transition-colors">
+        <span className="s0x-mono flex items-center gap-1.5 text-[10px] font-semibold text-s0x-accent transition-colors group-hover:text-s0x-teal shrink-0">
           {expanded ? "Collapse" : "Expand"}
           <ChevronDown
             size={13}
@@ -48,9 +55,9 @@ export default function CollapsibleSection({
         {!expanded && (
           <button
             onClick={() => setExpanded(true)}
-            className="absolute inset-x-0 bottom-0 h-20 flex items-end justify-center pb-3 bg-gradient-to-t from-brand-dark via-brand-dark/85 to-transparent cursor-pointer group"
+            className="absolute inset-x-0 bottom-0 h-20 flex items-end justify-center pb-3 bg-gradient-to-t from-s0x-bg via-s0x-bg/85 to-transparent cursor-pointer group"
           >
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-brand-gold group-hover:text-amber-300 transition-colors bg-brand-card border border-brand-border rounded-full px-3 py-1 shadow-lg">
+            <span className="s0x-btn s0x-btn-secondary !px-3 !py-1 !text-[10px] group-hover:border-s0x-ink group-hover:text-s0x-accent">
               Show more
               <ChevronDown size={12} />
             </span>

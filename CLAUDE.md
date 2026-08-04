@@ -880,6 +880,76 @@ The stop hook (`~/.claude/stop-hook-git-check.sh`) will warn if there are uncomm
 
 ---
 
+## LC26 SKIN — Gaming UI / dark HUD (owner directive 2026-08-04, worldcup lane)
+
+The Leagues Cup 2026 deployment (`leaguescup.studio0x.io`, Vercel
+`prj_3Gr6yOJZe8bGVcoMQwkNoFLeR8Cl`) ships a **Gaming-UI / dark-HUD** skin on the
+**official studio0x brand palette**. This SUPERSEDES the older "COLOR DISCIPLINE"
+block above for this deployment — in particular the "no teal" rule: **Riptide teal
+is now the sanctioned data/stats/live-value color.** No arbitrary colors anywhere.
+
+**Tokens (single source: `src/app/globals.css` `:root`)**
+
+| Token | Value | Role |
+|---|---|---|
+| `--s0x-bg` | `#0F0C0E` Noir 900 | page background |
+| `--s0x-surface` | `#1D191C` Noir 800 | cards, panels |
+| `--s0x-border` | `#312C2F` Noir 700 | borders, dividers |
+| `--s0x-text` | `#FAF5F7` Bone 50 | primary text |
+| `--s0x-muted` | `#9A8F95` | metadata |
+| `--s0x-accent` | `#F8BDD8` Rosa 200 | hover / highlight (the *readable* pink) |
+| `--s0x-accent-ink` | `#CA358B` Rosa 700 | primary CTA fill, LIVE badge, neon glow source |
+| `--s0x-teal` | `#5DCBD1` Riptide | data, stats, live values, anthem/audio |
+
+Fixed anchors that never flip with the theme: `--s0x-on-accent` (Bone 50 — what
+goes ON a Rosa 700 / Riptide fill) and `--s0x-noir`. **Never pair `text-s0x-text`
+with an accent fill** — it breaks lite-mode contrast; use `text-s0x-onink`.
+
+**How the re-skin works.** The six legacy vars (`--bg/--card/--border/--gold/
+--green/--blue`) now resolve THROUGH the s0x tokens, so every `brand-*` utility
+in the ~130 existing components re-skins from `globals.css` alone. On top of
+that, a **dark skin layer** (`html:not([data-theme="light"]) …` rules at the
+bottom of globals.css) repaints the hardcoded stock-Tailwind utilities:
+slate→Noir/Bone ramp, amber/yellow/orange→Rosa, red/rose/pink→Rosa 700,
+green/emerald→Riptide, blue/sky/indigo/purple→Riptide. **When you add a class
+from a stock Tailwind hue, add its remap there too** — otherwise a raw Tailwind
+color leaks onto a user-facing surface.
+
+**Typography** (`next/font/google`, loaded in `layout.tsx`):
+Archivo (display, variable `wdth` axis — `.s0x-display-hero` = wdth 125,
+`.s0x-display` = wdth 105) · Instrument Sans (body, Tailwind's default `sans`) ·
+IBM Plex Mono (labels/data/scores/timers — `.s0x-mono` uppercase +14% tracking,
+`.s0x-data` case-preserving).
+
+**Utilities** (all in globals.css, all CSS-only — no image assets):
+`.s0x-card` (Noir 800 + Noir 700 + 12px radius + Rosa 700 left-edge accent on
+hover) · `.s0x-eyebrow` (Rosa 700 mono section kicker) · `.s0x-hud-grid` /
+`.s0x-hud-scan` / `.s0x-scanline` (grid + scan-line textures, honors
+`prefers-reduced-motion`) · `.s0x-btn` + `-primary`/`-secondary`/`-teal` ·
+`.s0x-live` + `.s0x-live-dot` · `.s0x-table` / `.s0x-row` / `.s0x-pos` /
+`.s0x-feat` · `.s0x-neon-rosa` / `.s0x-neon-teal` / `.s0x-glow-*`.
+
+**Known accessibility caveat:** Rosa 700 on Noir 900 measures ~3.2:1 — below
+WCAG AA for small text. It is used per the owner's spec for the decorative
+`.s0x-eyebrow` kicker only, always above a real Bone 50 heading. Do NOT use it
+for body copy or as the only copy in a region.
+
+**Lite mode is preserved** and on-palette (Bone 50 paper, Noir ink, Rosa 700
+accent, darkened Riptide). Only the neutral ramp flips; Rosa 700 and the fixed
+on-accent anchors are identical in both modes.
+
+**Third-party marks kept as-is** (deliberate, not an oversight): the social
+share buttons in `AnthemHub.tsx` retain TikTok / Instagram / Facebook / YouTube
+brand colors — those are the platforms' identity, not our chrome.
+
+**`LEAGUES_CUP.branding` in `sportConfig.ts`** now carries the studio0x values
+(`primary` Rosa 700, `secondary` Noir 900, `accent` Riptide) with
+`styleGuideConfirmed: false` **intentionally** — these are studio0x's OWN
+confirmed brand colors, but the flag guards against presenting anything as the
+licensed Leagues Cup marks (SUM owns those). Don't flip it to `true`.
+
+---
+
 ## STORE SESSION NOTES (appended by the store session — store lane only)
 
 *Per the append-only protocol: this section is the store's; other tenant sessions please don't edit it, and I won't edit yours.*

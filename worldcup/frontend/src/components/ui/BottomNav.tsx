@@ -16,9 +16,11 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-50 border-t border-brand-border bg-brand-dark/90 backdrop-blur-xl"
+      className="sm:hidden fixed bottom-0 inset-x-0 z-50 border-t border-s0x-border bg-s0x-bg/92 backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
+      {/* HUD hairline along the top edge of the tab bar */}
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-s0x-ink/70 to-transparent" />
       <div className="grid grid-cols-4 h-16">
         {NAV_GROUPS.map((g) => {
           const Icon = GROUP_ICONS[g.key];
@@ -28,14 +30,16 @@ export default function BottomNav() {
               key={g.key}
               href={g.lead}
               className={`relative flex flex-col items-center justify-center gap-1 transition-colors ${
-                isActive ? "text-brand-gold" : "text-slate-500 hover:text-slate-300"
+                isActive ? "text-s0x-accent" : "text-s0x-muted hover:text-s0x-accent"
               }`}
             >
               <Icon size={19} strokeWidth={isActive ? 2.4 : 1.8} />
-              <span className={`text-[10px] tracking-wide ${isActive ? "font-bold" : "font-medium"}`}>
+              <span className={`s0x-mono text-[9px] ${isActive ? "font-bold" : "font-medium"}`}>
                 {g.label}
               </span>
-              {isActive && <span className="absolute top-0 w-8 h-0.5 rounded-full bg-brand-gold" />}
+              {isActive && (
+                <span className="absolute top-0 w-8 h-0.5 rounded-full bg-s0x-ink shadow-glow-rosa" />
+              )}
             </Link>
           );
         })}
@@ -43,7 +47,7 @@ export default function BottomNav() {
         {/* Theme toggle — the 4th thumb slot 😉 */}
         <div className="flex flex-col items-center justify-center gap-1">
           <ThemeToggle size={19} />
-          <span className="text-[10px] font-medium text-slate-600 tracking-wide">Theme</span>
+          <span className="s0x-mono text-[9px] font-medium text-s0x-muted">Theme</span>
         </div>
       </div>
     </nav>

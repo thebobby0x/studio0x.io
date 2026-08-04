@@ -10,9 +10,9 @@ import type { FlightArc } from "@/app/api/flight-paths/route";
 import type { VenueDensity } from "@/app/api/flight-density/route";
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-const GOLD  = "#f5a623";
-const GREEN = "#00b140";
-const BLUE  = "#3b82f6";
+const GOLD  = "#CA358B"; // Rosa 700
+const GREEN = "#5DCBD1"; // Riptide
+const BLUE  = "#F8BDD8"; // Rosa 200
 const W = 960;
 const H = 500;
 
@@ -264,14 +264,14 @@ export default function WorldFlightMap() {
 
   if (loading && countries.length === 0) {
     return (
-      <div className="w-full h-[500px] rounded-2xl bg-[#0a0e1a] border border-slate-700 flex items-center justify-center">
+      <div className="w-full h-[500px] rounded-2xl bg-s0x-bg border border-s0x-border flex items-center justify-center">
         <p className="text-slate-500 text-sm animate-pulse">Loading flight paths...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full rounded-2xl bg-[#0a0e1a] border border-slate-700 overflow-hidden">
+    <div className="w-full rounded-2xl bg-s0x-bg border border-s0x-border overflow-hidden">
 
       {/* ── Control bar ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-800">
@@ -288,9 +288,9 @@ export default function WorldFlightMap() {
                 className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border transition-all"
                 style={on
                   ? { borderColor: `${color}55`, background: `${color}18`, color }
-                  : { borderColor: "#334155", color: "#64748b" }}
+                  : { borderColor: "#312C2F", color: "#9A8F95" }}
               >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? color : "#334155" }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? color : "#312C2F" }} />
                 {label}
                 {id === "density"    && on && totalAircraft > 0  && <span className="ml-0.5 opacity-60">{densityEstimated ? `~${totalAircraft} est.` : totalAircraft}</span>}
                 {id === "home-arcs" && on && homeArcCount > 0   && <span className="ml-0.5 opacity-60">{homeArcCount} teams</span>}
@@ -335,7 +335,7 @@ export default function WorldFlightMap() {
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         style={{
-          width: "100%", height: "auto", display: "block", background: "#0a0e1a",
+          width: "100%", height: "auto", display: "block", background: "#0F0C0E",
           cursor: grabbing ? "grabbing" : "grab",
           touchAction: "none",
           userSelect: "none",
@@ -350,7 +350,7 @@ export default function WorldFlightMap() {
       >
         {/* Countries */}
         {countries.map((d, i) => (
-          <path key={i} d={d} fill="#1a2234" stroke="#243044" strokeWidth={0.4} />
+          <path key={i} d={d} fill="#1D191C" stroke="#312C2F" strokeWidth={0.4} />
         ))}
 
         {/* Density rings — faint base ring always visible, larger ring scaled to traffic count */}
@@ -440,7 +440,7 @@ export default function WorldFlightMap() {
 
       {/* ── Venue info panel ── */}
       {selectedVenue && venueInfo && (
-        <div className="border-t border-slate-800 px-5 py-4 bg-[#0d1220]">
+        <div className="border-t border-slate-800 px-5 py-4 bg-s0x-surface">
           <div className="flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="text-[9px] uppercase tracking-widest text-slate-600 mb-1">Stadium</div>
@@ -462,7 +462,7 @@ export default function WorldFlightMap() {
 
       {/* ── Team / arc info panel ── */}
       {selectedArc && !selectedVenue && (
-        <div className="border-t border-slate-800 px-5 py-4 bg-[#0d1220]">
+        <div className="border-t border-slate-800 px-5 py-4 bg-s0x-surface">
           <div className="flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5">

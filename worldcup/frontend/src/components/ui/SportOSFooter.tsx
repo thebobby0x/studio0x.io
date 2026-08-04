@@ -4,18 +4,19 @@
 // swap the <span>s for <a>s when the owner supplies links.
 export default function SportOSFooter() {
   return (
-    <footer className="border-t border-brand-border bg-brand-dark py-6 text-center space-y-2">
-      <div className="text-xs font-black text-slate-300 tracking-tight">
-        podium<span className="text-brand-gold">Metrics</span>
-        <span className="text-slate-600 font-medium"> — part of </span>
+    <footer className="relative border-t border-s0x-border bg-s0x-bg py-6 text-center space-y-2.5">
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-s0x-ink/50 to-transparent" />
+      <div className="s0x-display text-xs font-black text-s0x-text tracking-tight">
+        podium<span className="text-s0x-accent">Metrics</span>
+        <span className="text-s0x-muted font-medium"> — part of </span>
         sportOS
-        <span className="text-slate-600 font-medium"> by studio0x</span>
+        <span className="text-s0x-muted font-medium"> by studio0x</span>
       </div>
-      <div className="flex items-center justify-center gap-4 text-[10px] uppercase tracking-widest text-slate-600">
+      <div className="s0x-mono flex items-center justify-center gap-4 text-[9px] text-s0x-muted">
         <span title="VIP sport travel — coming soon" className="cursor-default">
           podiumSelect
         </span>
-        <span aria-hidden className="text-slate-700">·</span>
+        <span aria-hidden className="text-s0x-ink">·</span>
         <span title="Global sport calendar — coming soon" className="cursor-default">
           podiumSchedule
         </span>

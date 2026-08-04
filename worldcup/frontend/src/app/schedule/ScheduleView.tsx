@@ -59,59 +59,59 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
   return (
     <Link
       href={`/schedule/${m.id}`}
-      className={`group block rounded-2xl bg-brand-card border overflow-hidden transition-all hover:shadow-2xl mb-6 ${
+      className={`s0x-hud-grid s0x-hud-scan group block rounded-s0x bg-s0x-surface border overflow-hidden transition-all mb-6 ${
         isLive
-          ? "border-brand-green/50 shadow-lg shadow-brand-green/10"
+          ? "border-s0x-ink/60 shadow-[0_0_28px_-8px_rgb(202_53_139/0.6)]"
           : isDone
-          ? "border-brand-border/50"
+          ? "border-s0x-border hover:border-s0x-ink/40"
           : urgent
-          ? "border-amber-500/40 shadow-md shadow-amber-500/10"
-          : "border-brand-border"
+          ? "border-s0x-ink/45 shadow-[0_0_22px_-10px_rgb(202_53_139/0.7)]"
+          : "border-s0x-border hover:border-s0x-ink/40"
       }`}
     >
-      <div className="flex items-center justify-between px-5 py-2.5 border-b border-brand-border/40">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+      <span className="s0x-scanline" aria-hidden="true" />
+
+      <div className="relative flex items-center justify-between px-5 py-2.5 border-b border-s0x-border">
+        <span className="s0x-mono text-[10px] font-semibold text-s0x-muted">
           {label ?? (m.group ? `Group ${m.group}` : m.stageLabel)}
           {m.matchday > 0 ? ` · MD ${m.matchday}` : ""}
         </span>
         {isLive && (
-          <span className="flex items-center gap-1.5 text-[10px] font-black text-red-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="s0x-live">
+            <span className="s0x-live-dot" />
             LIVE
           </span>
         )}
-        {isDone && <span className="text-[10px] text-slate-500">Full Time</span>}
+        {isDone && <span className="s0x-mono text-[10px] text-s0x-muted">Full Time</span>}
         {!isLive && !isDone && (
-          <span suppressHydrationWarning className="text-[10px] text-slate-500">
+          <span suppressHydrationWarning className="s0x-data text-[10px] text-s0x-teal">
             {localTime(m.utcDate)}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-8">
+      <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-8">
         {/* Home */}
         <div className="text-center">
           <div className="flex justify-center mb-3"><FlagImg tla={m.homeTeam.tla} size={80} className="shadow-lg" /></div>
-          <div className="text-sm sm:text-base font-bold text-white group-hover:text-brand-gold transition-colors">
+          <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text transition-colors group-hover:text-s0x-accent">
             {m.homeTeam.name}
           </div>
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-0.5">
-            {m.homeTeam.tla}
-          </div>
+          <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{m.homeTeam.tla}</div>
         </div>
 
-        {/* Score / countdown */}
+        {/* Score / countdown — the HUD readout */}
         <div className="text-center min-w-[110px]">
           {isLive && (
             <>
-              <div className="text-5xl font-black tabular-nums text-white tracking-tighter">
+              <div className="s0x-data text-5xl font-bold text-s0x-text s0x-neon-rosa">
                 {m.homeScore ?? 0}
-                <span className="text-brand-border mx-2">–</span>
+                <span className="text-s0x-border mx-2">–</span>
                 {m.awayScore ?? 0}
               </div>
-              <div className="flex items-center justify-center gap-1.5 mt-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm font-mono text-red-400">
+              <div className="flex items-center justify-center gap-1.5 mt-2.5">
+                <span className="w-2 h-2 rounded-full bg-s0x-ink animate-pulse shadow-glow-rosa" />
+                <span className="s0x-data text-sm text-s0x-accent">
                   {m.status === "HT" ? "HT" : kickedOff ? "Kicking off" : `${m.minute}'`}
                 </span>
               </div>
@@ -119,25 +119,25 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
           )}
           {isDone && (
             <>
-              <div className="text-5xl font-black tabular-nums text-slate-300 tracking-tighter">
+              <div className="s0x-data text-5xl font-bold text-s0x-text/75">
                 {m.homeScore ?? 0}
-                <span className="text-brand-border/60 mx-2">–</span>
+                <span className="text-s0x-border mx-2">–</span>
                 {m.awayScore ?? 0}
               </div>
-              <div className="text-[11px] text-slate-500 mt-2 uppercase tracking-widest">Full Time</div>
+              <div className="s0x-mono text-[10px] text-s0x-muted mt-2.5">Full Time</div>
             </>
           )}
           {m.status === "NS" && !kickedOff && (
             <>
               <div
                 suppressHydrationWarning
-                className={`font-black tabular-nums tracking-tight ${
-                  urgent ? "text-4xl font-mono text-amber-400" : "text-3xl text-white"
+                className={`s0x-data font-bold ${
+                  urgent ? "text-4xl text-s0x-accent s0x-neon-rosa" : "text-3xl text-s0x-text"
                 }`}
               >
                 {ctLabel}
               </div>
-              <div className="text-[11px] text-slate-500 mt-1.5 uppercase tracking-wider">
+              <div className="s0x-mono text-[10px] text-s0x-muted mt-2">
                 {urgent ? "kicks off" : "countdown"}
               </div>
             </>
@@ -147,12 +147,10 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
         {/* Away */}
         <div className="text-center">
           <div className="flex justify-center mb-3"><FlagImg tla={m.awayTeam.tla} size={80} className="shadow-lg" /></div>
-          <div className="text-sm sm:text-base font-bold text-white group-hover:text-brand-gold transition-colors">
+          <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text transition-colors group-hover:text-s0x-accent">
             {m.awayTeam.name}
           </div>
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-0.5">
-            {m.awayTeam.tla}
-          </div>
+          <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{m.awayTeam.tla}</div>
         </div>
       </div>
     </Link>
@@ -169,12 +167,12 @@ function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
   return (
     <Link
       href={`/schedule/${m.id}`}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-card border border-brand-border hover:border-slate-600 transition-all group"
+      className="s0x-row group flex items-center gap-3 px-4 py-3 rounded-s0x bg-s0x-surface border border-s0x-border transition-all hover:border-s0x-ink/50"
     >
       {/* Home */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <FlagImg tla={m.homeTeam.tla} size={24} className="shrink-0" />
-        <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
+        <span className="text-sm font-semibold text-s0x-text/85 truncate transition-colors group-hover:text-s0x-accent">
           {m.homeTeam.name}
         </span>
       </div>
@@ -183,21 +181,21 @@ function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
       <div className="shrink-0 text-center min-w-[72px]">
         {isLive && (
           <span className="flex items-center justify-center gap-1.5">
-            <span className="text-sm font-black text-white tabular-nums">
+            <span className="s0x-data text-sm font-bold text-s0x-text">
               {m.homeScore ?? 0}–{m.awayScore ?? 0}
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-s0x-ink animate-pulse shadow-glow-rosa" />
           </span>
         )}
         {isDone && (
-          <span className="text-sm font-black text-slate-400 tabular-nums">
+          <span className="s0x-data text-sm font-bold text-s0x-muted">
             {m.homeScore ?? 0}–{m.awayScore ?? 0}
           </span>
         )}
         {m.status === "NS" && (
           <span
             suppressHydrationWarning
-            className={`text-xs font-semibold ${urgent ? "text-amber-400" : "text-slate-400"}`}
+            className={`s0x-data text-xs font-semibold ${urgent ? "text-s0x-accent s0x-neon-rosa" : "text-s0x-teal"}`}
           >
             {ctLabel}
           </span>
@@ -206,7 +204,7 @@ function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
 
       {/* Away */}
       <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-        <span className="text-sm font-semibold text-slate-300 truncate text-right group-hover:text-white transition-colors">
+        <span className="text-sm font-semibold text-s0x-text/85 truncate text-right transition-colors group-hover:text-s0x-accent">
           {m.awayTeam.name}
         </span>
         <FlagImg tla={m.awayTeam.tla} size={24} className="shrink-0" />
@@ -238,15 +236,15 @@ function SubFilterBar({
     <div className="space-y-2 mb-6">
       {/* Group chips */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] text-slate-600 uppercase tracking-widest w-12 shrink-0">Group</span>
+        <span className="s0x-mono text-[10px] text-s0x-muted w-12 shrink-0">Group</span>
         {["", ...GROUPS].map((g) => (
           <button
             key={g || "all"}
             onClick={() => onChange({ ...filters, group: g })}
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+            className={`s0x-mono px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
               filters.group === g
-                ? "bg-brand-gold text-brand-dark"
-                : "bg-brand-card border border-brand-border text-slate-400 hover:text-white hover:border-slate-500"
+                ? "bg-s0x-ink text-s0x-onink shadow-glow-rosa"
+                : "bg-s0x-surface border border-s0x-border text-s0x-muted hover:text-s0x-accent hover:border-s0x-ink/50"
             }`}
           >
             {g || "All"}
@@ -256,15 +254,15 @@ function SubFilterBar({
 
       {/* Matchday + team row */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] text-slate-600 uppercase tracking-widest w-12 shrink-0">MD</span>
+        <span className="s0x-mono text-[10px] text-s0x-muted w-12 shrink-0">MD</span>
         {[0, 1, 2, 3].map((d) => (
           <button
             key={d}
             onClick={() => onChange({ ...filters, matchday: d })}
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+            className={`s0x-mono px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
               filters.matchday === d
-                ? "bg-brand-gold text-brand-dark"
-                : "bg-brand-card border border-brand-border text-slate-400 hover:text-white hover:border-slate-500"
+                ? "bg-s0x-ink text-s0x-onink shadow-glow-rosa"
+                : "bg-s0x-surface border border-s0x-border text-s0x-muted hover:text-s0x-accent hover:border-s0x-ink/50"
             }`}
           >
             {d === 0 ? "All" : d}
@@ -274,7 +272,7 @@ function SubFilterBar({
         <select
           value={filters.team}
           onChange={(e) => onChange({ ...filters, team: e.target.value })}
-          className="ml-auto text-xs bg-brand-card border border-brand-border text-slate-400 rounded-full px-3 py-1.5 hover:border-slate-500 focus:outline-none focus:border-brand-gold cursor-pointer"
+          className="s0x-mono ml-auto text-[10px] bg-s0x-surface border border-s0x-border text-s0x-muted rounded-full px-3 py-1.5 hover:border-s0x-ink/50 focus:outline-none focus:border-s0x-ink cursor-pointer"
         >
           <option value="">All Teams</option>
           {teams.map((t) => (
@@ -529,17 +527,19 @@ export default function ScheduleView({ initialMatches }: { initialMatches: Sched
       </div>
 
       {/* View tabs */}
-      <div className="bg-brand-card border border-brand-border rounded-2xl p-1 inline-flex gap-1 mb-8">
+      <div className="bg-s0x-surface border border-s0x-border rounded-s0x p-1 inline-flex gap-1 mb-8">
         {(["today", "remaining", "results"] as View[]).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`relative px-5 py-1.5 rounded-xl text-sm font-semibold transition-all ${
-              view === v ? "bg-white text-brand-dark shadow" : "text-slate-400 hover:text-white"
+            className={`s0x-mono relative px-5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+              view === v
+                ? "bg-s0x-ink text-s0x-onink shadow-glow-rosa"
+                : "text-s0x-muted hover:text-s0x-accent"
             }`}
           >
             {v === "today" && liveCount > 0 && view !== "today" && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-s0x-ink animate-pulse shadow-glow-rosa" />
             )}
             {v === "today" ? "Today" : v === "remaining" ? "Remaining" : "Results"}
           </button>

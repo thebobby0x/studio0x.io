@@ -131,15 +131,17 @@ export const LEAGUES_CUP: DeploymentConfig = {
   momentTypes: FOOTBALL_MOMENTS,
   audioBed: "stadium",
   branding: {
-    // studio0x brand tokens for LC26 (owner 7/29): Miami-pink accent, electric-blue
-    // accent2, near-black base, Syne/DM Mono. NOT the licensed Leagues Cup marks —
-    // styleGuideConfirmed stays false (SUM owns the marks; editorial-only, no logos).
-    primary: "#ff2d78", // Miami pink — accent
-    secondary: "#0a0a0f", // near-black base
-    accent: "#2d9bff", // electric blue — accent2
+    // OFFICIAL studio0x brand palette (owner 8/4) — supersedes the 7/29 Miami-pink
+    // / electric-blue placeholders. Gaming-UI / dark-HUD skin; see globals.css for
+    // the full token set. These are studio0x's OWN confirmed brand values, NOT the
+    // licensed Leagues Cup marks — SUM owns those, so `styleGuideConfirmed` stays
+    // false: nothing here may be presented as official LC26 branding.
+    primary: "#CA358B", // Rosa 700 — primary accent / CTA / neon glow source
+    secondary: "#0F0C0E", // Noir 900 — page background
+    accent: "#5DCBD1", // Riptide — secondary accent, data/stats highlights
     styleGuideConfirmed: false,
   },
-  fonts: { display: "Syne", mono: "DM Mono" },
+  fonts: { display: "Archivo", mono: "IBM Plex Mono" },
   feedProvider: "api-football",
   // api-football V3 league id, verified from the dashboard (owner 7/29): 772
   // (season 2026, Current=True). NOTE: 8157 is the V2 legacy per-season id — do

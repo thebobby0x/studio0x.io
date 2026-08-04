@@ -483,8 +483,8 @@ export default function PredictPage() {
         <div
           className="rounded-2xl overflow-hidden mb-5"
           style={{
-            background: "linear-gradient(135deg, #1a1200 0%, #0f1420 60%)",
-            border: "1px solid #f5a62330",
+            background: "linear-gradient(135deg, #1D191C 0%, #0F0C0E 60%)",
+            border: "1px solid rgb(202 53 139 / 0.35)",
           }}
         >
           <div className="px-5 pt-5 pb-4">
@@ -620,8 +620,8 @@ export default function PredictPage() {
                           }}
                           className={`rounded-2xl overflow-hidden cursor-pointer transition-colors ${
                             pts > 0
-                              ? "border border-brand-gold/25 bg-[#0f1208]"
-                              : "border border-slate-800 bg-brand-card"
+                              ? "border border-s0x-ink/35 bg-s0x-surface"
+                              : "border border-s0x-border bg-s0x-bg"
                           }`}
                         >
                           <div

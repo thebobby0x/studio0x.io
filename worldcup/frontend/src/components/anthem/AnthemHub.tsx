@@ -125,23 +125,14 @@ function buildShareLinks(stream: Stream, pageUrl: string) {
   ];
 }
 
+// One on-palette HUD wash for every anthem plate. This replaced a per-nation
+// flag-colour map: those were arbitrary hexes (several with a white band, which
+// the dark HUD skin forbids), and LC26 is a CLUB tournament — national flag
+// colours were the wrong vocabulary for it anyway. Team identity reads from the
+// crest/emoji and the title, not the plate.
 function teamGradient(code: string | undefined) {
-  if (!code) return "from-[#1e3a5f] via-[#c2860a] to-slate-900";
-  const map: Record<string, string> = {
-    MEX: "from-[#006847] via-[#ce1126] to-slate-900",
-    RSA: "from-[#007A4D] via-[#FFB612] to-[#002395]",
-    BIH: "from-[#002395] via-[#FFCC00] to-slate-900",
-    BRA: "from-[#009c3b] via-[#FFDF00] to-[#002776]",
-    ARG: "from-[#74acdf] via-white to-[#74acdf]",
-    USA: "from-[#B22234] via-white to-[#3C3B6E]",
-    CAN: "from-[#FF0000] via-white to-[#FF0000]",
-    ENG: "from-[#CF142B] via-white to-[#012169]",
-    FRA: "from-[#002395] via-white to-[#ED2939]",
-    ESP: "from-[#AA151B] via-[#F1BF00] to-[#AA151B]",
-    DEU: "from-[#000000] via-[#DD0000] to-[#FFCE00]",
-    POR: "from-[#006600] via-[#FF0000] to-[#FF0000]",
-  };
-  return map[code] ?? "from-brand-green via-brand-gold to-slate-800";
+  void code;
+  return "from-s0x-teal/25 via-s0x-surface to-s0x-ink/30";
 }
 
 export default function AnthemHub({

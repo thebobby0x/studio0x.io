@@ -205,10 +205,12 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
 
   if (hero && isLive) {
     return (
-      <div className="rounded-2xl overflow-hidden border border-red-900/50" style={{
-        background: "linear-gradient(135deg, #0f1a0f 0%, #0d0d0d 40%, #1a0d0d 100%)",
-        boxShadow: "0 0 60px rgba(239,68,68,0.12), 0 0 120px rgba(34,197,94,0.06)",
+      <div className="s0x-hud-grid s0x-hud-scan rounded-s0x overflow-hidden border border-s0x-ink/50" style={{
+        // Noir 900/800 body with a Rosa 700 (live) + Riptide (data) halo.
+        background: "linear-gradient(135deg, #1D191C 0%, #0F0C0E 45%, #161014 100%)",
+        boxShadow: "0 0 60px rgba(202,53,139,0.16), 0 0 120px rgba(93,203,209,0.06)",
       }}>
+        <span className="s0x-scanline" aria-hidden="true" />
         {/* LIVE banner */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
@@ -244,7 +246,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             </Link>
 
             <div className="text-center">
-              <div className="text-7xl sm:text-8xl font-black tabular-nums tracking-tighter leading-none text-white" style={{ textShadow: "0 0 40px rgba(255,255,255,0.15)" }}>
+              <div className="s0x-data text-7xl sm:text-8xl font-bold leading-none text-s0x-text" style={{ textShadow: "0 0 12px rgb(248 189 216 / .55), 0 0 46px rgb(202 53 139 / .45)" }}>
                 {match.homeScore}
                 <span className="text-slate-700 mx-1">–</span>
                 {match.awayScore}
