@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { classifyRound } from "@/lib/tournament";
+import { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig";
 
 const BASE   = "https://v3.football.api-sports.io";
-const LEAGUE = 1;    // World Cup
-const SEASON = 2026;
+const LEAGUE = AF_LEAGUE; // deployment config (worldcup 1 / leaguescup 772)
+const SEASON = AF_SEASON;
 const CACHE_TTL = 20_000; // 20s bulk schedule (reduced from 60s)
 const LIVE_TTL  = 15_000; // 10s live overlay — widened pre-final (7/19): 2,915 used at 17:30Z, worst-case ET+pens must fit in the 4,585 remaining
 
