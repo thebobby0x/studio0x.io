@@ -604,6 +604,63 @@ Never push directly to main.
 
 ---
 
+## MULTI-DEPLOYMENT: how a tournament is configured (added 2026-08-04, LC26 launch)
+
+`src/lib/sportConfig.ts` is the ONE toggle. `TOURNAMENT` env selects a config from
+the registry (`worldcup` | `leaguescup` | `f1-2026`); everything tournament-specific
+hangs off it. Vercel projects: `worldcup-2026` (WC26) and `leaguescup` (LC26,
+`leaguescup.vercel.app`, own Neon DB).
+
+**`NEXT_PUBLIC_TOURNAMENT` must match `TOURNAMENT`.** `TOURNAMENT` is server-only —
+Next inlines only `NEXT_PUBLIC_*` into client bundles — so every `"use client"`
+module read it as undefined and silently fell back to WORLDCUP. The server rendered
+LC26 while the browser ran WC26 dates. `next.config.ts` now derives the public var
+from the server one at build time, so setting `TOURNAMENT` is sufficient; the
+explicit var is belt-and-braces. **Never read `process.env.TOURNAMENT` in client code.**
+
+**What lives in the config (never hardcode these again):**
+- `calendar` — start/knockoutStart/end + round windows + totalEvents. `lib/tournament.ts`
+  reads these; it used to hardcode WC26's June–July dates.
+- `teamGroups` — WC26's nation→group map. **Empty for LC26** (single league phase).
+- `odds` — Polymarket slugs. **`tournamentSlug: null` for LC26** — no Leagues Cup
+  market exists, and the surface must render an empty state, never another
+  competition's prices.
+- `feedCodesAreNationTlas` — true only for nation competitions.
+
+**CLUB DEPLOYMENTS — the team-identity rule (`src/lib/teamIdentity.ts`):**
+api-football's `team.code` is a FIFA nation TLA. It is useless-to-harmful for clubs:
+14 of the 36 Leagues Cup clubs have NO code at all (so code-keyed ingestion dropped
+every fixture they appeared in — 36 of 54), and the codes that exist COLLIDE with
+nations: Columbus Crew = "COL" (Colombia), Portland Timbers = "POR" (Portugal),
+Chicago Fire = "CHI" (Chile), Guadalajara = "GUA", Real Salt Lake = "SAL".
+- **Resolve teams by `afTeamId` (api-football team id), never by code.**
+- `Team.code` on a club deployment is a derived slug — a display label, not an
+  official abbreviation. `Team.country` comes from the feed.
+- **Never map a club code to a flag.** `getFlag()`/`getFlagUrl()` return neutral on
+  club deployments; use `FlagImg afId=` (crest) or `countryFlag(country)`.
+- Codes MOVE when the resolver changes (ATL: Atlas → Atlante; SAL: Real Salt Lake →
+  Santos Laguna). Both seed and fixtureSync run a code-freeing pre-pass and match
+  existing rows by **name before code**.
+
+**AI prompts:** never write a tournament name into a prompt. Import
+`EVENT_NAME` / `coveringLine()` / `tournamentBrief()` from `src/lib/promptContext.ts`.
+Hardcoded "2026 World Cup" in five prompts is what put "sudden-death World Cup
+knockout showdown" on a Leagues Cup league-phase fixture.
+
+**Provenance columns:** `Match.leagueId`, `NewsStory.tournamentId`, `MatchMoment.tournamentId`.
+0 / "" means "written before the column existed" — treat as unknown, never as ours.
+`afTeamId` is indexed, NOT `@unique`: Vercel's build runs `prisma db push` WITHOUT
+`--accept-data-loss`, and adding a unique constraint to a populated table fails the deploy.
+
+**Admin recovery (SUPER_ADMIN, `/admin` → "Tournament Data"):**
+`/api/admin/clear-foreign-data` (feed-verified: asks api-football which fixtures are
+ours, deletes the rest; refuses on an empty feed) · `/api/admin/seed-fixtures` ·
+`/api/admin/regenerate-news` (deletes first — plain generation SKIPS fixtures that
+already have a story, so a fixed prompt never reaches old copy) ·
+`/api/admin/refresh-odds` · "Run Full Reset" runs all four in order.
+
+---
+
 ## Current Production State (as of 2026-07-20 — WC26 COMPLETE, postmortem night)
 
 **WC26 FINISHED: Spain 1–0 Argentina (Ferrán Torres 106', AET). Golden Boot

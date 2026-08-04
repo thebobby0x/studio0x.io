@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw, Thermometer } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw, Thermometer, AlertTriangle, CalendarRange, TrendingUp, Rocket } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -33,8 +33,26 @@ const VIEW_OPTIONS = [
   { role: "USER" as Role,        label: "End User", description: "Public fan experience", color: "border-slate-500/50 bg-slate-500/5 hover:bg-slate-500/10" },
 ];
 
-export default function AdminDashboard({ users }: { users: User[] }) {
+export interface TournamentInfo {
+  id: string;
+  eventName: string;
+  leagueId: number;
+  season: number;
+  /** Fixtures this deployment expects (SPORT.calendar.totalEvents). */
+  expectedEvents: number;
+  /** Matches in the DB carrying THIS league's id. */
+  matchCount: number;
+  /** Matches that do NOT carry this league's id — another tournament's rows, or
+   *  rows seeded before the leagueId column existed. */
+  foreignMatchCount: number;
+  teamCount: number;
+  newsCount: number;
+  foreignNewsCount: number;
+}
+
+export default function AdminDashboard({ users, tournament }: { users: User[]; tournament: TournamentInfo }) {
   const [viewLoading, setViewLoading] = useState<Role | null>(null);
+  const [resetLog, setResetLog] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<Record<string, Role>>(
     Object.fromEntries(users.map((u) => [u.id, u.role]))
   );
@@ -71,6 +89,46 @@ export default function AdminDashboard({ users }: { users: User[] }) {
       setSeedStatus(s => ({ ...s, [key]: "error" }));
       setSeedDetail(d => ({ ...d, [key]: e instanceof Error ? e.message : "request failed" }));
     }
+  }
+
+  // Full Reset — steps 1→4 in order, one request each.
+  //
+  // Sequential, not parallel: clearing must finish before seeding (or the seed's
+  // fresh rows get deleted), and news generation reads the fixtures the seed just
+  // wrote. One step per request also keeps each call inside the serverless
+  // function time limit — the same reason the anthem reimport is chunked
+  // (CLAUDE.md gotcha #18). Stops on the first failure rather than running the
+  // remaining destructive steps against a half-migrated database.
+  const RESET_STEPS: Array<{ label: string; url: string }> = [
+    { label: "1/4 Clear other-tournament data", url: "/api/admin/clear-foreign-data" },
+    { label: "2/4 Seed fixtures", url: "/api/admin/seed-fixtures" },
+    { label: "3/4 Regenerate news", url: "/api/admin/regenerate-news" },
+    { label: "4/4 Refresh odds", url: "/api/admin/refresh-odds" },
+  ];
+
+  async function runFullReset() {
+    setSeedStatus(s => ({ ...s, fullReset: "loading" }));
+    setResetLog([`Starting full reset for ${tournament.eventName} (league ${tournament.leagueId}, season ${tournament.season})…`]);
+    for (const step of RESET_STEPS) {
+      setResetLog(l => [...l, `▶ ${step.label}…`]);
+      try {
+        const res = await fetch(step.url, { method: "POST" });
+        const json = await res.json().catch(() => null);
+        const detail = summarize(json) || `HTTP ${res.status}`;
+        if (!res.ok) {
+          setResetLog(l => [...l, `✗ ${step.label} FAILED — ${detail}`, "Stopped. Fix the failure above, then re-run."]);
+          setSeedStatus(s => ({ ...s, fullReset: "error" }));
+          return;
+        }
+        setResetLog(l => [...l, `✓ ${step.label} — ${detail}`]);
+      } catch (e) {
+        setResetLog(l => [...l, `✗ ${step.label} FAILED — ${e instanceof Error ? e.message : "request failed"}`, "Stopped."]);
+        setSeedStatus(s => ({ ...s, fullReset: "error" }));
+        return;
+      }
+    }
+    setResetLog(l => [...l, "✓ Full reset complete. Reload this page to refresh the counts above."]);
+    setSeedStatus(s => ({ ...s, fullReset: "done" }));
   }
 
   type SeedTool = {
@@ -167,6 +225,109 @@ export default function AdminDashboard({ users }: { users: User[] }) {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* ── Tournament Data ─────────────────────────────────────────────────
+            The recovery controls for "this deployment is showing another
+            tournament's data". Every button is scoped to the ACTIVE deployment
+            (leagueId / tournamentId), never to a hardcoded league. */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarRange size={14} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
+              Tournament Data — {tournament.eventName}
+            </h2>
+          </div>
+
+          {/* Live state, so the operator can see what a button will act on. */}
+          <div className="rounded-xl border border-brand-border bg-brand-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">League / season</div>
+              <div className="font-black text-white">{tournament.leagueId} · {tournament.season}</div>
+              <div className="text-[10px] text-slate-600">TOURNAMENT={tournament.id}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Fixtures in DB</div>
+              <div className={`font-black ${tournament.matchCount >= tournament.expectedEvents ? "text-brand-green" : "text-brand-gold"}`}>
+                {tournament.matchCount}
+                <span className="text-slate-600 text-[11px]">/{tournament.expectedEvents}</span>
+              </div>
+              <div className="text-[10px] text-slate-600">{tournament.teamCount} teams</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Other-tournament rows</div>
+              <div className={`font-black ${tournament.foreignMatchCount > 0 ? "text-red-400" : "text-brand-green"}`}>
+                {tournament.foreignMatchCount}
+              </div>
+              <div className="text-[10px] text-slate-600">matches (incl. unverified)</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">News stories</div>
+              <div className="font-black text-white">{tournament.newsCount}</div>
+              <div className={`text-[10px] ${tournament.foreignNewsCount > 0 ? "text-red-400" : "text-slate-600"}`}>
+                {tournament.foreignNewsCount} untagged/foreign
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {([
+              {
+                key: "clearForeign",
+                icon: AlertTriangle,
+                label: `1 · Clear non-${tournament.eventName} data`,
+                desc: `DESTRUCTIVE. Asks api-football which fixtures belong to league ${tournament.leagueId}/${tournament.season}, then deletes every match NOT in that set (plus its markets, metrics, player stats, weather, event logs, roundtable episodes and predictions), all moments and news not tagged "${tournament.id}", and any team left with no fixtures. Refuses to run if the feed returns zero fixtures.`,
+                action: () => runSeed("clearForeign", "/api/admin/clear-foreign-data", "POST"),
+              },
+              {
+                key: "seedFixtures",
+                icon: CalendarRange,
+                label: `2 · Seed ${tournament.eventName} fixtures`,
+                desc: `Pulls all fixtures for league ${tournament.leagueId}, season ${tournament.season} and upserts them. Non-destructive and safe to re-run. Teams resolve by api-football team id, so clubs with no 3-letter code are no longer skipped. Reports fixtures written and any that failed.`,
+                action: () => runSeed("seedFixtures", "/api/admin/seed-fixtures", "POST"),
+              },
+              {
+                key: "regenNews",
+                icon: Sparkles,
+                label: "3 · Regenerate news",
+                desc: `DESTRUCTIVE. Deletes this deployment's stories (and untagged legacy ones), then regenerates previews, match recaps and day round-ups with the ${tournament.eventName} prompt. Needed because normal generation SKIPS fixtures that already have a story — a fixed prompt never reaches old copy otherwise.`,
+                action: () => runSeed("regenNews", "/api/admin/regenerate-news", "POST"),
+              },
+              {
+                key: "refreshOdds",
+                icon: TrendingUp,
+                label: "4 · Refresh odds",
+                desc: "Clears the cached prediction-market data and any foreign-ticker market rows, then re-pulls for this deployment's configured market. If no market is listed for this competition, it says so — the odds panel shows an empty state rather than another tournament's prices.",
+                action: () => runSeed("refreshOdds", "/api/admin/refresh-odds", "POST"),
+              },
+            ] as SeedTool[]).map(renderSeedTool)}
+          </div>
+
+          {/* Full reset — runs 1→4 in order, streaming progress. Sequential on
+              purpose: each step depends on the previous one's DB state, and one
+              step per request keeps every call inside the function time limit. */}
+          <button
+            onClick={runFullReset}
+            disabled={seedStatus.fullReset === "loading"}
+            className="w-full text-left rounded-xl border border-brand-gold/40 bg-brand-gold/5 p-4 hover:border-brand-gold/70 transition-colors disabled:opacity-60"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Rocket size={14} className={seedStatus.fullReset === "done" ? "text-brand-green" : seedStatus.fullReset === "error" ? "text-red-400" : "text-brand-gold"} />
+              <div className="font-black text-white text-sm">5 · Run Full Reset</div>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Runs steps 1 → 4 in sequence for {tournament.eventName}. Destructive: clears
+              other-tournament data first, then reseeds fixtures, regenerates news and
+              refreshes odds. Progress appears below.
+            </div>
+            {resetLog.length > 0 && (
+              <div className="mt-3 rounded-lg bg-slate-950/60 p-3 space-y-1">
+                {resetLog.map((line, i) => (
+                  <div key={i} className="text-[10px] font-mono text-slate-400 break-words">{line}</div>
+                ))}
+              </div>
+            )}
+          </button>
         </section>
 
         {/* Seed Tools — 6 daily-driver buttons; rare/destructive tools live in the

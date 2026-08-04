@@ -98,11 +98,28 @@ model Team {
   code        String        @unique
   flagEmoji   String
   groupStage  String
+  // Country as api-football spells it. Added 8/4 for club deployments: a club's
+  // badge comes from the country it plays in, NOT from its 3-letter code (which
+  // collides with nation TLAs — Columbus Crew emits "COL" and was rendering
+  // Colombia's flag). Empty for nation deployments, which key off the code.
+  country     String        @default("")
+  // api-football team id — the ONLY identifier the feed always supplies. Club
+  // feeds omit `team.code` for 14 of 36 Leagues Cup clubs, so code-keyed
+  // ingestion silently dropped their fixtures. Nullable for rows seeded before
+  // this field existed.
+  //
+  // Indexed, NOT @unique, on purpose: Vercel's build runs `prisma db push`
+  // without --accept-data-loss, and adding a unique constraint to a populated
+  // table makes push refuse and the deploy fail. Uniqueness is maintained by
+  // the sync (one row per feed team) and by Team.name being unique.
+  afTeamId    Int?
   anthem      AudioStream?
   homePlayers Player[]
   homeMatches Match[]       @relation("HomeTeam")
   awayMatches Match[]       @relation("AwayTeam")
   createdAt   DateTime      @default(now())
+
+  @@index([afTeamId])
 }
 
 model Player {
@@ -197,6 +214,11 @@ model PlayerMatchStat {
 model Match {
   id           String            @id @default(cuid())
   fixture      Int               @unique
+  // api-football league id this fixture belongs to. Added 8/4: the DB had no way
+  // to tell one tournament's rows from another's, so "clear the other
+  // tournament's data" was not expressible. 0 = seeded before this field
+  // existed (treated as unknown, never as "belongs to us").
+  leagueId     Int               @default(0)
   homeTeamId   String
   awayTeamId   String
   homeTeam     Team              @relation("HomeTeam", fields: [homeTeamId], references: [id])
@@ -235,9 +257,15 @@ model NewsStory {
   teamsInvolved String[]           // team codes (TLAs) for flag display
   audioUrl      String?
   generatedAt   DateTime @default(now())
+  // Deployment id (worldcup | leaguescup | f1-2026) this story was written for.
+  // Added 8/4: LC26 shipped with World Cup copy because prompts hardcoded the
+  // tournament AND stories carried no provenance, so bad copy couldn't be
+  // identified or purged selectively. "" = written before this field existed.
+  tournamentId  String   @default("")
 
   @@index([date])
   @@index([fixture])
+  @@index([tournamentId])
 }
 
 // One canonical Roundtable episode per fixture (owner 7/18): persisting the

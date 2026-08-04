@@ -93,7 +93,7 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-8">
         {/* Home */}
         <div className="text-center">
-          <div className="flex justify-center mb-3"><FlagImg tla={m.homeTeam.tla} size={80} className="shadow-lg" /></div>
+          <div className="flex justify-center mb-3"><FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={80} className="shadow-lg" /></div>
           <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text transition-colors group-hover:text-s0x-accent">
             {m.homeTeam.name}
           </div>
@@ -146,7 +146,7 @@ function FeaturedCard({ m, now, label }: { m: ScheduleMatch; now: number; label?
 
         {/* Away */}
         <div className="text-center">
-          <div className="flex justify-center mb-3"><FlagImg tla={m.awayTeam.tla} size={80} className="shadow-lg" /></div>
+          <div className="flex justify-center mb-3"><FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={80} className="shadow-lg" /></div>
           <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text transition-colors group-hover:text-s0x-accent">
             {m.awayTeam.name}
           </div>
@@ -171,7 +171,7 @@ function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
     >
       {/* Home */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <FlagImg tla={m.homeTeam.tla} size={24} className="shrink-0" />
+        <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={24} className="shrink-0" />
         <span className="text-sm font-semibold text-s0x-text/85 truncate transition-colors group-hover:text-s0x-accent">
           {m.homeTeam.name}
         </span>
@@ -207,7 +207,7 @@ function MatchRow({ m, now }: { m: ScheduleMatch; now: number }) {
         <span className="text-sm font-semibold text-s0x-text/85 truncate text-right transition-colors group-hover:text-s0x-accent">
           {m.awayTeam.name}
         </span>
-        <FlagImg tla={m.awayTeam.tla} size={24} className="shrink-0" />
+        <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={24} className="shrink-0" />
       </div>
     </Link>
   );

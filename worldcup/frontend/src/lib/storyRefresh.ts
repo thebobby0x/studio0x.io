@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
+import { SPORT } from "@/lib/sportConfig";
+import { coveringLine, tournamentBrief } from "@/lib/promptContext";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -45,11 +47,28 @@ function dramaLabel(home: number, away: number): string {
 // Stage context for prompts. Knockout matches must NEVER be framed as group
 // games — teams carry a residual groupStage field, but after KNOCKOUT_START
 // the group is history and "Group D performance" on an R16 story is wrong info.
+// This function produced the LC26 launch bug's worst output. Under the old
+// WC-hardcoded calendar, KNOCKOUT_START was 2026-06-28, so EVERY August Leagues
+// Cup fixture fell past it, classifyRound() found no matching window, and the
+// prompt was handed "Knockout round … winner advances, loser goes home" for
+// league-phase games — hence "Crew and Atlas meet in sudden-death World Cup
+// knockout showdown" on matchday one. Dates now come from SPORT.calendar, and a
+// deployment with no published bracket never claims a knockout tie.
+const HAS_GROUPS = Object.keys(SPORT.teamGroups).length > 0;
+const HAS_BRACKET = SPORT.calendar.rounds.length > 0;
+
 function stageContext(date: Date, groupStage: string): { label: string; stakes: string; isKnockout: boolean } {
-  if (date < KNOCKOUT_START) {
+  if (!HAS_BRACKET || date < KNOCKOUT_START) {
+    if (HAS_GROUPS && groupStage) {
+      return {
+        label: `Group ${groupStage}`,
+        stakes: `the group context and what is at stake in Group ${groupStage}`,
+        isKnockout: false,
+      };
+    }
     return {
-      label: `Group ${groupStage}`,
-      stakes: `the group context and what is at stake in Group ${groupStage}`,
+      label: "League phase",
+      stakes: "what is at stake in the standings — do NOT mention any group, and do NOT describe this as a knockout or elimination game",
       isKnockout: false,
     };
   }
@@ -123,7 +142,9 @@ export async function runStoryRefresh(): Promise<{ ok: boolean; previewsWritten:
         : "(First match of the tournament for both teams)";
 
       const stage = stageContext(m.date, m.homeTeam.groupStage);
-      const prompt = `You are studio0x's AI football analyst. Write a pre-match preview for this upcoming World Cup 2026 match, kicking off in ${kickoffIn} minutes.
+      const prompt = `${coveringLine("AI football analyst")} Write a pre-match preview for this upcoming fixture, kicking off in ${kickoffIn} minutes.
+
+${tournamentBrief()}
 
 MATCH: ${m.homeTeam.name} vs ${m.awayTeam.name}
 STAGE: ${stage.label}${stage.isKnockout ? " (knockout — the group stage is over; do NOT mention any group)" : ""}
@@ -132,7 +153,7 @@ ${prevContext}
 Return ONLY valid JSON, no other text:
 {
   "headline": "Pre-match headline, max 12 words, build anticipation",
-  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference ${stage.stakes}. STRICT: only cite the results visible above — do not invent stats, player names, injuries, suspensions, or historical results/anecdotes not shown. General, well-known context (e.g. a nation's footballing pedigree) is fine; specific invented facts are not."
+  "body": "3-4 sentences of pre-match editorial in The Athletic style. Reference ${stage.stakes}. STRICT: only cite the results visible above — do not invent stats, player names, injuries, suspensions, or historical results/anecdotes not shown. General, well-known context about the competing sides is fine; specific invented facts are not."
 }`;
 
       try {
@@ -152,6 +173,7 @@ Return ONLY valid JSON, no other text:
               headline: parsed.headline,
               body: parsed.body,
               teamsInvolved: [m.homeTeam.code, m.awayTeam.code],
+              tournamentId: SPORT.id,
             },
           });
           previewsWritten++;
@@ -182,7 +204,9 @@ Return ONLY valid JSON, no other text:
 
     for (const m of recentFT.filter(m => !haveRecap.has(m.fixture))) {
       const stage = stageContext(m.date, m.homeTeam.groupStage);
-      const prompt = `You are studio0x's AI football analyst covering the 2026 World Cup. Write a match recap.
+      const prompt = `${coveringLine("AI football analyst")} Write a match recap.
+
+${tournamentBrief()}
 
 RESULT: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
 TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
@@ -211,6 +235,7 @@ Return ONLY valid JSON:
               headline: parsed.headline,
               body: parsed.body,
               teamsInvolved: [m.homeTeam.code, m.awayTeam.code],
+              tournamentId: SPORT.id,
             },
           });
           recapsWritten++;

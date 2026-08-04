@@ -3,14 +3,56 @@
 import Image from "next/image";
 import { getFlagUrl } from "@/lib/teamMeta";
 import { getFlag } from "@/lib/flags";
+import { SPORT } from "@/lib/sportConfig";
 
 interface FlagImgProps {
   tla: string | undefined | null;
   size?: number;   // rendered width in px
   className?: string;
+  /** api-football team id. On club deployments this yields the club crest —
+   *  the only correct badge for a club. */
+  afId?: number | null;
 }
 
-export default function FlagImg({ tla, size = 40, className = "" }: FlagImgProps) {
+// A 3-letter code identifies a NATION only on a nation deployment. On a club
+// competition the same codes belong to clubs and collide with FIFA TLAs, so
+// mapping code → country flag rendered Colombia's flag on Columbus Crew ("COL"),
+// Portugal's on Portland Timbers ("POR") and Chile's on Chicago Fire ("CHI").
+// Club deployments therefore never derive a flag from the code: they show the
+// crest when we know the team id, and a neutral monogram when we don't.
+const CODES_ARE_NATIONS = SPORT.feedCodesAreNationTlas;
+
+/** api-football serves crests at a stable public path, already allow-listed in
+ *  next.config.ts remotePatterns. */
+function crestUrl(afId: number): string {
+  return `https://media.api-sports.io/football/teams/${afId}.png`;
+}
+
+export default function FlagImg({ tla, size = 40, className = "", afId }: FlagImgProps) {
+  if (!CODES_ARE_NATIONS) {
+    if (afId) {
+      return (
+        <Image
+          src={crestUrl(afId)}
+          alt={tla ?? "crest"}
+          width={size}
+          height={size}
+          className={`object-contain ${className}`}
+          unoptimized
+        />
+      );
+    }
+    // No crest available — a neutral monogram, never a country's flag.
+    return (
+      <span
+        className={`inline-flex items-center justify-center rounded-sm bg-slate-800 text-slate-300 font-black ${className}`}
+        style={{ width: size, height: size, fontSize: size * 0.38 }}
+      >
+        {(tla ?? "?").slice(0, 3)}
+      </span>
+    );
+  }
+
   const url = getFlagUrl(tla, size <= 40 ? 40 : 80);
 
   if (!url) {

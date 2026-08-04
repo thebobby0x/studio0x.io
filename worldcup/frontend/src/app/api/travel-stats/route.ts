@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAllVenues, type VenueInfo } from "@/lib/venues";
+import { AF_LEAGUE, SPORT } from "@/lib/sportConfig";
+import { countryFlag } from "@/lib/teamIdentity";
 
 export const dynamic = "force-dynamic";
 
@@ -108,20 +110,40 @@ export interface CityTravelStats {
   remainingCount: number;
   hasMatchToday: boolean;
   nextMatchDate: string | null;
-  peakArrivals: number;
-  peakDepartures: number;
-  intlSharePct: number;
-  hotelRateUsd: number;
-  intlFlightsPerDay: number;
-  estimatedRevenuePerMatch: number;
-  totalEstimatedRevenue: number;
+  // ── Modelled fields ──────────────────────────────────────────────────────
+  // null when this deployment has NO travel-economics model. The multipliers,
+  // hotel rates, international-share and flight counts below are WC26-specific
+  // estimates built for a 104-match, 16-city, three-nation tournament; applying
+  // them to another competition would publish invented numbers (CONTENT TRUTH).
+  // The UI hides every null field rather than showing a zero.
+  peakArrivals: number | null;
+  peakDepartures: number | null;
+  intlSharePct: number | null;
+  hotelRateUsd: number | null;
+  intlFlightsPerDay: number | null;
+  estimatedRevenuePerMatch: number | null;
+  totalEstimatedRevenue: number | null;
   /** Modelled revenue for matches ALREADY PLAYED in this city — grows as the tournament progresses */
-  revenueToDate: number;
-  travelFact: string;
+  revenueToDate: number | null;
+  travelFact: string | null;
 }
+
+// This deployment's travel model. "fan-origin" is the WC26 economic projection
+// (fan multipliers, hotel rates, international share, $ per fan). Anything else
+// gets a FACTS-ONLY host-city pulse: real venues, real cities, real match counts,
+// real kickoff dates — and no modelled economics at all.
+//
+// Before this split, the route filtered every city through the hardcoded WC26
+// venue table (`if (!venueInfo) continue`). On LC26 exactly one of the 16 WC
+// cities matched a Leagues Cup venue, so Travel Pulse rendered a single card —
+// Seattle — carrying $302M of World Cup revenue projection for two club
+// fixtures, a WC travel fact about Korean and Japanese fans, and a 104-match
+// denominator.
+const HAS_ECONOMIC_MODEL = SPORT.features.travel === "fan-origin";
 
 export async function GET() {
   const matches = await prisma.match.findMany({
+    where: { leagueId: { in: [AF_LEAGUE, 0] } },
     include: { homeTeam: true, awayTeam: true },
   });
 
@@ -146,7 +168,11 @@ export async function GET() {
 
   for (const [city, cityMatches] of cityMatchMap.entries()) {
     const venueInfo = venueByCity.get(city);
-    if (!venueInfo) continue;
+    // WC26 keeps its curated venue table as the gate. Other deployments derive
+    // the host city from the fixtures themselves, so no city is ever dropped for
+    // being absent from a World Cup lookup.
+    if (!venueInfo && HAS_ECONOMIC_MODEL) continue;
+    if (!city) continue;
 
     const completed = cityMatches.filter(m => m.status === "FT").length;
     const upcoming  = cityMatches.filter(m => m.status === "NS" || m.status === "LIVE");
@@ -159,7 +185,45 @@ export async function GET() {
 
     const nextMatch = upcoming.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
-    const capacity = venueInfo.capacity;
+    // Facts we always have, from the fixtures themselves.
+    const sample = cityMatches[0];
+    const venueName = venueInfo?.name ?? sample.venue ?? "";
+    // The host country of a fixture is the home side's country (a home fixture is
+    // played in the home club's country) — read from the feed at sync time, not
+    // guessed. WC26 keeps its curated venue table's country.
+    const country = venueInfo?.country ?? sample.homeTeam.country ?? "";
+
+    if (!HAS_ECONOMIC_MODEL) {
+      cities.push({
+        name: city,
+        country,
+        flag: COUNTRY_FLAG[country] ?? countryFlag(country),
+        venue: venueName,
+        capacity: venueInfo?.capacity ?? 0,
+        lat: venueInfo?.lat ?? 0,
+        lng: venueInfo?.lng ?? 0,
+        avgTempC: venueInfo?.avgJuneTempC ?? 0,
+        matchCount: cityMatches.length,
+        completedCount: completed,
+        remainingCount: remaining,
+        hasMatchToday,
+        nextMatchDate: nextMatch ? new Date(nextMatch.date).toISOString() : null,
+        // No economic model for this deployment — every modelled field is null
+        // rather than a WC26 number wearing another tournament's name.
+        peakArrivals: null,
+        peakDepartures: null,
+        intlSharePct: null,
+        hotelRateUsd: null,
+        intlFlightsPerDay: null,
+        estimatedRevenuePerMatch: null,
+        totalEstimatedRevenue: null,
+        revenueToDate: null,
+        travelFact: null,
+      });
+      continue;
+    }
+
+    const capacity = venueInfo!.capacity;
     const intlPct  = INTL_SHARE[city] ?? 20;
     const hotel    = HOTEL_RATE[city] ?? 220;
     const flights  = FLIGHTS_INTL[city] ?? 150;
@@ -177,13 +241,13 @@ export async function GET() {
 
     cities.push({
       name: city,
-      country: venueInfo.country,
-      flag: COUNTRY_FLAG[venueInfo.country] ?? "🌎",
-      venue: venueInfo.name,
+      country: venueInfo!.country,
+      flag: COUNTRY_FLAG[venueInfo!.country] ?? "🌎",
+      venue: venueInfo!.name,
       capacity,
-      lat: venueInfo.lat,
-      lng: venueInfo.lng,
-      avgTempC: venueInfo.avgJuneTempC,
+      lat: venueInfo!.lat,
+      lng: venueInfo!.lng,
+      avgTempC: venueInfo!.avgJuneTempC,
       matchCount: cityMatches.length,
       completedCount: completed,
       remainingCount: remaining,
@@ -197,30 +261,62 @@ export async function GET() {
       estimatedRevenuePerMatch: revPerMatch,
       totalEstimatedRevenue: revPerMatch * cityMatches.length,
       revenueToDate: revPerMatch * completed,
-      travelFact: TRAVEL_FACT[city] ?? `${city} is one of ${cityMatches.length} match cities in the 2026 World Cup.`,
+      travelFact: TRAVEL_FACT[city] ?? `${city} is one of ${cityMatches.length} match cities in the ${SPORT.eventName}.`,
     });
   }
 
-  // Sort: cities with today's matches first, then by total revenue
+  // Sort: cities with today's matches first, then by modelled revenue where we
+  // have it, else by how much football the city is actually hosting.
   cities.sort((a, b) => {
     if (a.hasMatchToday && !b.hasMatchToday) return -1;
     if (!a.hasMatchToday && b.hasMatchToday) return 1;
-    return b.totalEstimatedRevenue - a.totalEstimatedRevenue;
+    if (a.totalEstimatedRevenue != null && b.totalEstimatedRevenue != null) {
+      return b.totalEstimatedRevenue - a.totalEstimatedRevenue;
+    }
+    return b.matchCount - a.matchCount;
   });
 
-  const totalRevenue = cities.reduce((s, c) => s + c.totalEstimatedRevenue, 0);
-  const totalMatches = 104; // FIFA WC 2026: 72 group stage + 32 knockout
+  // Denominator is THIS tournament's real fixture count — the DB's own rows,
+  // falling back to the configured total. It was hardcoded to 104 (WC26's
+  // 72 + 32), so LC26 rendered "0/104" against its 54-fixture league phase.
+  const totalMatches = matches.length || SPORT.calendar.totalEvents;
+  const completedMatches = matches.filter(m => m.status === "FT").length;
+
+  if (!HAS_ECONOMIC_MODEL) {
+    // Facts only. No revenue, no visitor projection, no economic impact — those
+    // are WC26 estimates and there is no equivalent model for this competition.
+    return NextResponse.json({
+      model: "fixtures-only",
+      disclosure: `Host-city facts for the ${SPORT.eventName}, from the fixture list. No travel-economics model is published for this competition.`,
+      cities,
+      totals: {
+        cities: cities.length,
+        matches: totalMatches,
+        completedMatches,
+        estimatedRevenue: null,
+        revenueToDate: null,
+        fansArrivingToday: null,
+        intlVisitorsToDate: null,
+        intlVisitors: null,
+        economicImpactToDate: null,
+        economicImpact: null,
+      },
+    });
+  }
+
+  const totalRevenue = cities.reduce((s, c) => s + (c.totalEstimatedRevenue ?? 0), 0);
   const totalFansPerDay = cities
     .filter(c => c.hasMatchToday)
-    .reduce((s, c) => s + c.peakArrivals, 0);
+    .reduce((s, c) => s + (c.peakArrivals ?? 0), 0);
 
   // Progress-aware totals — these MOVE as the tournament plays out instead of
   // sitting on the same full-tournament projection for six weeks.
-  const completedMatches = matches.filter(m => m.status === "FT").length;
-  const progress = Math.min(1, completedMatches / totalMatches);
-  const revenueToDate = cities.reduce((s, c) => s + c.revenueToDate, 0);
+  const progress = Math.min(1, completedMatches / Math.max(1, totalMatches));
+  const revenueToDate = cities.reduce((s, c) => s + (c.revenueToDate ?? 0), 0);
 
   return NextResponse.json({
+    model: "wc-fan-origin",
+    disclosure: null,
     cities,
     totals: {
       cities: cities.length,

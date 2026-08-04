@@ -197,12 +197,22 @@ function GroupCard({
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border bg-brand-card flex-wrap">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider shrink-0">
-          {standing.group}
-        </span>
-        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
-          Group {standing.group}
-        </span>
+        {/* A single-letter key is a GROUP; anything else is the whole-competition
+            table (LC26's one league phase), which must not be headed "Group X". */}
+        {standing.group.length === 1 ? (
+          <>
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider shrink-0">
+              {standing.group}
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
+              Group {standing.group}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
+            {standing.group}
+          </span>
+        )}
         {/* Group Danger Index™ — pre-tournament Polymarket strength */}
         {gdi && (
           <span className="flex items-center gap-1 text-[10px] font-bold border border-brand-border/50 rounded-full px-2 py-0.5">

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { maybeScheduleRefresh } from "@/lib/storyRefresh";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
+import { coveringLine, tournamentBrief } from "@/lib/promptContext";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,10 @@ function buildMatchMetrics(
 }
 
 function buildPrompt(matchData: string, metricsData: string, standingsData: string, knockoutStarted: boolean): string {
-  return `You are studio0x's AI sports analyst covering the 2026 World Cup. Write 5 original editorial news stories based on the tournament data below.
+  return `${coveringLine("AI sports analyst")} Write 5 original editorial news stories based on the tournament data below.
+
+${tournamentBrief()}
+
 ${knockoutStarted ? "\nIMPORTANT: The group stage is OVER — the tournament is in the knockout rounds. Each match below is labeled with its stage. Never describe a knockout match (Round of 32/16, Quarter-final, Semi-final, Final) as a group game or say a knockout result affects a group table.\n" : ""}
 RECENT MATCHES (last 14 days, each labeled with its stage):
 ${matchData}

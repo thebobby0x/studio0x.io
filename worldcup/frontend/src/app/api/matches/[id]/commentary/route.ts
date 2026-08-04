@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getFixtureStatistics } from "@/lib/liveStats";
+import { EVENT_NAME } from "@/lib/promptContext";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +163,7 @@ export async function GET(
 
   const quietBrief = `NO NEW MATCH ACTION since the last update. This batch is QUIET-PERIOD BANTER: react to the current score, the stats above, and what's at stake; tease each other; drop a grounded observation or two. You must NOT narrate any new match action — no chances, saves, tackles, cards, or moments that are not in the data above. Opinions and feelings are welcome; invented events are not.`;
 
-  const baseContext = `World Cup 2026 match — ${score}
+  const baseContext = `${EVENT_NAME} match — ${score}
 Status: ${match.status}${isLive ? ` (${match.elapsed}' played)` : ""}
 
 Events so far:

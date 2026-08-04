@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { isAdminAuthed as authed } from "@/lib/adminAuth";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
+import { AF_LEAGUE, SPORT } from "@/lib/sportConfig";
+import { coveringLine, tournamentBrief } from "@/lib/promptContext";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,9 +25,21 @@ function dayKey(d: Date): string {
 // Stage context for prompts. Knockout matches must NEVER be described as group
 // games — the group stage ended July 2 and "Group D performance" on an R16
 // recap is wrong info (same bug class as the match-page group leak, PR #106).
+//
+// Formats without a published knockout bracket (LC26 as of 8/4: 54 fixtures, all
+// round "Group Stage", knockouts not yet in the feed) must not have one invented.
+// SPORT.calendar.rounds is empty there, so classifyRound returns null and every
+// fixture stays in the league phase — which is the truth.
+const HAS_GROUPS = Object.keys(SPORT.teamGroups).length > 0;
+const HAS_BRACKET = SPORT.calendar.rounds.length > 0;
+const PHASE_LABEL = HAS_GROUPS ? "Group stage" : "League phase";
+const PHASE_STAKES = HAS_GROUPS
+  ? "what the result means for the group table"
+  : "what the result means for the standings and qualification";
+
 function stageContext(date: Date): { label: string; stakes: string; isKnockout: boolean } {
-  if (date < KNOCKOUT_START) {
-    return { label: "Group stage", stakes: "what the result means for the group table", isKnockout: false };
+  if (!HAS_BRACKET || date < KNOCKOUT_START) {
+    return { label: PHASE_LABEL, stakes: PHASE_STAKES, isKnockout: false };
   }
   const round = classifyRound(date) ?? "Knockout round";
   return {
@@ -91,8 +105,11 @@ async function handler(req: Request) {
   }
   const client = new Anthropic({ apiKey: key });
 
+  // Scope to THIS deployment's competition. leagueId 0 = rows seeded before the
+  // field existed; they are included so a first run after deploy isn't empty,
+  // and the fixture sync backfills them on its next pass.
   const matches = (await prisma.match.findMany({
-    where: { status: "FT" },
+    where: { status: "FT", leagueId: { in: [AF_LEAGUE, 0] } },
     select: {
       fixture: true, date: true, homeScore: true, awayScore: true,
       homeTeam: { select: { name: true, code: true } },
@@ -139,10 +156,12 @@ async function handler(req: Request) {
 
   const gameResults = await mapPool(missingGames, CONCURRENCY, async (m) => {
     const stage = stageContext(m.date);
-    const prompt = `You are studio0x's AI football analyst covering the 2026 World Cup. Write a concise match recap.
+    const prompt = `${coveringLine("AI football analyst")} Write a concise match recap.
+
+${tournamentBrief()}
 
 MATCH: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name}
-STAGE: ${stage.label}${stage.isKnockout ? " (knockout — group stage is over; do NOT mention any group)" : ""}
+STAGE: ${stage.label}${stage.isKnockout ? " (knockout — group stage is over; do NOT mention any group)" : ""}${!HAS_GROUPS ? " (this competition has no groups — do NOT mention a group)" : ""}
 RESULT TYPE: ${dramaLabel(m.homeScore, m.awayScore)}
 
 Return ONLY a JSON object, no other text:
@@ -167,6 +186,7 @@ Return ONLY a JSON object, no other text:
           headline: parsed.headline,
           body: parsed.body,
           teamsInvolved: [m.homeTeam.code, m.awayTeam.code],
+          tournamentId: SPORT.id,
         },
       });
       return true;
@@ -194,7 +214,9 @@ Return ONLY a JSON object, no other text:
       .join("\n");
     const dayIsKnockout = dayMatches.every(m => stageContext(m.date).isKnockout);
     const prettyDate = new Date(k).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
-    const prompt = `You are studio0x's AI football editor covering the 2026 World Cup. Write an end-of-day round-up for all matches played on ${prettyDate}.
+    const prompt = `${coveringLine("AI football editor")} Write an end-of-day round-up for all matches played on ${prettyDate}.
+
+${tournamentBrief()}
 
 RESULTS:
 ${resultsList}
@@ -222,6 +244,7 @@ Return ONLY a JSON object, no other text:
           headline: parsed.headline,
           body: parsed.body,
           teamsInvolved: [top.homeTeam.code, top.awayTeam.code],
+          tournamentId: SPORT.id,
         },
       });
       return true;

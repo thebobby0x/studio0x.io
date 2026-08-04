@@ -1,3 +1,16 @@
+import { SPORT } from "@/lib/sportConfig";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Polymarket event slugs are per-deployment (SPORT.odds). They were hardcoded to
+// "world-cup-winner" / "world-cup-group-<x>-winner", so the Leagues Cup site
+// served World Cup winner odds verbatim — Spain at probability 1.0, because WC26
+// is over and Spain won it. Polymarket lists no Leagues Cup market, so LC26's
+// tournamentSlug is null and these functions return null, which every caller
+// already renders as an honest "no market" state. Showing one competition's odds
+// on another's page is exactly the class of falsehood CLAUDE.md's CONTENT TRUTH
+// rule bans.
+// ─────────────────────────────────────────────────────────────────────────────
+
 const GAMMA = "https://gamma-api.polymarket.com";
 const CACHE_TTL_MS = 30_000;
 const TOURNAMENT_CACHE_TTL_MS = 300_000; // 5 minutes — tournament odds move slowly
@@ -103,7 +116,9 @@ export async function getGroupWinnerMarkets(group: string): Promise<GroupWinnerD
     return { ...cached.data, source: "cache" };
   }
 
-  const events = await fetchGamma(`world-cup-group-${group.toLowerCase()}-winner`);
+  const slugFor = SPORT.odds.groupSlugFor;
+  if (!slugFor) return null; // deployment has no per-group markets
+  const events = await fetchGamma(slugFor(group));
   if (!events) return null;
 
   const event = events[0] as { markets?: RawPolyMarket[]; liquidity?: number } | undefined;
@@ -158,7 +173,9 @@ export async function getTournamentWinnerMarkets(): Promise<TournamentWinnerData
     return { ..._tournamentCache.data, source: "cache" };
   }
 
-  const events = await fetchGamma("world-cup-winner");
+  const slug = SPORT.odds.tournamentSlug;
+  if (!slug) return null; // no winner market exists for this competition
+  const events = await fetchGamma(slug);
   if (!events) return null;
 
   const event = events[0] as { markets?: RawPolyMarket[]; liquidity?: number } | undefined;
@@ -191,6 +208,15 @@ export async function getTournamentWinnerMarkets(): Promise<TournamentWinnerData
 
   _tournamentCache = { ts: Date.now(), data: result };
   return result;
+}
+
+/** Drop every in-process odds cache so the next read re-fetches from the API.
+ *  Used by the admin "Refresh Odds" button — without it a warm serverless
+ *  instance keeps serving the previously-cached market for up to 5 minutes. */
+export function clearOddsCache(): void {
+  _tournamentCache = null;
+  _tlaCache.clear();
+  _groupCache.clear();
 }
 
 /** Get a single team's tournament win probability by TLA. Returns null if not found. */
