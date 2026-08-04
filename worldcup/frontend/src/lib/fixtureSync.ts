@@ -32,6 +32,7 @@ export const STATUS_MAP: Record<string, string> = {
 // the competition has no groups — applying the WC map to clubs is what put
 // Columbus Crew ("COL" = Colombia) into World Cup Group K.
 export const TEAM_GROUPS: Record<string, string> = SPORT.teamGroups;
+const HAS_GROUPS = Object.keys(TEAM_GROUPS).length > 0;
 
 interface AFFixture {
   fixture: {
@@ -152,14 +153,21 @@ export async function syncFixtures(): Promise<SyncResult> {
         (await prisma.team.findFirst({ where: { afTeamId: afId } })) ??
         (await prisma.team.findUnique({ where: { name: t.name } })) ??
         (await prisma.team.findUnique({ where: { code: t.code } }));
+      // groupStage on a deployment WITHOUT groups must be empty, not preserved
+      // and not "KO". Preserving left Columbus Crew and Portland Timbers holding
+      // "K" — World Cup Group K, written by the old code-keyed seed because
+      // their feed codes are Colombia's and Portugal's TLAs. And "KO" ("in the
+      // tournament, not in a group") is only meaningful where groups exist; on
+      // LC26 it leaked into the schedule's `group` field via synthesizeFromDb.
+      const groupStage = HAS_GROUPS ? (t.groupStage || existing?.groupStage || "KO") : "";
       if (existing) {
         await prisma.team.update({
           where: { id: existing.id },
-          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage: t.groupStage || existing.groupStage },
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage },
         });
       } else {
         await prisma.team.create({
-          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage: t.groupStage || "KO" },
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage },
         });
       }
       result.teamsUpserted++;

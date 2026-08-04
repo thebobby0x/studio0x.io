@@ -460,7 +460,8 @@ async function seed(req: Request) {
       name: t.name,
       flagEmoji: t.flagEmoji,
       country: t.country,
-      groupStage: t.groupStage || groupByCode.get(t.code) || "",
+      // Empty on a groupless format — never "KO", and never a stale WC letter.
+      groupStage: hasGroups ? (t.groupStage || groupByCode.get(t.code) || "KO") : "",
     }));
     // Free wanted codes held by a different team before reassigning any — same
     // pre-pass as lib/fixtureSync.ts (Team.code is @unique and codes move).
