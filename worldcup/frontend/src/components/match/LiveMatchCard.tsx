@@ -157,7 +157,10 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
   const [goals, setGoals] = useState<GoalEvent[] | null>(null);
   const [missedPens, setMissedPens] = useState<MissedPen[]>([]);
   const [varEvents, setVarEvents] = useState<VarEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // "missing" = the route says this match does not exist (404) — permanent, so
+  // stop polling. "transient" = anything else; keep polling, because a 5s loop
+  // will very likely fix itself.
+  const [fault, setFault] = useState<"missing" | "transient" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -165,7 +168,19 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         fetch(`/api/matches/${matchId}/live`),
         fetch(`/api/matches/${matchId}/goals`),
       ]);
-      if (!liveRes.ok) throw new Error("API error");
+      if (!liveRes.ok) {
+        // Log the real status and body — the old code threw a bare
+        // `new Error("API error")` and rendered `String(e)`, which is how the
+        // dashboard came to display the literal string "Error: Error: API
+        // error" with nothing in it to debug from.
+        const body = await liveRes.text().catch(() => "");
+        console.error(
+          `[LiveMatchCard] /api/matches/${matchId}/live → ${liveRes.status}`,
+          body.slice(0, 300),
+        );
+        setFault(liveRes.status === 404 ? "missing" : "transient");
+        return;
+      }
       const [liveData, goalsData] = await Promise.all([
         liveRes.json(),
         goalsRes.ok ? goalsRes.json() : Promise.resolve({ goals: [] }),
@@ -174,18 +189,42 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       setGoals(goalsData.goals ?? []);
       setMissedPens(goalsData.missedPens ?? []);
       setVarEvents(goalsData.varEvents ?? []);
+      // Recovered. The old code never cleared the error, so a single blip in a
+      // 5s poll left the tile broken until a full page reload.
+      setFault(null);
     } catch (e) {
-      setError(String(e));
+      console.error(`[LiveMatchCard] fetch failed for ${matchId}`, e);
+      setFault("transient");
     }
   }, [matchId]);
 
   useEffect(() => {
     load();
+    // A match the API doesn't have will never appear by polling — stop asking.
+    if (fault === "missing") return;
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, fault]);
 
-  if (error) return <div className="rounded-xl bg-brand-card border border-red-800/40 p-6 text-red-400">Error: {error}</div>;
+  // A live tile that can't reach its data is a degraded state, not a crash: it
+  // renders calm, on-palette copy and (when transient) keeps retrying behind it.
+  // Raw error strings never reach the dashboard.
+  if (fault && !data) {
+    return (
+      <div className="s0x-card s0x-hud-grid p-6 text-center">
+        <span className="s0x-scanline" aria-hidden="true" />
+        <Activity size={18} className="mx-auto mb-2 text-s0x-muted" />
+        <p className="s0x-mono text-[11px] text-s0x-muted">
+          {fault === "missing" ? "Match data unavailable" : "Live data temporarily unavailable"}
+        </p>
+        <p className="text-[11px] text-s0x-muted/70 mt-1">
+          {fault === "missing"
+            ? "This fixture isn't in the database yet — run Sync Fixtures."
+            : "Reconnecting…"}
+        </p>
+      </div>
+    );
+  }
   if (!data) return <div className="rounded-xl bg-brand-card border border-brand-border p-6 animate-pulse h-64" />;
 
   const { match, metrics, dataSources } = data;

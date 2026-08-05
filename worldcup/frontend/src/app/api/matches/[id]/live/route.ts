@@ -85,8 +85,23 @@ async function getAFFixture(fixtureId: number): Promise<AFResult | null> {
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  try {
+    return await handler(await params);
+  } catch (e) {
+    // Everything that touches the network here is already in allSettled or
+    // catches internally; what remained unguarded were the two Prisma calls, and
+    // a Neon connection blip mid-poll took the whole route to a 500 that the
+    // dashboard rendered as a raw error string. Fail as a typed 503 the client
+    // can treat as transient, and log enough to identify the real cause.
+    console.error("[api/matches/:id/live] unhandled:", e);
+    return NextResponse.json(
+      { error: "live_unavailable", detail: e instanceof Error ? e.message : String(e) },
+      { status: 503 },
+    );
+  }
+}
 
+async function handler({ id }: { id: string }) {
   const match = await prisma.match.findUnique({
     where: { id },
     include: { homeTeam: true, awayTeam: true },
@@ -145,7 +160,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? { home_win: kalshi.home_win, draw: kalshi.draw, away_win: kalshi.away_win }
     : simPrices;
 
-  const dbMarkets = await prisma.kalshiMarket.findMany({ where: { matchId: id } });
+  // Markets are decoration on a live tile — never let their absence take down
+  // the score, which is the one thing this route must always deliver.
+  const dbMarkets = await prisma.kalshiMarket
+    .findMany({ where: { matchId: id } })
+    .catch(() => [] as Awaited<ReturnType<typeof prisma.kalshiMarket.findMany>>);
   const enrichedMarkets = dbMarkets.map((m) => ({
     ...m,
     price: priceMap[m.outcome as keyof typeof priceMap] ?? m.price,
