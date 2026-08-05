@@ -17,6 +17,15 @@ export interface VarEvent {
   firstSeenAt?: string;
 }
 
+export interface CardEvent {
+  minute: number;
+  team: string;
+  player: string;
+  /** "Yellow Card" | "Red Card" | "Second Yellow card" — the feed's own wording. */
+  detail: string;
+  color: "yellow" | "red";
+}
+
 export interface GoalEvent {
   minute: number;
   team: string;
@@ -158,6 +167,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         const varEvents: VarEvent[] = events
           .filter((e) => e.type === "Var")
           .map((e) => ({ minute: e.time.elapsed, team: e.team.name, detail: e.detail }));
+        // Cards were already in this payload and were being dropped on the
+        // floor — the UI could only ever show them as an aggregate count. A
+        // second yellow IS a dismissal, so it is coloured red.
+        const cards: CardEvent[] = events
+          .filter((e) => e.type === "Card")
+          .map((e) => ({
+            minute: e.time.elapsed,
+            team: e.team.name,
+            player: e.player?.name ?? "",
+            detail: e.detail,
+            color: /red|second yellow/i.test(e.detail) ? "red" as const : "yellow" as const,
+          }));
 
         // ── Live event capture (VAR Freeze™) ────────────────────────────────
         // Record when each event FIRST appears in our polling so wall-clock
@@ -217,12 +238,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           ).length;
           if (homeEffective !== match.homeScore || awayEffective !== match.awayScore) {
             // Event totals don't match the confirmed scoreline — data is corrupt.
-            return NextResponse.json({ goals: [], dataWarning: "event_score_mismatch" });
+            // Scorers are untrustworthy here, but cards are independent of the
+            // scoreline check — keep them rather than blanking the timeline.
+            return NextResponse.json({ goals: [], cards, dataWarning: "event_score_mismatch" });
           }
         }
 
-        if (goals.length > 0 || missedPens.length > 0 || varEvents.length > 0) {
-          return NextResponse.json({ goals, missedPens, varEvents });
+        if (goals.length > 0 || missedPens.length > 0 || varEvents.length > 0 || cards.length > 0) {
+          return NextResponse.json({ goals, missedPens, varEvents, cards });
         }
         // No real events yet — fall through to simulation below (LIVE/HT only)
       }

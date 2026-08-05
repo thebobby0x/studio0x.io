@@ -242,6 +242,109 @@ h1, h2, h3, h4, h5, h6 {
 .s0x-brackets::before { top: 8px; left: 8px; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 4px; }
 .s0x-brackets::after { bottom: 8px; right: 8px; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 4px; }
 
+/* Circuit-board corner decorations — four corner traces plus solder nodes, so a
+   panel reads as instrumentation rather than a plain box. Riptide on the data
+   corner, Rosa on the live corner.
+
+   Painted as background LAYERS on the element itself, deliberately NOT as
+   ::before/::after: .s0x-hud-grid and .s0x-hud-scan already own both pseudo-
+   elements, and combining the classes on one node silently cancelled whichever
+   lost the cascade. Background-color (e.g. Tailwind's bg-*) composes underneath
+   these layers; a background-IMAGE utility on the same element would not. */
+.s0x-circuit {
+  background-image:
+    /* solder nodes */
+    radial-gradient(circle at 7px 7px,               rgb(93 203 209 / .95) 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 7px) calc(100% - 7px), rgb(202 53 139 / .95) 0 2px, transparent 2.5px),
+    /* top-left trace (Riptide) */
+    linear-gradient(to right,  rgb(93 203 209 / .7) 0 26px, transparent 26px),
+    linear-gradient(to bottom, rgb(93 203 209 / .7) 0 26px, transparent 26px),
+    /* bottom-right trace (Rosa) */
+    linear-gradient(to left,   rgb(202 53 139 / .7) 0 26px, transparent 26px),
+    linear-gradient(to top,    rgb(202 53 139 / .7) 0 26px, transparent 26px);
+  background-repeat: no-repeat;
+  background-position:
+    0 0, 0 0,
+    7px 7px, 7px 7px,
+    calc(100% - 7px) calc(100% - 7px), calc(100% - 7px) calc(100% - 7px);
+  background-size:
+    100% 100%, 100% 100%,
+    calc(100% - 14px) 1px, 1px calc(100% - 14px),
+    calc(100% - 14px) 1px, 1px calc(100% - 14px);
+}
+[data-theme="light"] .s0x-circuit { background-image: none; }
+
+/* ── Versus bar ───────────────────────────────────────────────────────────────
+   The head-to-head split used by possession and every live stat row: home fills
+   Riptide from the left, away fills Rosa from the right, over a Noir track.
+   Width is set inline (it's data); everything else lives here. */
+.s0x-versus {
+  display: flex;
+  height: 6px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: rgb(var(--s0x-border));
+}
+.s0x-versus > span { display: block; height: 100%; transition: width .7s cubic-bezier(.22,.61,.36,1); }
+.s0x-versus-home {
+  background: linear-gradient(90deg, rgb(93 203 209 / .55), rgb(93 203 209));
+  box-shadow: 0 0 10px rgb(93 203 209 / .45);
+}
+.s0x-versus-away {
+  background: linear-gradient(270deg, rgb(202 53 139 / .55), rgb(202 53 139));
+  box-shadow: 0 0 10px rgb(202 53 139 / .45);
+}
+[data-theme="light"] .s0x-versus-home,
+[data-theme="light"] .s0x-versus-away { box-shadow: none; }
+
+/* ── Match moment card ────────────────────────────────────────────────────────
+   One event (goal, card, substitution) as a HUD row with a neon left edge.
+   Accent is set by a modifier so the event TYPE is legible at a glance. */
+.s0x-moment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  padding: .5rem .75rem .5rem 1rem;
+  border-radius: 8px;
+  background-color: rgb(var(--s0x-surface));
+  border: 1px solid rgb(var(--s0x-border));
+  transition: border-color .2s ease, transform .2s ease;
+}
+.s0x-moment::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgb(var(--s0x-accent-ink));
+  box-shadow: var(--s0x-glow-rosa);
+}
+.s0x-moment-teal::before {
+  background: rgb(var(--s0x-teal));
+  box-shadow: var(--s0x-glow-teal);
+}
+/* Mirrored card (home column of a two-sided timeline): the accent edge follows
+   the content to the outer side, so the pair reads symmetrically inward toward
+   the scoreline instead of both stripes hugging the left. */
+.s0x-moment-mirror { padding: .5rem 1rem .5rem .75rem; }
+.s0x-moment-mirror::before { left: auto; right: 0; border-radius: 3px 0 0 3px; }
+.s0x-moment:hover { border-color: rgb(202 53 139 / .4); transform: translateX(2px); }
+.s0x-moment-mirror:hover { transform: translateX(-2px); }
+.s0x-moment-teal:hover { border-color: rgb(93 203 209 / .4); }
+/* Icon lights up on hover — the "gamified" tell. */
+.s0x-moment .s0x-moment-icon { transition: filter .2s ease, color .2s ease; }
+.s0x-moment:hover .s0x-moment-icon { filter: drop-shadow(0 0 6px currentColor); }
+@media (prefers-reduced-motion: reduce) {
+  .s0x-moment, .s0x-moment:hover, .s0x-moment-mirror:hover { transform: none; }
+  .s0x-versus > span { transition: none; }
+}
+[data-theme="light"] .s0x-moment::before,
+[data-theme="light"] .s0x-moment-teal::before { box-shadow: none; }
+
 /* ═════════════════════════════════════════════════════════════════════════════
    NEON
    ══════════════════════════════════════════════════════════════════════════ */
