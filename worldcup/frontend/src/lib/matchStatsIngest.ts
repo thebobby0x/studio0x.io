@@ -34,6 +34,42 @@ interface AFEvent {
   comments?: string | null;
 }
 
+// ── api-football quota, straight from the provider ──────────────────────────
+// Every response carries the account's own accounting:
+//   x-ratelimit-requests-limit / -remaining  → DAILY budget
+//   X-RateLimit-Limit / -Remaining           → per-MINUTE budget
+// We read it rather than counting locally, because a local counter can't see
+// calls made by the schedule route, the per-match live route, or another
+// serverless instance — and undercounting is how the quota gets exhausted.
+//
+// This matters more now that live-sync loops within an invocation: at a 3s
+// interval a single minute costs ~18 polls instead of 1. CLAUDE.md gotcha #25
+// records the 7/18 outage where the daily quota ran out mid-match and the
+// platform froze at 51' — this snapshot is what lets the loop stop before that
+// happens again.
+export interface QuotaSnapshot {
+  dailyLimit: number | null;
+  dailyRemaining: number | null;
+  minuteLimit: number | null;
+  minuteRemaining: number | null;
+  observedAt: string | null;
+}
+
+let _quota: QuotaSnapshot = {
+  dailyLimit: null, dailyRemaining: null, minuteLimit: null, minuteRemaining: null, observedAt: null,
+};
+
+export function getQuotaSnapshot(): QuotaSnapshot {
+  return { ..._quota };
+}
+
+function numHeader(h: Headers, name: string): number | null {
+  const v = h.get(name);
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function afFetch(path: string, timeoutMs = 9000): Promise<unknown | null> {
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return null;
@@ -46,6 +82,23 @@ async function afFetch(path: string, timeoutMs = 9000): Promise<unknown | null> 
       cache: "no-store",
     });
     clearTimeout(timer);
+
+    // Record quota even on a non-OK response — a 429 is exactly when we most
+    // need to know, and it still carries the headers.
+    const dailyLimit = numHeader(res.headers, "x-ratelimit-requests-limit");
+    const dailyRemaining = numHeader(res.headers, "x-ratelimit-requests-remaining");
+    const minuteLimit = numHeader(res.headers, "X-RateLimit-Limit");
+    const minuteRemaining = numHeader(res.headers, "X-RateLimit-Remaining");
+    if (dailyLimit != null || dailyRemaining != null || minuteRemaining != null) {
+      _quota = {
+        dailyLimit: dailyLimit ?? _quota.dailyLimit,
+        dailyRemaining: dailyRemaining ?? _quota.dailyRemaining,
+        minuteLimit: minuteLimit ?? _quota.minuteLimit,
+        minuteRemaining: minuteRemaining ?? _quota.minuteRemaining,
+        observedAt: new Date().toISOString(),
+      };
+    }
+
     if (!res.ok) return null;
     return await res.json();
   } catch {

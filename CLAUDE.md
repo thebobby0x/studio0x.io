@@ -680,6 +680,17 @@ corrected prompt never reaches copy written by a broken one. Scoping the
 idempotency checks too means the app self-heals; the untagged (`""`) rows are
 legacy World Cup copy on any non-WC deployment and are hidden there.
 
+**LIVE STATS CADENCE (`/api/cron/live-sync`):** Vercel's minimum cron granularity
+is 1 minute, so the route POLLS IN A LOOP inside each invocation to go sub-minute.
+Iterations are derived from `LIVE_SYNC_INTERVAL_MS` and a ~55s budget — never
+hardcoded. **Cost scales linearly**: one poll = (matches in play) × 2 calls, so a
+90-min window with 4 matches costs 2,160 calls at 20s and **10,800 at 3s**.
+20000ms is the ceiling for a 7,500/day Pro plan; **3000–5000ms needs an
+enterprise plan (50k+/day)**. The loop hard-stops on api-football's own
+`x-ratelimit-requests-remaining` (reserve 300) — the provider's accounting, not a
+local counter, because a local one can't see the schedule/live routes or other
+instances. That guard is what prevents a repeat of gotcha #25.
+
 **Admin recovery (SUPER_ADMIN, `/admin` → "Tournament Data"):**
 `/api/admin/clear-foreign-data` (feed-verified: asks api-football which fixtures are
 ours, deletes the rest; refuses on an empty feed) · `/api/admin/seed-fixtures` ·
