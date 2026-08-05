@@ -451,10 +451,17 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 },
               },
               {
+                key: "blobCleanupPreview",
+                icon: Trash2,
+                label: "1a · Preview Audio Storage Cleanup",
+                desc: "DRY RUN — deletes nothing. Shows what this deployment could reclaim, and flags un-namespaced blobs that may belong to another site sharing the same Blob store. Read legacySharedCount / sharedStore before purging anything.",
+                action: () => runSeed("blobCleanupPreview", "/api/admin/blob-cleanup?secret=wc2026studio0x&dryRun=true", "GET"),
+              },
+              {
                 key: "blobCleanup",
                 icon: Trash2,
-                label: "1 · Free Up Audio Storage",
-                desc: "THE fix for \"Audio storage full\". Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us. Once the Blob store hits its 1GB cap every write fails (reads keep working, so nothing looks broken) and no new narration can be saved. This purges the regenerable tts/ + deep-dive caches — on a club deployment that is World Cup narration nobody will play again — plus orphaned anthem dupes. Run this BEFORE generating story audio.",
+                label: "1b · Free Up Audio Storage (this deployment)",
+                desc: "Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us, so clearing ElevenLabs history frees none of this. At the 1GB cap every write fails while reads keep working. SAFE SCOPE: deletes only this deployment's own namespaced narration cache plus orphaned anthem dupes. Un-namespaced legacy blobs are left alone — they predate namespacing and could belong to another deployment sharing this store. ONLY purge those (includeLegacy=CONFIRM_SHARED_OK) after confirming in the Vercel dashboard that this project has a DEDICATED Blob store.",
                 action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
               },
               {

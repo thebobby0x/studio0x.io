@@ -107,6 +107,38 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     return registerStoryStop(stop);
   }, []);
 
+  /**
+   * Load and play a URL. Resolves false when the media cannot be played —
+   * a 404/403 blob fires the element's `error` event and never rejects play(),
+   * so both signals have to be raced or a purged blob just hangs.
+   */
+  const playUrl = useCallback(async (url: string): Promise<boolean> => {
+    const audio = new Audio(url);
+    const loadable = await new Promise<boolean>((resolve) => {
+      const done = (v: boolean) => {
+        audio.removeEventListener("canplay", ok);
+        audio.removeEventListener("error", bad);
+        resolve(v);
+      };
+      const ok = () => done(true);
+      const bad = () => done(false);
+      audio.addEventListener("canplay", ok, { once: true });
+      audio.addEventListener("error", bad, { once: true });
+      audio.load();
+    });
+    if (!loadable) return false;
+    audioRef.current = audio;
+    audio.onended = () => { setPlaying(false); stopAmbient(); };
+    try {
+      await audio.play();
+    } catch {
+      return false; // autoplay policy or decode failure
+    }
+    startAmbient();
+    setPlaying(true);
+    return true;
+  }, []);
+
   const handlePlay = useCallback(async () => {
     if (audioRef.current && audioUrl) {
       if (playing) {
@@ -125,6 +157,17 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     setAudioLoading(true);
     setAudioError(null);
     try {
+      // A story row can carry a PERSISTED narration URL (admin batch generation).
+      // Use it directly — that's the whole point of persisting it — but never
+      // trust it blindly: the blob it points at is a regenerable cache that an
+      // admin storage purge can delete out from under the row. If it won't load,
+      // fall through and re-synthesise once rather than showing a dead player.
+      if (audioUrl) {
+        const ok = await playUrl(audioUrl);
+        if (ok) return;
+        console.warn("[StoryCard] persisted audioUrl failed to load, regenerating", audioUrl);
+        setAudioUrl(null);
+      }
       const res = await fetch("/api/ai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,14 +181,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         return;
       }
       setAudioUrl(data.url);
-      const audio = new Audio(data.url);
-      audioRef.current = audio;
-      audio.onended = () => { setPlaying(false); stopAmbient(); };
-      // play() rejects on autoplay policy and on a dead blob URL; unhandled, it
-      // left the button showing "Pause" with nothing playing.
-      await audio.play().catch(() => { throw new Error("playback blocked"); });
-      startAmbient();
-      setPlaying(true);
+      if (!(await playUrl(data.url))) throw new Error("playback blocked");
     } catch (e) {
       console.error("[StoryCard] story audio", e);
       setAudioError("Audio unavailable");
@@ -153,7 +189,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     } finally {
       setAudioLoading(false);
     }
-  }, [audioUrl, playing, story]);
+  }, [audioUrl, playing, story, playUrl]);
 
   const handleDeepPlay = useCallback(async () => {
     if (!deepDive) return;

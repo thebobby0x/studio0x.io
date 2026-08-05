@@ -3,6 +3,7 @@ import { list } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { storyScope } from "@/lib/storyScope";
+import { SPORT } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,32 +37,62 @@ const PROBE_TEXT = "studio0x audio check.";
 // nothing new can be written (CLAUDE.md gotcha #15).
 const BLOB_QUOTA_MB = 1000;
 
-/** Blob usage by prefix. tts/ + deep-dives/ are regenerable; anthems/ are not. */
+/**
+ * Blob usage by prefix, and — the question that decides whether a purge is safe
+ * — whether this store looks SHARED with another deployment.
+ *
+ * TTS keys are namespaced `tts/<deployment>/…` since 8/5. Two signals matter:
+ *   · another deployment's namespace present → the store is definitely shared.
+ *   · flat `tts/<hash>.mp3` keys present → written before namespacing, so they
+ *     are unattributable and could belong to either site.
+ * Neither is proof of a dedicated store; only the Vercel dashboard is.
+ */
 async function blobUsage(): Promise<{
   totalMB: number; ttsMB: number; anthemsMB: number; otherMB: number;
   reclaimableMB: number; percentOfQuota: number; count: number;
+  ownTtsMB: number; legacyTtsMB: number; legacyTtsCount: number;
+  otherDeploymentNamespaces: string[]; sharedStore: "yes" | "unknown";
 } | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   try {
     let cursor: string | undefined;
     let total = 0, tts = 0, anthems = 0, count = 0;
+    let ownTts = 0, legacyTts = 0, legacyTtsCount = 0;
+    const namespaces = new Set<string>();
     do {
       const res = await list({ cursor, limit: 1000 });
       for (const b of res.blobs) {
         count++;
         total += b.size;
-        if (b.pathname.startsWith("tts/") || b.pathname.startsWith("deep-dives/")) tts += b.size;
-        else if (b.pathname.startsWith("anthems/")) anthems += b.size;
+        const p = b.pathname;
+        if (p.startsWith("tts/") || p.startsWith("deep-dives/")) {
+          tts += b.size;
+          const ns = p.startsWith("tts/") ? p.split("/")[1] : null;
+          if (ns && p.split("/").length > 2) {
+            namespaces.add(ns);
+            if (ns === SPORT.id) ownTts += b.size;
+          } else {
+            legacyTts += b.size;
+            legacyTtsCount++;
+          }
+        } else if (p.startsWith("anthems/")) anthems += b.size;
       }
       cursor = res.cursor || undefined;
     } while (cursor);
     const mb = (n: number) => +(n / 1e6).toFixed(1);
+    const others = [...namespaces].filter((n) => n !== SPORT.id);
     return {
       totalMB: mb(total), ttsMB: mb(tts), anthemsMB: mb(anthems),
       otherMB: mb(total - tts - anthems),
-      reclaimableMB: mb(tts),
+      // Only what THIS deployment owns is safely reclaimable without a decision.
+      reclaimableMB: mb(ownTts),
       percentOfQuota: Math.round((total / 1e6 / BLOB_QUOTA_MB) * 100),
       count,
+      ownTtsMB: mb(ownTts),
+      legacyTtsMB: mb(legacyTts),
+      legacyTtsCount,
+      otherDeploymentNamespaces: others,
+      sharedStore: others.length > 0 ? "yes" : "unknown",
     };
   } catch {
     return null;
@@ -97,7 +128,17 @@ async function handler(req: Request) {
   if (blob && blob.percentOfQuota >= 90) {
     blockers.push(
       `Vercel Blob is at ${blob.percentOfQuota}% of the ${BLOB_QUOTA_MB}MB quota — every new audio write fails. ` +
-      `Run "Free Up Blob Storage" to reclaim ~${blob.reclaimableMB}MB of regenerable narration cache.`,
+      (blob.reclaimableMB > 0
+        ? `Run "Free Up Audio Storage" to reclaim ~${blob.reclaimableMB}MB owned by this deployment.`
+        : `NOTHING is safely reclaimable by this deployment alone: ${blob.legacyTtsCount} un-namespaced blob(s) ` +
+          `(${blob.legacyTtsMB}MB) predate namespacing and may belong to another site sharing this store. ` +
+          `Confirm in the Vercel dashboard whether worldcup-2026 and leaguescup use the same Blob store before purging them.`),
+    );
+  }
+  if (blob?.sharedStore === "yes") {
+    blockers.push(
+      `This Blob store is SHARED — it also holds namespaces: ${blob.otherDeploymentNamespaces.join(", ")}. ` +
+      `Purging un-namespaced blobs here would clear that deployment's narration cache too (regenerable, but it re-bills on next play).`,
     );
   }
   if (!hasVoice) blockers.push("ELEVENLABS_VOICE_ID is not set — the default narration voice is unconfigured.");

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { put, head } from "@vercel/blob";
+import { SPORT } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -120,7 +121,16 @@ export async function POST(req: Request) {
   // Check Vercel Blob cache — persona + audio rev in the key (all Roundtable
   // voices, host included) so voices never collide and model/settings/respell
   // changes regenerate instead of serving stale takes.
-  const blobKey = `tts/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${textKey(text)}.mp3`;
+  //
+  // DEPLOYMENT-NAMESPACED (8/5). Keys used to be a flat `tts/<hash>.mp3` across
+  // every deployment. If two Vercel projects point at the SAME Blob store, their
+  // caches commingle indistinguishably — and the cleanup tool, which deletes
+  // everything under tts/, then cannot tell one deployment's audio from
+  // another's. Namespacing makes future purges scopable. Existing flat keys are
+  // left alone: they are a regenerable cache, so the worst case of the changed
+  // key is one re-synthesis per line, and blob-cleanup treats un-namespaced
+  // blobs as shared legacy that only an explicit opt-in may delete.
+  const blobKey = `tts/${SPORT.id}/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${textKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });
