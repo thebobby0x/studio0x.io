@@ -10,6 +10,7 @@ import LiveMatchBanner from "./LiveMatchBanner";
 import ThemeToggle from "./ThemeToggle";
 import { useUnits } from "@/lib/units";
 import { NAV_GROUPS, activeGroupFor, type NavGroup } from "@/lib/navGroups";
+import { SPORT } from "@/lib/sportConfig";
 
 // ── Desktop: one button per intent group, dropdown with its pages ─────────────
 function GroupMenu({ group, path }: { group: NavGroup; path: string }) {
@@ -117,6 +118,9 @@ function UserMenu({ session }: { session: NonNullable<ReturnType<typeof useSessi
   );
 }
 
+// Tournament identity in the nav, from config.
+const NAV_SUBLINE = SPORT.id === "worldcup" ? "studio0x.io" : SPORT.eventName;
+
 export default function AppNav() {
   const { data: session, status } = useSession();
   const { units, toggleUnits } = useUnits();
@@ -136,7 +140,12 @@ export default function AppNav() {
               <div className="s0x-display font-black text-s0x-text text-sm tracking-tight transition-colors group-hover:text-s0x-accent">
                 podium<span className="text-s0x-accent">Metrics</span>
               </div>
-              <div className="s0x-mono text-[8px] text-s0x-muted/70 mt-0.5">studio0x.io</div>
+              {/* Deployment subtitle. CLAUDE.md BRANDING: "podiumMetrics" is the
+                  product mark on every deployment; the TOURNAMENT name belongs in
+                  the subtitle ("podiumMetrics – Leagues Cup 2026"), never in the
+                  mark itself. WC26 keeps "studio0x.io" — putting "World Cup" into
+                  a user-facing title needs explicit owner sign-off (FIFA marks). */}
+              <div className="s0x-mono text-[8px] text-s0x-muted/70 mt-0.5">{NAV_SUBLINE}</div>
             </div>
           </Link>
 

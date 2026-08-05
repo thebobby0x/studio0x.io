@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import AppNav from "@/components/ui/AppNav";
 import BracketView from "@/components/bracket/BracketView";
 import ShareButton from "@/components/ui/ShareButton";
@@ -17,6 +18,7 @@ import {
   classifyRound,
   daysUntil,
 } from "@/lib/tournament";
+import { SPORT } from "@/lib/sportConfig";
 
 // Round classification, dates and sizes now live in src/lib/tournament.ts so
 // every surface (bracket, schedule, banner, pulse) agrees on the same numbers.
@@ -222,7 +224,47 @@ function soundtrackStatus(rounds: Record<KnockoutRound, BracketMatch[]>) {
   return { alive, unresolvedPens, champion, silenced };
 }
 
+// A deployment only has a bracket once the feed publishes its knockout rounds.
+// LC26's 54 fixtures are all round "Group Stage" today, so SPORT.calendar.rounds
+// is empty and there is genuinely nothing to bracket — rendering an R32→Final
+// skeleton would be inventing a structure the competition has not announced.
+const HAS_BRACKET = SPORT.calendar.rounds.length > 0;
+
 export default async function BracketPage() {
+  if (!HAS_BRACKET) {
+    return (
+      <div className="min-h-screen bg-brand-dark text-slate-200">
+        <AppNav />
+        <main className="max-w-3xl mx-auto px-4 py-12">
+          <div className="flex items-center gap-3 mb-2">
+            <GitBranch size={22} className="text-brand-gold" />
+            <h1 className="text-3xl font-black text-white tracking-tight">
+              Knockout <span className="text-brand-gold">Bracket</span>
+            </h1>
+          </div>
+          <div className="rounded-2xl bg-brand-card border border-brand-border p-5 mt-4">
+            <p className="text-slate-300 text-sm leading-relaxed">
+              The {SPORT.eventName} knockout bracket has not been published yet. Every
+              fixture currently in the schedule belongs to the league phase.
+            </p>
+            <p className="text-slate-500 text-xs leading-relaxed mt-3">
+              This page fills in automatically once the knockout rounds appear in the
+              fixture feed — nothing here is placeholder or predicted.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <Link href="/schedule" className="text-xs font-bold text-brand-gold hover:underline">
+                View the full schedule →
+              </Link>
+              <Link href="/standings" className="text-xs font-bold text-brand-gold hover:underline">
+                League phase table →
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const rounds = await fetchKnockoutMatches();
   const [anthems] = await Promise.all([fetchAnthemTracks()]);
   const soundtrack = soundtrackStatus(rounds);
@@ -254,7 +296,7 @@ export default async function BracketPage() {
             />
           </div>
           <p className="text-slate-500 text-sm">
-            podiumMetrics · Round of 32 through the Final · July 3–19
+            {SPORT.brandSubtitle} · {ALL_ROUNDS[0]} through the {ALL_ROUNDS[ALL_ROUNDS.length - 1]}
           </p>
         </div>
 

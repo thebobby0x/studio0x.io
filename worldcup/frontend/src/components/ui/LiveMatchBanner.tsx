@@ -52,21 +52,29 @@ function LiveSection({ liveMatch }: { liveMatch: LiveMatch | null }) {
     return (
       <Link
         href={`/schedule/${liveMatch.fixture}`}
-        className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
       >
         {/* LIVE badge: Rosa 700 fill + Rosa glow. Clock value in Riptide. */}
-        <span className="s0x-live shrink-0 !py-1 !px-2.5 !text-xs">
+        <span className="s0x-live shrink-0 !py-1 !px-2 sm:!px-2.5 !text-[10px] sm:!text-xs">
           <span className="s0x-live-dot !w-2 !h-2" />
           LIVE
         </span>
-        <span className="flex items-center gap-2 text-lg sm:text-xl text-s0x-text/90 font-medium">
-          <FlagImg tla={liveMatch.homeTeam.code} logoUrl={liveMatch.homeTeam.logoUrl} afId={liveMatch.homeTeam.afTeamId} size={24} />
-          <span className="s0x-data font-bold text-s0x-text s0x-neon-rosa">
+        {/* Every child is shrink-0 and the row never wraps.
+            Two bugs lived here on a 375px viewport:
+            1. the score box was allowed to shrink below its content and broke
+               "1–1" across two lines;
+            2. fixing that alone left the crest+score group squeezed to 59px while
+               its contents needed ~94px, so the crests overflowed and collided
+               with the minute.
+            The strip now keeps its intrinsic width and the row scrolls instead. */}
+        <span className="flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl text-s0x-text/90 font-medium shrink-0">
+          <FlagImg tla={liveMatch.homeTeam.code} logoUrl={liveMatch.homeTeam.logoUrl} afId={liveMatch.homeTeam.afTeamId} size={20} className="shrink-0" />
+          <span className="s0x-data font-bold text-s0x-text s0x-neon-rosa shrink-0 whitespace-nowrap tabular-nums">
             {liveMatch.homeScore}–{liveMatch.awayScore}
           </span>
-          <FlagImg tla={liveMatch.awayTeam.code} logoUrl={liveMatch.awayTeam.logoUrl} afId={liveMatch.awayTeam.afTeamId} size={24} />
+          <FlagImg tla={liveMatch.awayTeam.code} logoUrl={liveMatch.awayTeam.logoUrl} afId={liveMatch.awayTeam.afTeamId} size={20} className="shrink-0" />
         </span>
-        <span className="s0x-data text-sm text-s0x-teal font-bold shrink-0">{minute}</span>
+        <span className="s0x-data text-xs sm:text-sm text-s0x-teal font-bold shrink-0 whitespace-nowrap tabular-nums">{minute}</span>
       </Link>
     );
   }
@@ -110,7 +118,7 @@ function PastResultsChips() {
             className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors"
           >
             <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={20} />
-            <span className="s0x-data text-s0x-text font-bold">
+            <span className="s0x-data text-s0x-text font-bold shrink-0 whitespace-nowrap tabular-nums">
               {m.homeScore}–{m.awayScore}
             </span>
             <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={20} />
@@ -130,10 +138,17 @@ function AudioSection() {
   if (!current) {
     // Desktop-only: on mobile the anthem shortcut lives in the nav pill row —
     // this pill was overlapping the ticker text on small screens (owner 7/9).
+    // !hidden / sm:!flex, NOT hidden / sm:flex: the .s0x-btn component classes in
+    // globals.css are UNLAYERED, and unlayered CSS beats every @layer, so
+    // Tailwind's display utilities (in @layer utilities) silently lost to
+    // `.s0x-btn { display: inline-flex }`. The pill reappeared on mobile and
+    // squeezed the live score strip — the 7/9 bug, back. The ! modifier restores
+    // the intended cascade. Same treatment on the other s0x-btn + responsive
+    // display call site (app/page.tsx).
     return (
       <Link
         href="/anthems"
-        className="s0x-btn s0x-btn-teal hidden sm:flex !text-[11px] !px-3.5 !py-1.5 shrink-0"
+        className="s0x-btn s0x-btn-teal !hidden sm:!flex !text-[11px] !px-3.5 !py-1.5 shrink-0"
       >
         <Music2 size={16} />
         <span>Team Anthems</span>

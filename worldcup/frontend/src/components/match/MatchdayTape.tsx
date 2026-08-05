@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Swords, TrendingUp } from "lucide-react";
 import { getFlag } from "@/lib/flags";
+import FlagImg from "@/components/ui/FlagImg";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Matchday Tale of the Tape (owner 7/18) — side-by-side full-tournament
@@ -12,7 +13,7 @@ import { getFlag } from "@/lib/flags";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface TapeSide {
-  name: string; tla: string;
+  name: string; tla: string; afId?: number | null;
   played: number; wins: number; draws: number; losses: number;
   goalsFor: number; goalsAgainst: number; cleanSheets: number;
   biggestWin: string | null; form: string; titleProb: number | null;
@@ -81,12 +82,12 @@ export default function MatchdayTape({ fixture, stageLabel }: { fixture: number;
         {/* Team headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div className="text-right">
-            <div className="text-lg font-black text-white leading-tight">{getFlag(home.tla)} {home.name}</div>
+            <div className="text-lg font-black text-white leading-tight flex items-center justify-end gap-2"><FlagImg tla={home.tla} afId={home.afId} size={20} />{home.name}</div>
             <div className="mt-1 flex justify-end"><FormChips form={home.form} /></div>
           </div>
           <span className="text-[10px] font-black text-slate-600 uppercase px-2">vs</span>
           <div>
-            <div className="text-lg font-black text-white leading-tight">{away.name} {getFlag(away.tla)}</div>
+            <div className="text-lg font-black text-white leading-tight flex items-center gap-2">{away.name}<FlagImg tla={away.tla} afId={away.afId} size={20} /></div>
             <div className="mt-1"><FormChips form={away.form} /></div>
           </div>
         </div>

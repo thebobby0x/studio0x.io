@@ -595,7 +595,7 @@ export default async function DashboardPage({
               </Link>
             </div>
 
-            <Link href="/schedule" className="s0x-btn s0x-btn-secondary hidden sm:flex !rounded-s0x">
+            <Link href="/schedule" className="s0x-btn s0x-btn-secondary !hidden sm:!flex !rounded-s0x">
               <CalendarDays size={12} />
               Schedule
               <ChevronRight size={11} />

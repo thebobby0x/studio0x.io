@@ -249,9 +249,13 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             </Link>
 
             <div className="text-center">
-              <div className="s0x-data text-7xl sm:text-8xl font-bold leading-none text-s0x-text" style={{ textShadow: "0 0 12px rgb(248 189 216 / .55), 0 0 46px rgb(202 53 139 / .45)" }}>
+              {/* whitespace-nowrap + tabular-nums: at text-7xl in a 3-column grid
+                  on a phone this column is narrower than "0 – 0" renders, so the
+                  scoreline wrapped and the two goal totals stacked vertically
+                  with the dash between them. It must always read as one line. */}
+              <div className="s0x-data text-6xl sm:text-8xl font-bold leading-none text-s0x-text whitespace-nowrap tabular-nums" style={{ textShadow: "0 0 12px rgb(248 189 216 / .55), 0 0 46px rgb(202 53 139 / .45)" }}>
                 {match.homeScore}
-                <span className="text-slate-700 mx-1">–</span>
+                <span className="text-slate-700 mx-0.5 sm:mx-1">–</span>
                 {match.awayScore}
               </div>
               <div className="mt-3 flex items-center justify-center gap-1.5">
@@ -382,7 +386,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
 
           {/* Score */}
           <div className="text-center">
-            <div className="text-5xl sm:text-6xl font-black text-white tabular-nums tracking-tighter leading-none">
+            <div className="text-5xl sm:text-6xl font-black text-white tabular-nums tracking-tighter leading-none whitespace-nowrap">
               {match.homeScore}<span className="text-brand-border mx-1 sm:mx-2">–</span>{match.awayScore}
             </div>
             <div suppressHydrationWarning className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">

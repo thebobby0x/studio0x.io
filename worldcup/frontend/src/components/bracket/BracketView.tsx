@@ -7,6 +7,7 @@ import FlagImg from "@/components/ui/FlagImg";
 import ShareButton from "@/components/ui/ShareButton";
 import { useAudio, type Track } from "@/lib/AudioContext";
 import type { BracketMatch, KnockoutRound } from "@/app/bracket/page";
+import { SPORT } from "@/lib/sportConfig";
 
 interface Props {
   rounds: Record<KnockoutRound, BracketMatch[]>;
@@ -47,7 +48,17 @@ function AnthemNote({ track, isSilenced }: { track: Track; isSilenced: boolean }
   );
 }
 
-const ALL_ROUNDS: KnockoutRound[] = [
+// The WC26 bracket shape. This is a LOCAL fallback, not the source of truth —
+// SPORT.calendar.rounds is. It stays here so the labels/ordering below keep
+// working for the World Cup deployment, but every `rounds[...]` access is
+// guarded: a deployment whose bracket the feed has not published yet (LC26)
+// passes an EMPTY rounds object, and `rounds["Round of 32"].some(...)` threw
+// "Cannot read properties of undefined (reading 'some')" — a 500 on /bracket.
+/** Round labels declared by this deployment's calendar (empty when the feed has
+ *  not published a bracket). */
+const CONFIG_ROUNDS: KnockoutRound[] = SPORT.calendar.rounds.map((r) => r.round);
+
+const WC_ROUND_ORDER: KnockoutRound[] = [
   "Round of 32",
   "Round of 16",
   "Quarter-finals",
@@ -55,6 +66,14 @@ const ALL_ROUNDS: KnockoutRound[] = [
   "3rd Place Final",
   "Final",
 ];
+
+/** Rounds this deployment actually has, in bracket order. Falls back to the
+ *  WC26 shape only when the config declares no rounds AND data is present. */
+function roundOrder(rounds: Record<string, BracketMatch[]>): KnockoutRound[] {
+  const configured = CONFIG_ROUNDS.length > 0 ? CONFIG_ROUNDS : [];
+  if (configured.length > 0) return configured.filter((r) => rounds[r]);
+  return WC_ROUND_ORDER.filter((r) => rounds[r]);
+}
 
 const ROUND_SHORT: Record<KnockoutRound, string> = {
   "Round of 32":    "R32",
@@ -285,15 +304,6 @@ function RoundColumn({
   );
 }
 
-const ROUNDS_TOP_TO_BOTTOM: KnockoutRound[] = [
-  "Final",
-  "3rd Place Final",
-  "Semi-finals",
-  "Quarter-finals",
-  "Round of 16",
-  "Round of 32",
-];
-
 // ── Main bracket view ─────────────────────────────────────────────────────────
 
 export default function BracketView({
@@ -304,13 +314,16 @@ export default function BracketView({
   champion = null,
   silenced = [],
 }: Props) {
-  const [activeRound, setActiveRound] = useState<KnockoutRound>("Round of 32");
+  // Rounds this deployment actually has. Empty when the feed hasn't published a
+  // bracket yet — the page renders an explanatory state instead (see page.tsx).
+  const order = roundOrder(rounds);
+  const [activeRound, setActiveRound] = useState<KnockoutRound>(order[0] ?? "Round of 32");
   const silencedSet = new Set(silenced);
   const championTrack = champion ? anthems[champion.code] : undefined;
 
   // Detect if any round has live or completed matches (to highlight it)
-  const liveRound = ALL_ROUNDS.find((r) =>
-    rounds[r].some((m) => isLive(m.status))
+  const liveRound = order.find((r) =>
+    (rounds[r] ?? []).some((m) => isLive(m.status))
   );
   const highlightRound = liveRound ?? null;
 
@@ -351,9 +364,9 @@ export default function BracketView({
       <div className="lg:hidden">
         {/* Tab bar */}
         <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-          {ALL_ROUNDS.map((r) => {
-            const hasLive = rounds[r].some((m) => isLive(m.status));
-            const hasFt = rounds[r].some((m) => isFinished(m.status) && m.fixture > 0);
+          {order.map((r) => {
+            const hasLive = (rounds[r] ?? []).some((m) => isLive(m.status));
+            const hasFt = (rounds[r] ?? []).some((m) => isFinished(m.status) && m.fixture > 0);
             return (
               <button
                 key={r}
@@ -379,7 +392,7 @@ export default function BracketView({
 
         {/* Cards for selected round */}
         <div className="flex flex-col gap-3">
-          {rounds[activeRound].map((m) => (
+          {(rounds[activeRound] ?? []).map((m) => (
             <MatchCard key={m.id} match={m} anthems={anthems} silencedSet={silencedSet} />
           ))}
         </div>
@@ -396,8 +409,8 @@ export default function BracketView({
 
         {/* Rounds stacked top-to-bottom: Final → R32 */}
         <div className="space-y-6">
-          {ROUNDS_TOP_TO_BOTTOM.map((r) => {
-            const matches = rounds[r];
+          {[...order].reverse().map((r) => {
+            const matches = rounds[r] ?? [];
             const isHighlight = highlightRound === r;
             return (
               <div key={r}>
