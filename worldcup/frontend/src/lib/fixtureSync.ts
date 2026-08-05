@@ -188,7 +188,7 @@ export async function syncFixtures(): Promise<SyncResult> {
 
   // ── 3. Diff-aware match upsert by fixture id ───────────────────────────────
   const existing = await prisma.match.findMany({
-    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true, leagueId: true },
+    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true, leagueId: true, venue: true, city: true },
   });
   const existingByFixture = new Map(existing.map((m) => [m.fixture, m]));
 
@@ -225,12 +225,16 @@ export async function syncFixtures(): Promise<SyncResult> {
     const date = new Date(f.fixture.date);
     const referee = f.fixture.referee?.trim() || null;
 
+    // "World Cup Stadium" is a WC26 DB sentinel (see CLAUDE.md) — never stamp it
+    // on another tournament's fixture. Unknown venue stays blank.
+    const venue = f.fixture.venue.name ?? (SPORT.id === "worldcup" ? "World Cup Stadium" : "");
+    // Prefer OUR canonical city name (matches travel-stats/venue maps); the
+    // feed's raw city string is the fallback.
+    const city = getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "";
+
     const cur = existingByFixture.get(f.fixture.id);
     try {
       if (!cur) {
-        // "World Cup Stadium" is a WC26 DB sentinel (see CLAUDE.md) — never
-        // stamp it on another tournament's fixture. Unknown venue stays blank.
-        const venue = f.fixture.venue.name ?? (SPORT.id === "worldcup" ? "World Cup Stadium" : "");
         await prisma.match.create({
           data: {
             fixture: f.fixture.id,
@@ -238,9 +242,7 @@ export async function syncFixtures(): Promise<SyncResult> {
             homeTeamId: effHomeTeamId,
             awayTeamId: effAwayTeamId,
             venue,
-            // Prefer OUR canonical city name (matches travel-stats/venue maps);
-            // api-football's raw city string only as fallback.
-            city: getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "",
+            city,
             date,
             status,
             homeScore,
@@ -262,6 +264,13 @@ export async function syncFixtures(): Promise<SyncResult> {
           cur.homeTeamId !== effHomeTeamId || // TBD → real team upgrade (never the reverse)
           cur.awayTeamId !== effAwayTeamId ||
           cur.leagueId !== AF_LEAGUE || // backfills rows seeded before leagueId existed
+          // Heal venue/city. These were write-once (create only), so rows whose
+          // city the old seed blanked stayed blank forever — 42 of 54 LC26
+          // fixtures had a real venue name and no city, which is why Travel
+          // Pulse could only group 7 host cities. Only ever fill or correct from
+          // a non-empty feed value; never blank a known venue/city.
+          (!!venue && cur.venue !== venue) ||
+          (!!city && cur.city !== city) ||
           (penHome !== null && cur.penHome !== penHome) ||
           (penAway !== null && cur.penAway !== penAway) ||
           (referee !== null && cur.referee !== referee); // don't null-out a known ref
@@ -269,7 +278,7 @@ export async function syncFixtures(): Promise<SyncResult> {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
             // Only write pens when the feed has them (never null-out a shootout result).
-            data: { status, homeScore, awayScore, elapsed, date, leagueId: AF_LEAGUE, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
+            data: { status, homeScore, awayScore, elapsed, date, leagueId: AF_LEAGUE, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(venue ? { venue } : {}), ...(city ? { city } : {}), ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {
