@@ -32,6 +32,7 @@ export default async function AdminPage() {
           id: SPORT.id,
           eventName: SPORT.eventName,
           brandName: SPORT.brandName,
+          entityKind: SPORT.entityKind,
           leagueId: AF_LEAGUE,
           season: AF_SEASON,
           expectedEvents: SPORT.calendar.totalEvents,

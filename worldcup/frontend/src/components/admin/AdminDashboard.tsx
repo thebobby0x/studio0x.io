@@ -38,6 +38,8 @@ export interface TournamentInfo {
   eventName: string;
   /** SPORT.brandName — the deployment's primary user-facing name. */
   brandName: string;
+  /** SPORT.entityKind — "nation" competitions have squads; clubs do not. */
+  entityKind: "nation" | "club" | "constructor";
   leagueId: number;
   season: number;
   /** Fixtures this deployment expects (SPORT.calendar.totalEvents). */
@@ -358,10 +360,19 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 action: () => runSeed("news", "/api/news/generate?secret=wc2026studio0x", "POST"),
               },
               {
+                // NATION COMPETITIONS ONLY — hidden below on club deployments.
+                //
+                // The route is hardcoded to api-football league 1 (World Cup) and
+                // matches our teams by nation TLA. On a club deployment that is
+                // not merely useless, it is destructive: LC26 club codes COLLIDE
+                // with nation TLAs (COL = Columbus Crew and Colombia, POR =
+                // Portland Timbers and Portugal, CHI = Chicago Fire and Chile),
+                // so it would write World Cup national-team players into club
+                // squads. See CLAUDE.md "CLUB DEPLOYMENTS — the team-identity rule".
                 key: "fullSquads",
                 icon: Users,
                 label: "Seed Full Squads (Live API)",
-                desc: "Import all 26-man squads for all 48 WC teams from api-football. Populates the Leagues page with all called-up players.",
+                desc: `Import every 26-man squad for the ${tournament.eventName} nations from api-football. Populates the Leagues page with all called-up players.`,
                 action: () => runSeed("fullSquads", "/api/admin/seed-full-squads", "POST"),
               },
               {
@@ -475,7 +486,13 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                   setTimeout(() => setSeedStatus(s => ({ ...s, resetAnthems: "idle" })), 6000);
                 },
               },
-            ] as SeedTool[]).map(renderSeedTool)}
+            ] as SeedTool[])
+              // Squad seeding is a NATION-competition tool; on a club deployment
+              // it would import World Cup national squads into clubs whose codes
+              // collide with nation TLAs. Hidden rather than relabelled — there
+              // is no correct time to press it here.
+              .filter((t) => t.key !== "fullSquads" || tournament.entityKind === "nation")
+              .map(renderSeedTool)}
           </div>
 
           {/* Maintenance & Danger Zone — rare repairs + destructive resets, collapsed
