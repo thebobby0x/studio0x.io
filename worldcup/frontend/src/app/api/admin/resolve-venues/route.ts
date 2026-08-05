@@ -38,6 +38,7 @@ async function handler(req: Request) {
     select: { name: true, city: true, country: true, lat: true, lng: true, source: true },
     orderBy: { name: "asc" },
   });
+  const venuesWithCoords = venues.filter((v) => v.lat != null).length;
 
   return NextResponse.json({
     ok: true,
@@ -49,10 +50,17 @@ async function handler(req: Request) {
     unresolvedVenues: result.unresolved,
     // Venues resolve from the api-football venue id. If most are unresolved,
     // run "Seed Fixtures" first — that is what writes Match.venueId.
+    //
+    // COORDINATES are the output that matters: weather backfill needs lat/lng,
+    // not a city string. A run that fills cities but resolves no coordinates is
+    // NOT a success for the ingest downstream of it, so say so explicitly rather
+    // than returning ok:true and letting the next step look like the broken one.
     hint: result.unresolved.length > 0
       ? "Unresolved venues need Match.venueId — run Seed Fixtures first, then re-run this."
-      : null,
-    venuesWithCoords: venues.filter((v) => v.lat != null).length,
+      : venuesWithCoords < venues.length
+        ? `${venues.length - venuesWithCoords} venue(s) still have no coordinates — Backfill Match Weather will skip their matches.`
+        : null,
+    venuesWithCoords,
     venuesTotal: venues.length,
     // Provenance is surfaced deliberately: "geocoded-city" is a city centroid,
     // NOT a stadium-exact position, and must never be presented as one.

@@ -321,23 +321,48 @@ export async function backfillMatchCities(limit = 40): Promise<{
     }
   }
 
-  const missing = await prisma.match.findMany({
-    where: { city: "", NOT: { venue: "" } },
+  // EVERY distinct venue, not just the ones on city-less matches.
+  //
+  // This used to select `where: { city: "" }`, so a venue was only ever resolved
+  // if some match at it was missing a city. api-football DID supply a city for 14
+  // of the 54 LC26 fixtures — those venues therefore never got a Venue row, never
+  // got coordinates, and this route still reported success. Weather backfill then
+  // had to geocode them inline, one match at a time, against Nominatim and
+  // Open-Meteo — which is what pushed it past the function timeout.
+  //
+  // Coordinates, not the city string, are what the weather ingest needs, so the
+  // work list is "venues without coordinates" and city backfill is a by-product.
+  const fixtures = await prisma.match.findMany({
+    where: { NOT: { venue: "" } },
     select: { venue: true, venueId: true },
-    take: limit * 4,
   });
-
-  // One resolution per distinct venue, not per match.
   const byVenue = new Map<string, number | null>();
-  for (const m of missing) if (!byVenue.has(m.venue)) byVenue.set(m.venue, m.venueId ?? null);
+  for (const m of fixtures) {
+    // Prefer a row that actually carries the api-football venue id — that id is
+    // what /venues needs to supply the city the corroboration check requires.
+    if (!byVenue.get(m.venue)) byVenue.set(m.venue, m.venueId ?? null);
+  }
 
-  for (const [venue, afVenueId] of [...byVenue.entries()].slice(0, limit)) {
+  const resolvedVenues = await prisma.venue.findMany({
+    where: { lat: { not: null }, lng: { not: null } },
+    select: { name: true },
+  });
+  const haveCoords = new Set(resolvedVenues.map((v) => v.name));
+
+  // Already-resolved venues cost nothing to re-check (resolveVenueGeo short-
+  // circuits on the cache), but they must not consume the budget either.
+  const todo = [...byVenue.entries()].filter(([name]) => !haveCoords.has(name));
+
+  for (const [venue, afVenueId] of todo.slice(0, limit)) {
     // No country hint: the venue's own metadata is the only valid source.
     const geo = await resolveVenueGeo(venue, "", afVenueId);
-    if (!geo?.city) { out.unresolved.push(venue); continue; }
+    if (!geo) { out.unresolved.push(venue); continue; }
     out.venuesResolved++;
-    const res = await prisma.match.updateMany({ where: { venue, city: "" }, data: { city: geo.city } });
-    out.matchesUpdated += res.count;
+    if (geo.city) {
+      const res = await prisma.match.updateMany({ where: { venue, city: "" }, data: { city: geo.city } });
+      out.matchesUpdated += res.count;
+    }
   }
+
   return out;
 }

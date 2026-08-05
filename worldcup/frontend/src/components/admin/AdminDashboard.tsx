@@ -382,7 +382,7 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 key: "venueGeo",
                 icon: Thermometer,
                 label: "Resolve Venues (city + coords)",
-                desc: "Fills the empty Match.city values the fixture feed never supplied, and geocodes each venue so weather ingest can locate it. Weather was skipping every match because the curated venue table only covers the 16 World Cup stadiums. Run this before Backfill Match Weather.",
+                desc: "Geocodes EVERY distinct venue (not just the ones on city-less fixtures) and caches the coordinates, then fills the empty Match.city values the fixture feed never supplied. Weather ingest needs the coordinates — check venuesWithCoords in the result. Run this before Backfill Match Weather.",
                 action: () => runSeed("venueGeo", "/api/admin/resolve-venues", "POST"),
               },
               {
@@ -396,22 +396,44 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 key: "heatBackfill",
                 icon: Thermometer,
                 label: "Backfill Match Weather (Heat vs. Outcomes)",
-                desc: "Stamps every played match with its real kickoff-hour heat index + humidity (Open-Meteo archive) and FT outcome facts. Chunked; safe to re-run — only fills gaps. New matches auto-stamp nightly.",
+                desc: "Stamps every played match with its real kickoff-hour heat index + humidity (Open-Meteo archive) and FT outcome facts. Chunked; safe to re-run — only fills gaps. Matches whose venue has no coordinates are skipped and named in the result: run Resolve Venues, then re-run this. New matches auto-stamp nightly.",
                 action: async () => {
                   setSeedStatus(s => ({ ...s, heatBackfill: "loading" }));
+                  setSeedDetail(d => ({ ...d, heatBackfill: "" }));
                   try {
-                    // Chunks of 8 (1 weather + 1 events call per match) so no
-                    // single request nears the 60s Hobby function limit.
-                    let created = 0;
+                    // Chunks of 8 so no single request nears the 60s Hobby
+                    // function limit, walking `nextOffset` so matches that CAN'T
+                    // be stamped (unresolvable venue / no upstream reading) are
+                    // stepped over instead of re-tried on every iteration —
+                    // which is what made this loop spin 25 times and then report
+                    // a failure that wasn't one.
+                    let created = 0, skipped = 0, offset = 0;
+                    const unresolved = new Set<string>();
                     for (let guard = 0; guard < 25; guard++) {
-                      const res = await fetch("/api/admin/backfill-weather?count=8", { method: "POST" });
+                      const res = await fetch(`/api/admin/backfill-weather?count=8&offset=${offset}`, { method: "POST" });
                       if (!res.ok) throw new Error(`chunk failed (${res.status})`);
-                      const data = await res.json() as { created: number; outcomesAdded: number; remaining: number };
+                      const data = await res.json() as {
+                        created: number; outcomesAdded: number;
+                        skippedNoVenue: number; skippedNoData: number;
+                        nextOffset: number | null; unresolvedVenues?: string[];
+                      };
                       created += (data.created ?? 0) + (data.outcomesAdded ?? 0);
-                      if ((data.remaining ?? 0) === 0) break;
+                      skipped += (data.skippedNoVenue ?? 0) + (data.skippedNoData ?? 0);
+                      (data.unresolvedVenues ?? []).forEach(v => unresolved.add(v));
+                      if (data.nextOffset == null) break;
+                      offset = data.nextOffset;
                     }
-                    setSeedStatus(s => ({ ...s, heatBackfill: created > 0 ? "done" : "error" }));
-                  } catch {
+                    // Nothing to do is a SUCCESS, not a failure: this button is
+                    // idempotent and a fully-backfilled deployment legitimately
+                    // creates zero rows. Report the real numbers either way
+                    // (gotcha #26) — "✓ Done" alone masked the zero-row runs.
+                    setSeedDetail(d => ({ ...d, heatBackfill:
+                      `${created} stamped · ${skipped} skipped` +
+                      (unresolved.size ? ` · unresolved venues: ${[...unresolved].join(", ")} — run Resolve Venues` : "")
+                    }));
+                    setSeedStatus(s => ({ ...s, heatBackfill: "done" }));
+                  } catch (e) {
+                    setSeedDetail(d => ({ ...d, heatBackfill: e instanceof Error ? e.message : "request failed" }));
                     setSeedStatus(s => ({ ...s, heatBackfill: "error" }));
                   }
                   setTimeout(() => setSeedStatus(s => ({ ...s, heatBackfill: "idle" })), 6000);
