@@ -95,6 +95,38 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
     }
   }
 
+  // ── Destructive-action gate (owner directive 8/5) ──────────────────────────
+  // Nothing is deleted without BK reviewing the exact list first. A destructive
+  // button's FIRST click runs the tool's dry run and prints what it would
+  // remove; only a SECOND click, while that preview is on screen, executes.
+  // `armed` holds the keys currently showing a reviewed preview.
+  const [armed, setArmed] = useState<Record<string, boolean>>({});
+
+  async function runDestructive(
+    key: string,
+    previewUrl: string,
+    confirmUrl: string,
+    method: "GET" | "POST" = "POST",
+  ) {
+    const isArmed = armed[key];
+    setSeedStatus(s => ({ ...s, [key]: "loading" }));
+    try {
+      const res = await fetch(isArmed ? confirmUrl : previewUrl, { method });
+      const json = await res.json().catch(() => null);
+      const detail = summarize(json) || `HTTP ${res.status}`;
+      setSeedStatus(s => ({ ...s, [key]: res.ok ? "done" : "error" }));
+      setSeedDetail(d => ({
+        ...d,
+        [key]: isArmed ? `DELETED — ${detail}` : `PREVIEW (nothing deleted) — ${detail} · click again to confirm`,
+      }));
+      setArmed(a => ({ ...a, [key]: res.ok && !isArmed }));
+    } catch (e) {
+      setSeedStatus(s => ({ ...s, [key]: "error" }));
+      setSeedDetail(d => ({ ...d, [key]: e instanceof Error ? e.message : "request failed" }));
+      setArmed(a => ({ ...a, [key]: false }));
+    }
+  }
+
   // Full Reset — steps 1→4 in order, one request each.
   //
   // Sequential, not parallel: clearing must finish before seeding (or the seed's
@@ -450,19 +482,16 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                   setTimeout(() => setSeedStatus(s => ({ ...s, heatBackfill: "idle" })), 6000);
                 },
               },
-              {
-                key: "blobCleanupPreview",
-                icon: Trash2,
-                label: "1a · Preview Audio Storage Cleanup",
-                desc: "DRY RUN — deletes nothing. Shows what this deployment could reclaim, and flags un-namespaced blobs that may belong to another site sharing the same Blob store. Read legacySharedCount / sharedStore before purging anything.",
-                action: () => runSeed("blobCleanupPreview", "/api/admin/blob-cleanup?secret=wc2026studio0x&dryRun=true", "GET"),
-              },
-              {
+                          {
                 key: "blobCleanup",
                 icon: Trash2,
-                label: "1b · Free Up Audio Storage (this deployment)",
-                desc: "Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us, so clearing ElevenLabs history frees none of this. At the 1GB cap every write fails while reads keep working. SAFE SCOPE: deletes only this deployment's own namespaced narration cache plus orphaned anthem dupes. Un-namespaced legacy blobs are left alone — they predate namespacing and could belong to another deployment sharing this store. ONLY purge those (includeLegacy=CONFIRM_SHARED_OK) after confirming in the Vercel dashboard that this project has a DEDICATED Blob store.",
-                action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
+                label: "1 · Free Up Audio Storage (preview first)",
+                desc: "TWO-STEP: first click previews what would be removed, second click executes. Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us, so clearing ElevenLabs history frees none of this. At the 1GB cap every write fails while reads keep working. SAFE SCOPE: deletes only this deployment's own namespaced narration cache plus orphaned anthem dupes. Un-namespaced legacy blobs are left alone — they predate namespacing and could belong to another deployment sharing this store. ONLY purge those (includeLegacy=CONFIRM_SHARED_OK) after confirming in the Vercel dashboard that this project has a DEDICATED Blob store.",
+                action: () => runDestructive(
+                  "blobCleanup",
+                  "/api/admin/blob-cleanup?secret=wc2026studio0x&dryRun=true",
+                  "/api/admin/blob-cleanup?secret=wc2026studio0x",
+                ),
               },
               {
                 key: "storyAudio",
@@ -569,7 +598,7 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                   key: "matches",
                   icon: Database,
                   label: "Re-seed Matches (Hard Reset)",
-                  desc: "DESTRUCTIVE: wipes and rebuilds all match data (stats/markets included). Teams, players and anthems are preserved. Use Sync Fixtures instead unless something is truly broken.",
+                  desc: "DESTRUCTIVE and NOT preview-gated — wipes and rebuilds all match data (stats/markets included) in one shot. Teams, players and anthems are preserved. Use Sync Fixtures instead unless something is truly broken.",
                   action: () => runSeed("matches", "/api/seed?secret=wc2026studio0x", "GET"),
                 },
                 {
@@ -583,11 +612,23 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                   key: "purge",
                   icon: Trash2,
                   label: "Purge & Regenerate Stories",
-                  desc: "DESTRUCTIVE: deletes all news stories, then regenerates from scratch.",
+                  desc: "DESTRUCTIVE — two-step. First click PREVIEWS how many stories would go (scoped to this deployment; nothing is deleted). Second click deletes and regenerates. Never removes another deployment's rows.",
                   action: async () => {
+                    // First click previews (purge-stories dry-runs without the
+                    // confirm token); second click deletes, then regenerates.
+                    if (!armed.purge) {
+                      setSeedStatus(s => ({ ...s, purge: "loading" }));
+                      const prev = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                      const pj = await prev.json().catch(() => null);
+                      setSeedStatus(s => ({ ...s, purge: prev.ok ? "done" : "error" }));
+                      setSeedDetail(d => ({ ...d, purge: `PREVIEW (nothing deleted) — ${summarize(pj)} · click again to confirm` }));
+                      setArmed(a => ({ ...a, purge: prev.ok }));
+                      return;
+                    }
+                    setArmed(a => ({ ...a, purge: false }));
                     setSeedStatus(s => ({ ...s, purge: "loading" }));
                     try {
-                      const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                      const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x&confirm=DELETE_STORIES", { method: "POST" });
                       if (!del.ok) throw new Error("purge failed");
                       const gen = await fetch("/api/news/generate?secret=wc2026studio0x", { method: "POST" });
                       setSeedStatus(s => ({ ...s, purge: gen.ok ? "done" : "error" }));

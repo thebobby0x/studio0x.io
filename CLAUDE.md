@@ -178,6 +178,27 @@ as "FIFA World Cup Passport"). News is a SEPARATE module from live-game followin
 **`docs/sportos-modules.md`**. Keep module code/IDs vertical-neutral (owner-agreed);
 module extraction is post-tournament work — don't refactor mid-tournament.
 
+**NO DELETION WITHOUT APPROVAL — HARD RULE (owner directive 2026-08-05):**
+Never delete any files, audio, DB records, or assets without BK explicitly
+reviewing and approving the exact deletion list first. Suggesting a deletion is
+welcome; executing one without sign-off is not.
+- **Why:** the frozen **WC26 site, including all of its generated ElevenLabs
+  narration, is a preserved proof-of-concept** for marketing, investor demos and
+  acquisition conversations. Its value is that it still works end to end. "It's
+  a regenerable cache" is NOT self-approving — regenerating costs money and a
+  first-play delay on a site that is being shown to buyers.
+- **How:** every destructive tool is preview-first. Enumerate what would be
+  deleted (counts + sizes), hand that to BK, and only then execute. Default
+  every purge to the narrowest scope that could be correct; anything wider goes
+  behind an explicit confirm token (e.g. `includeLegacy=CONFIRM_SHARED_OK`).
+- **Cross-deployment hazard:** the Neon DBs are per-deployment, but the Vercel
+  **Blob store may be shared** between `worldcup-2026` and `leaguescup` — that is
+  unverified and only the Vercel dashboard can answer it. TTS blobs are
+  namespaced `tts/<deployment>/…` since 8/5; anything flat predates that and is
+  unattributable. `/api/admin/audio-health` reports whether another deployment's
+  namespace is present (positive proof of sharing). Assume shared until told
+  otherwise.
+
 **CONTENT TRUTH — HARD RULE (owner directive 7/18, verbatim intent):** "actual facts
 and truths, with opinions based on facts and truths, NO false, NO fake, NO invented,
 NO imaginary anything." Applies to EVERY content surface, present and future:
