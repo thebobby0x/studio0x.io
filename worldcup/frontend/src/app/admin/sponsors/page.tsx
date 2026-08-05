@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import AppNav from "@/components/ui/AppNav";
 import { AdSlotPlacement, SponsorTier } from "@prisma/client";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function SponsorsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-black text-white">Sponsor Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">studio0x · podiumMetrics</p>
+            <p className="text-xs text-slate-500 mt-0.5">studio0x · {BRAND_NAME}</p>
           </div>
           <div className="flex gap-4 text-right">
             <div>

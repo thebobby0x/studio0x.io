@@ -4,6 +4,7 @@ import AppNav from "@/components/ui/AppNav";
 import ShareButton from "@/components/ui/ShareButton";
 import { prisma } from "@/lib/prisma";
 import { Trophy, Medal } from "lucide-react";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // ── Tournament Records (owner 7/9: "we have Golden Boot for most goals — can
 // we also create other things?") ──────────────────────────────────────────────
@@ -467,9 +468,9 @@ export default async function RecordsPage() {
               Tournament <span className="text-brand-gold">Records</span>
             </h1>
             <ShareButton
-              text="podiumMetrics Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io"
+              text={`${BRAND_NAME} Records — Golden Boot, Iron Man, The Wall and every leaderboard · studio0x.io`}
               url="/records"
-              title="podiumMetrics Records"
+              title={`${BRAND_NAME} Records`}
               className="ml-1"
             />
           </div>
@@ -533,7 +534,7 @@ export default async function RecordsPage() {
         </div>
       </main>
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Player stats via api-football.com
+        studio0x.io · {BRAND_NAME} · Player stats via api-football.com
       </footer>
     </div>
   );

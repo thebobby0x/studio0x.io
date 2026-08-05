@@ -36,6 +36,8 @@ const VIEW_OPTIONS = [
 export interface TournamentInfo {
   id: string;
   eventName: string;
+  /** SPORT.brandName — the deployment's primary user-facing name. */
+  brandName: string;
   leagueId: number;
   season: number;
   /** Fixtures this deployment expects (SPORT.calendar.totalEvents). */
@@ -199,7 +201,7 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
           </div>
           <div>
             <h1 className="text-xl font-black text-white">Super Admin</h1>
-            <p className="text-xs text-slate-500">studio0x · podiumMetrics</p>
+            <p className="text-xs text-slate-500">studio0x · {tournament.brandName}</p>
           </div>
         </div>
 

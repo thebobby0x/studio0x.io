@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { AudioStream } from "@/lib/types";
 import { useAudio, type Track } from "@/lib/AudioContext";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } | null };
 type FilterMode = "all" | "team" | "fifa";
@@ -521,7 +522,7 @@ export default function AnthemHub({
                           <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
                             {s.title}
                           </div>
-                          <div className="text-xs text-slate-500">podiumMetrics</div>
+                          <div className="text-xs text-slate-500">{BRAND_NAME}</div>
                         </div>
                         {isActive && isPlaying && (
                           <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>

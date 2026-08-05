@@ -10,6 +10,7 @@ import ClubContributionIndex from "@/components/stats/ClubContributionIndex";
 import TournamentBoards from "@/components/stats/TournamentBoards";
 import TournamentXMetrics from "@/components/stats/TournamentXMetrics";
 import ClubWCImpact from "@/components/stats/ClubWCImpact";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 function LeagueIcon({ league }: { league: string }): string {
   const map: Record<string, string> = {
@@ -223,7 +224,7 @@ export default async function LeaguesPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Club &amp; League breakdown
+        studio0x.io · {BRAND_NAME} · Club &amp; League breakdown
       </footer>
     </div>
   );

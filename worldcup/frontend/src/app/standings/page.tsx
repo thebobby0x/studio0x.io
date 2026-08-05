@@ -10,6 +10,7 @@ import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
 import { getTournamentWinnerMarkets } from "@/lib/polymarket";
 import { prisma } from "@/lib/prisma";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // ── Group Intensity™ ──────────────────────────────────────────────────────────
 // LIVE results-based: measures how tight and entertaining the group actually is
@@ -386,12 +387,12 @@ export default async function StandingsPage() {
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-black text-white tracking-tight">
-              podiumMetrics <span className="text-brand-gold">Standings</span>
+              {BRAND_NAME} <span className="text-brand-gold">Standings</span>
             </h1>
             <ShareButton
-              text="podiumMetrics group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io"
+              text={`${BRAND_NAME} group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io`}
               url="/standings"
-              title="podiumMetrics Standings"
+              title={`${BRAND_NAME} Standings`}
             />
           </div>
           <p className="text-slate-500 mt-1 text-sm">
@@ -506,7 +507,7 @@ export default async function StandingsPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Standings computed from live match data
+        studio0x.io · {BRAND_NAME} · Standings computed from live match data
       </footer>
     </div>
   );

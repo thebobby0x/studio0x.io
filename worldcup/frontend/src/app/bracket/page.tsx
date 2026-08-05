@@ -18,7 +18,7 @@ import {
   classifyRound,
   daysUntil,
 } from "@/lib/tournament";
-import { SPORT } from "@/lib/sportConfig";
+import { SPORT, BRAND_NAME } from "@/lib/sportConfig";
 
 // Round classification, dates and sizes now live in src/lib/tournament.ts so
 // every surface (bracket, schedule, banner, pulse) agrees on the same numbers.
@@ -289,9 +289,9 @@ export default async function BracketPage() {
               Knockout <span className="text-brand-gold">Bracket</span>
             </h1>
             <ShareButton
-              text="podiumMetrics Knockout Bracket — every round, live scores and prediction markets · studio0x.io"
+              text={`${BRAND_NAME} Knockout Bracket — every round, live scores and prediction markets · studio0x.io`}
               url="/bracket"
-              title="podiumMetrics Knockout Bracket"
+              title={`${BRAND_NAME} Knockout Bracket`}
               className="ml-1"
             />
           </div>
@@ -337,7 +337,7 @@ export default async function BracketPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Bracket data via api-football.com
+        studio0x.io · {BRAND_NAME} · Bracket data via api-football.com
       </footer>
     </div>
   );

@@ -99,6 +99,28 @@ export interface DeploymentConfig {
   // ── editorial / branding copy ──
   eventName: string; // nominative-use tournament name for AI prompts
   brandSubtitle: string; // e.g. "podiumMetrics – Leagues Cup 2026"
+  /**
+   * The PRIMARY user-facing name for this deployment — nav wordmark, page
+   * headings, footers, share titles, metadata.
+   *
+   * Historically every surface hardcoded the string "podiumMetrics", so the LC26
+   * deployment shipped the platform's name as its headline with the tournament
+   * demoted to an 8px subtitle. `brandName` is what a visitor should read first;
+   * the platform lineage still appears in the sportOS family footer
+   * ("… — powered by podiumMetrics"), so nothing about the platform story is
+   * lost by leading with the tournament.
+   *
+   * WC26 keeps "podiumMetrics": per CLAUDE.md BRANDING, putting FIFA's "World
+   * Cup" mark into a user-facing product title needs explicit owner sign-off.
+   */
+  brandName: string;
+  /**
+   * Two-part wordmark. `lead` renders in the primary text color, `accent` in the
+   * deployment accent — the "podium" + "Metrics" split, generalised so a
+   * deployment name can be split wherever reads best. Concatenated they must
+   * equal `brandName`.
+   */
+  wordmark: { lead: string; accent: string };
 
   entityKind: EntityKind;
   features: {
@@ -200,6 +222,10 @@ export const WORLDCUP: DeploymentConfig = {
   season: 2026,
   eventName: "World Cup 2026",
   brandSubtitle: "podiumMetrics – World Cup 26",
+  // Unchanged, deliberately: "World Cup" is a FIFA mark and may not become the
+  // product title without owner sign-off (CLAUDE.md BRANDING).
+  brandName: "podiumMetrics",
+  wordmark: { lead: "podium", accent: "Metrics" },
   entityKind: "nation",
   features: { anthems: "national", travel: "fan-origin", crossTournamentCompare: false },
   calendar: WORLDCUP_CALENDAR,
@@ -247,6 +273,11 @@ export const LEAGUES_CUP: DeploymentConfig = {
   season: Number(process.env.LEAGUES_CUP_SEASON ?? 2026),
   eventName: "Leagues Cup 2026",
   brandSubtitle: "podiumMetrics – Leagues Cup 2026",
+  // Owner directive 8/4: the tournament leads on this deployment, not the
+  // platform. Descriptive/nominative use of the competition name — never
+  // presented as official, and SUM's marks are not used (see `branding`).
+  brandName: "Leagues Cup 2026",
+  wordmark: { lead: "Leagues ", accent: "Cup 2026" },
   entityKind: "club",
   features: { anthems: "club", travel: "team-staff", crossTournamentCompare: true },
   // Verified against the live api-football feed (league 772 / season 2026) on
@@ -299,6 +330,10 @@ export const F1_2026: DeploymentConfig = {
   season: 2026,
   eventName: "Formula 1 2026",
   brandSubtitle: "podiumMetrics – F1 2026",
+  // "Formula 1" / "F1" are Formula One Licensing marks — same rule as WC26:
+  // the platform name leads until there is sign-off to do otherwise.
+  brandName: "podiumMetrics",
+  wordmark: { lead: "podium", accent: "Metrics" },
   entityKind: "constructor",
   features: { anthems: "off", travel: "team-staff", crossTournamentCompare: true },
   calendar: {
@@ -345,3 +380,20 @@ export function isConfigured(cfg: DeploymentConfig = SPORT): boolean {
 // Back-compat drop-ins for the existing AF_LEAGUE / AF_SEASON constants.
 export const AF_LEAGUE = SPORT.leagueId;
 export const AF_SEASON = SPORT.season;
+
+/**
+ * The deployment's primary user-facing name. Import this instead of writing
+ * "podiumMetrics" into a heading, footer, share string or page title — that
+ * literal is what made every LC26 surface announce the platform rather than the
+ * tournament.
+ */
+export const BRAND_NAME = SPORT.brandName;
+
+/** Two-part wordmark for the nav / footer lockups. */
+export const WORDMARK = SPORT.wordmark;
+
+/**
+ * True when this deployment leads with the platform name, so the sportOS family
+ * footer can add "— powered by podiumMetrics" only where it isn't redundant.
+ */
+export const BRAND_IS_PLATFORM = SPORT.brandName === "podiumMetrics";

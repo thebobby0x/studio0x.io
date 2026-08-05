@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Share2, Copy, Check, Twitter, Linkedin, Facebook, MessageCircle } from "lucide-react";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 interface Props {
   /** The text to share (headline, commentary line, score line…) */
@@ -31,7 +32,7 @@ function resolveUrl(url?: string): string {
   return url ? new URL(url, window.location.origin).toString() : window.location.href;
 }
 
-export default function ShareButton({ text, url, title = "studio0x · podiumMetrics", variant = "icon", className = "" }: Props) {
+export default function ShareButton({ text, url, title = `studio0x · ${BRAND_NAME}`, variant = "icon", className = "" }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);

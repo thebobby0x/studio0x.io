@@ -15,6 +15,7 @@ import type { FlightArc } from "@/app/api/flight-paths/route";
 import type { CityTravelStats } from "@/app/api/travel-stats/route";
 import AppNav from "@/components/ui/AppNav";
 import { useUnits } from "@/lib/units";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 const WorldFlightMap = dynamic(
   () => import("@/components/map/WorldFlightMap"),
@@ -734,7 +735,7 @@ export default function PulsePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Flight paths refresh every 60s · Arrivals, flights,
+        studio0x.io · {BRAND_NAME} · Flight paths refresh every 60s · Arrivals, flights,
         hotel rates and revenue are modelled estimates from stadium capacity + travel baselines,
         not measured data
       </footer>

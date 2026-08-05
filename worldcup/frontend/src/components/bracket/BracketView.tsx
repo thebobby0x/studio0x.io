@@ -7,7 +7,7 @@ import FlagImg from "@/components/ui/FlagImg";
 import ShareButton from "@/components/ui/ShareButton";
 import { useAudio, type Track } from "@/lib/AudioContext";
 import type { BracketMatch, KnockoutRound } from "@/app/bracket/page";
-import { SPORT } from "@/lib/sportConfig";
+import { SPORT, BRAND_NAME } from "@/lib/sportConfig";
 
 interface Props {
   rounds: Record<KnockoutRound, BracketMatch[]>;
@@ -403,7 +403,7 @@ export default function BracketView({
         {/* Header */}
         <div className="mb-6 text-center">
           <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-            podiumMetrics · Knockout Stage
+            {BRAND_NAME} · Knockout Stage
           </p>
         </div>
 

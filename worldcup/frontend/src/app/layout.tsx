@@ -8,7 +8,7 @@ import FloatingMiniPlayer from "@/components/ui/FloatingMiniPlayer";
 import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 import SportOSFooter from "@/components/ui/SportOSFooter";
-import { SPORT } from "@/lib/sportConfig";
+import { SPORT, BRAND_IS_PLATFORM } from "@/lib/sportConfig";
 
 // ── studio0x type stack (LC26 Gaming-UI skin) ────────────────────────────────
 // Archivo is loaded with its `wdth` axis so display type can run EXPANDED —
@@ -42,15 +42,21 @@ const FONT_VARS = `${archivo.variable} ${instrumentSans.variable} ${plexMono.var
 // description about "the 2026 tournament across North America" written for WC26)
 // because these were plain string literals.
 //
-// SPORT.brandSubtitle is the nominative-use deployment name ("podiumMetrics –
-// Leagues Cup 2026"). Per CLAUDE.md BRANDING, the tournament name belongs in the
-// deployment SUBTITLE, never in the product mark itself, and nothing here may
+// SPORT.brandName is the deployment's primary user-facing name — "Leagues Cup
+// 2026" on LC26, "podiumMetrics" on WC26/F1 (those carry FIFA / Formula One
+// marks and need owner sign-off before leading with them). Nothing here may
 // claim to be official.
 const SITE_URL = SPORT.id === "leaguescup"
   ? "https://leaguescup.vercel.app"
   : "https://podiummetrics.studio0x.io";
 
-const SITE_TITLE = `${SPORT.brandSubtitle} · live tournament stats by studio0x`;
+// A platform-led deployment still needs the tournament somewhere, so it keeps
+// the "podiumMetrics – World Cup 26" subtitle form. A tournament-led one already
+// IS the tournament name — "podiumMetrics – Leagues Cup 2026 · Leagues Cup 2026"
+// would just be redundant.
+const SITE_TITLE = BRAND_IS_PLATFORM
+  ? `${SPORT.brandSubtitle} · live tournament stats by studio0x`
+  : `${SPORT.brandName} · live tournament stats by studio0x`;
 
 const SITE_DESCRIPTION = SPORT.entityKind === "club"
   ? `Live match telemetry, proprietary metrics and club coverage for the ${SPORT.eventName} — MLS and Liga MX clubs across North America.`
@@ -62,7 +68,7 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   alternates: { canonical: "./" },
   openGraph: {
-    siteName: "podiumMetrics",
+    siteName: SPORT.brandName,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: SITE_URL,

@@ -26,6 +26,7 @@ import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/Fi
 import FinalRoundtable from "@/components/news/FinalRoundtable";
 import MatchdayTape from "@/components/match/MatchdayTape";
 import { storyScope } from "@/lib/storyScope";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -940,7 +941,7 @@ export default async function DashboardPage({
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Data refreshes every 5 seconds
+        studio0x.io · {BRAND_NAME} · Data refreshes every 5 seconds
       </footer>
     </div>
   );

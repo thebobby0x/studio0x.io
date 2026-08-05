@@ -11,6 +11,7 @@ import VenueWeather from "@/components/ui/VenueWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
 import FlagImg from "@/components/ui/FlagImg";
 import ShareButton from "@/components/ui/ShareButton";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 const METRIC_LABELS: Record<string, string> = {
   possession:   "Possession %",
@@ -232,7 +233,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
               <VenueWeather lat={venueInfo.lat} lng={venueInfo.lng} timezone={venueInfo.timezone} />
             )}
             <ShareButton
-              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · podiumMetrics · studio0x.io`}
+              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · ${BRAND_NAME} · studio0x.io`}
               url={`/schedule/${match.fixture}`}
               title={`${match.homeTeam.name} vs ${match.awayTeam.name}`}
             />

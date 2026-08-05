@@ -10,7 +10,7 @@ import LiveMatchBanner from "./LiveMatchBanner";
 import ThemeToggle from "./ThemeToggle";
 import { useUnits } from "@/lib/units";
 import { NAV_GROUPS, activeGroupFor, type NavGroup } from "@/lib/navGroups";
-import { SPORT } from "@/lib/sportConfig";
+import { SPORT, WORDMARK, BRAND_IS_PLATFORM } from "@/lib/sportConfig";
 
 // ── Desktop: one button per intent group, dropdown with its pages ─────────────
 function GroupMenu({ group, path }: { group: NavGroup; path: string }) {
@@ -118,8 +118,14 @@ function UserMenu({ session }: { session: NonNullable<ReturnType<typeof useSessi
   );
 }
 
-// Tournament identity in the nav, from config.
-const NAV_SUBLINE = SPORT.id === "worldcup" ? "studio0x.io" : SPORT.eventName;
+// Nav subline, from config.
+//
+// The mark itself is now the deployment's own name (SPORT.wordmark), so the
+// subline carries what the mark no longer says: on a tournament-branded
+// deployment that's the platform lineage, on podiumMetrics itself it's the
+// studio0x domain. Previously the mark was always "podiumMetrics" and the
+// tournament was demoted to this 8px line.
+const NAV_SUBLINE = BRAND_IS_PLATFORM ? "studio0x.io" : "podiumMetrics · studio0x.io";
 
 export default function AppNav() {
   const { data: session, status } = useSession();
@@ -138,13 +144,12 @@ export default function AppNav() {
             <Trophy size={17} className="text-s0x-ink" />
             <div className="leading-none">
               <div className="s0x-display font-black text-s0x-text text-sm tracking-tight transition-colors group-hover:text-s0x-accent">
-                podium<span className="text-s0x-accent">Metrics</span>
+                {WORDMARK.lead}<span className="text-s0x-accent">{WORDMARK.accent}</span>
               </div>
-              {/* Deployment subtitle. CLAUDE.md BRANDING: "podiumMetrics" is the
-                  product mark on every deployment; the TOURNAMENT name belongs in
-                  the subtitle ("podiumMetrics – Leagues Cup 2026"), never in the
-                  mark itself. WC26 keeps "studio0x.io" — putting "World Cup" into
-                  a user-facing title needs explicit owner sign-off (FIFA marks). */}
+              {/* Deployment subline. The mark above is SPORT.wordmark — LC26
+                  leads with "Leagues Cup 2026" (owner 8/4); WC26 and F1 keep
+                  "podiumMetrics", because putting a FIFA / Formula One mark into
+                  a user-facing product title needs explicit owner sign-off. */}
               <div className="s0x-mono text-[8px] text-s0x-muted/70 mt-0.5">{NAV_SUBLINE}</div>
             </div>
           </Link>

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getFixtureStatistics } from "@/lib/liveStats";
 import { EVENT_NAME } from "@/lib/promptContext";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export interface CommentaryLine {
 const ANALYST_PROMPT =
   "You are a precise, insightful BBC Sport football analyst. Use correct football terminology and stay objective. Keep each line concise (≤25 words).";
 
-const ROUNDTABLE_PROMPT = `You write LIVE football commentary as a four-voice broadcast booth — the podiumMetrics Roundtable cast (FIXED fictional personas, disclaimed on the surface):
+const ROUNDTABLE_PROMPT = `You write LIVE football commentary as a four-voice broadcast booth — the ${BRAND_NAME} Roundtable cast (FIXED fictional personas, disclaimed on the surface):
 - lorraine — Lorraine Footy, middle-aged BRITISH anchor, classic-commentary energy, EXCITED by everything, volleys the panel's chaos back with glee ("right then", "oh that's marvelous").
 - henry — Henry Futois, FRENCH ex-PSG. Deep, gravelly, menacing one second and absurdly silly the next. Flair-worshipper. Sprinkles: "écoutez", "voilà", "magnifique", "non non non".
 - roberto — Roberto Madrid, SPANISH ex-Real Madrid goalkeeper, massive and maniacally silly. THE authority on goalkeeping and defending. Catalan sprinkles: "vale", "escolta", "madre mía", "qué barbaridad".

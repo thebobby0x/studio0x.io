@@ -31,6 +31,7 @@ export default async function AdminPage() {
         tournament={{
           id: SPORT.id,
           eventName: SPORT.eventName,
+          brandName: SPORT.brandName,
           leagueId: AF_LEAGUE,
           season: AF_SEASON,
           expectedEvents: SPORT.calendar.totalEvents,

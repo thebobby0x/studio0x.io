@@ -5,6 +5,7 @@ import ShareButton from "@/components/ui/ShareButton";
 import { Shield, Plane, MapPin } from "lucide-react";
 import type { OfficialProfile } from "@/app/api/officials/route";
 import { GET as officialsGET } from "@/app/api/officials/route";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // Metric badge with the standard studio0x™ treatment
 function Metric({ label, value, suffix, hint }: { label: string; value: number | null; suffix?: string; hint: string }) {
@@ -68,7 +69,7 @@ export default async function OfficialsPage() {
             <ShareButton
               text="The Officials — WC 2026 referee profiles with Whistle Index™, Card Threshold™ and Let It Flow™ ratings · studio0x.io"
               url="/officials"
-              title="podiumMetrics — The Officials"
+              title={`${BRAND_NAME} — The Officials`}
             />
           </div>
           <p className="text-slate-500 text-sm">
