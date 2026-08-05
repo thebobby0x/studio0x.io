@@ -19,12 +19,17 @@ function Track({ stream }: { stream: AudioStream }) {
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [playCount, setPlayCount] = useState(stream.playCount);
+  // Why this track isn't playing. Previously `.play().catch(() => {})` threw the
+  // reason away and `setPlaying(true)` ran regardless, so a dead audio URL showed
+  // a Pause button and a moving progress bar over total silence.
+  const [fault, setFault] = useState<string | null>(null);
 
   function startListenTimer() {
     if (listenTimerRef.current) return;
     listenTimerRef.current = setInterval(() => {
+      // Listen accounting only — `elapsed` now comes from the media clock
+      // (onTimeUpdate), so incrementing it here too would double-count.
       continuousSecs.current += 1;
-      setElapsed((e) => e + 1);
 
       // Every 10 seconds of continuous play → record a listen
       if (continuousSecs.current > 0 && continuousSecs.current % 10 === 0) {
@@ -49,15 +54,39 @@ function Track({ stream }: { stream: AudioStream }) {
   }
 
   function togglePlay() {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     if (playing) {
-      audioRef.current.pause();
+      audio.pause();
       stopListenTimer();
-    } else {
-      audioRef.current.play().catch(() => {});
-      startListenTimer();
+      setPlaying(false);
+      return;
     }
-    setPlaying((p) => !p);
+    if (!stream.audioUrl) {
+      setFault("This anthem hasn't been imported yet.");
+      return;
+    }
+    setFault(null);
+    // Only claim to be playing once the browser actually starts.
+    audio.play()
+      .then(() => { startListenTimer(); setPlaying(true); })
+      .catch((e: unknown) => {
+        setPlaying(false);
+        stopListenTimer();
+        setFault(
+          (e instanceof Error ? e.name : "") === "NotAllowedError"
+            ? "Tap play again to start audio."
+            : "This track could not be played.",
+        );
+      });
+  }
+
+  // The element's own failure channel — a 404/403 audio URL never rejects
+  // play(), it fires `error` here.
+  function onAudioError() {
+    stopListenTimer();
+    setPlaying(false);
+    setFault("This anthem's audio file is missing or unreadable.");
   }
 
   useEffect(() => {
@@ -86,7 +115,17 @@ function Track({ stream }: { stream: AudioStream }) {
 
       {/* Player controls */}
       <div className="p-4">
-        <audio ref={audioRef} src={stream.audioUrl} loop preload="none" muted={muted} />
+        <audio
+          ref={audioRef}
+          src={stream.audioUrl || undefined}
+          loop
+          preload="none"
+          muted={muted}
+          onError={onAudioError}
+          // Progress follows the media clock, not a wall-clock interval — the
+          // old bar advanced even when nothing was actually playing.
+          onTimeUpdate={(e) => setElapsed(Math.floor(e.currentTarget.currentTime))}
+        />
 
         {/* Progress bar */}
         <div className="w-full h-1 bg-s0x-border rounded-full mb-3 overflow-hidden">
@@ -127,6 +166,12 @@ function Track({ stream }: { stream: AudioStream }) {
           </div>
         </div>
 
+        {fault && (
+          <p className="s0x-mono mt-3 text-[10px] text-s0x-muted" role="status">
+            {fault}
+          </p>
+        )}
+
         {/* Credit + TikTok deep link */}
         <div className="mt-3 pt-3 border-t border-s0x-border flex items-center justify-between gap-2">
           <span className="text-xs text-s0x-muted">{stream.artistCredit}</span>
@@ -149,11 +194,18 @@ function Track({ stream }: { stream: AudioStream }) {
 
 export default function AnthemPlayer({ streams }: { streams: AudioStream[] }) {
   if (!streams.length) {
+    // "No anthems yet" is a KNOWN state, not a loading one. This used to render
+    // two pulsing skeletons forever, so a deployment whose anthems hadn't been
+    // imported looked like a page that never finished loading.
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-48 rounded-s0x bg-s0x-surface border border-s0x-border animate-pulse" />
-        ))}
+      <div className="s0x-card s0x-hud-grid p-8 text-center">
+        <span className="s0x-scanline" aria-hidden="true" />
+        <Music2 size={28} className="mx-auto mb-3 text-s0x-teal/50" />
+        <p className="s0x-display text-s0x-text font-bold text-sm">Anthems coming soon</p>
+        <p className="text-[11px] text-s0x-muted mt-1.5 max-w-sm mx-auto">
+          Club anthems are still being produced and imported. They&apos;ll appear
+          here automatically once they land — nothing to do on your end.
+        </p>
       </div>
     );
   }

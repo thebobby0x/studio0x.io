@@ -290,12 +290,23 @@ export default function AnthemHub({
     (showTeam ? teamStreams.length + sortedComingSoon.length : 0);
 
   if (!streams.length) {
+    // Reads as a product state ("coming soon"), not a failure. On club
+    // deployments the catalogue is DISCOVERED by walking a Drive folder tree, so
+    // an empty hub most often means the import hasn't run yet — that diagnosis
+    // belongs in /admin ("Discover Anthems"), not in a fan's face.
     return (
-      <div className="min-h-screen bg-brand-dark flex items-center justify-center">
-        <div className="text-center text-slate-500">
-          <Music2 size={48} className="mx-auto mb-4 opacity-30" />
-          <p>No anthems loaded yet.</p>
-          <Link href="/" className="text-brand-gold hover:underline text-sm mt-2 block">← Dashboard</Link>
+      <div className="min-h-screen bg-s0x-bg flex items-center justify-center px-6">
+        <div className="s0x-card s0x-hud-grid max-w-md w-full p-8 text-center">
+          <span className="s0x-scanline" aria-hidden="true" />
+          <Music2 size={40} className="mx-auto mb-4 text-s0x-teal/50" />
+          <p className="s0x-display text-s0x-text font-bold">Anthems coming soon</p>
+          <p className="text-xs text-s0x-muted mt-2">
+            Club anthems are still being produced. They&apos;ll appear here
+            automatically once they&apos;re imported.
+          </p>
+          <Link href="/" className="s0x-mono text-[10px] text-s0x-accent hover:text-s0x-teal transition-colors mt-5 inline-block">
+            ← Dashboard
+          </Link>
         </div>
       </div>
     );
@@ -353,6 +364,14 @@ export default function AnthemHub({
               <span>{formatTime(duration || current?.durationSecs || 0)}</span>
             </div>
           </div>
+
+          {/* Why nothing is playing. The shared player used to swallow every
+              failure, so a dead Blob URL was indistinguishable from a pause. */}
+          {audio.error && (
+            <div className="s0x-mono mb-4 text-center text-[10px] text-s0x-muted" role="status">
+              {audio.error}
+            </div>
+          )}
 
           {/* Playback controls */}
           <div className="flex items-center justify-center gap-7">
