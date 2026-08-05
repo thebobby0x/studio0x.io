@@ -48,6 +48,20 @@ export function DeepDivePanel({ text }: { text: string }) {
   );
 }
 
+// The TTS route reports WHY it failed — missing key, ElevenLabs rejection, full
+// Blob store — and the player used to throw all of it away and say "Audio
+// unavailable" for every case. CLAUDE.md gotcha #15 exists precisely because a
+// full Blob store produces symptoms identical to a missing API key, so the
+// distinction has to reach the surface.
+function ttsMessage(status: number, error?: string): string {
+  const e = (error ?? "").toLowerCase();
+  if (e.includes("elevenlabs_api_key")) return "Narration isn't configured yet";
+  if (e.includes("quota") || e.includes("cache failed")) return "Audio storage full — retry later";
+  if (status === 429 || e.includes("429")) return "Narration busy — try again";
+  if (e.includes("elevenlabs")) return "Narration service unavailable";
+  return "Audio unavailable";
+}
+
 export default function StoryCard({ story, showAge = true }: { story: StoryCardData; showAge?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -66,11 +80,11 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   const [deepAudioUrl, setDeepAudioUrl] = useState<string | null>(null);
   const [deepAudioLoading, setDeepAudioLoading] = useState(false);
   const [deepPlaying, setDeepPlaying] = useState(false);
-  const [deepAudioError, setDeepAudioError] = useState(false);
+  const [deepAudioError, setDeepAudioError] = useState<string | null>(null);
   const deepAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Short story audio error state
-  const [audioError, setAudioError] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   const catColor = CATEGORY_COLORS[story.category] ?? "bg-s0x-surface border border-s0x-border text-s0x-muted";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
@@ -105,25 +119,33 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setAudioLoading(true);
-    setAudioError(false);
+    setAudioError(null);
     try {
       const res = await fetch("/api/ai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: `${story.headline}. ${story.body}`, storyId: story.id }),
       });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) { setAudioError(true); setTimeout(() => setAudioError(false), 4000); return; }
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!data.url) {
+        console.error("[StoryCard] TTS failed", res.status, data.error);
+        setAudioError(ttsMessage(res.status, data.error));
+        setTimeout(() => setAudioError(null), 6000);
+        return;
+      }
       setAudioUrl(data.url);
       const audio = new Audio(data.url);
       audioRef.current = audio;
       audio.onended = () => { setPlaying(false); stopAmbient(); };
-      audio.play();
+      // play() rejects on autoplay policy and on a dead blob URL; unhandled, it
+      // left the button showing "Pause" with nothing playing.
+      await audio.play().catch(() => { throw new Error("playback blocked"); });
       startAmbient();
       setPlaying(true);
-    } catch {
-      setAudioError(true);
-      setTimeout(() => setAudioError(false), 4000);
+    } catch (e) {
+      console.error("[StoryCard] story audio", e);
+      setAudioError("Audio unavailable");
+      setTimeout(() => setAudioError(null), 6000);
     } finally {
       setAudioLoading(false);
     }
@@ -146,7 +168,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setDeepAudioLoading(true);
-    setDeepAudioError(false);
+    setDeepAudioError(null);
     try {
       // Strip markdown formatting for clean TTS
       const cleanDeep = deepDive.replace(/\*\*/g, "").replace(/\n\n+/g, ". ");
@@ -156,18 +178,24 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: fullText, storyId: `${story.id}-deep` }),
       });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) { setDeepAudioError(true); setTimeout(() => setDeepAudioError(false), 4000); return; }
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!data.url) {
+        console.error("[StoryCard] deep-dive TTS failed", res.status, data.error);
+        setDeepAudioError(ttsMessage(res.status, data.error));
+        setTimeout(() => setDeepAudioError(null), 6000);
+        return;
+      }
       setDeepAudioUrl(data.url);
       const audio = new Audio(data.url);
       deepAudioRef.current = audio;
       audio.onended = () => { setDeepPlaying(false); stopAmbient(); };
-      audio.play();
+      await audio.play().catch(() => { throw new Error("playback blocked"); });
       startAmbient();
       setDeepPlaying(true);
-    } catch {
-      setDeepAudioError(true);
-      setTimeout(() => setDeepAudioError(false), 4000);
+    } catch (e) {
+      console.error("[StoryCard] deep-dive audio", e);
+      setDeepAudioError("Audio unavailable");
+      setTimeout(() => setDeepAudioError(null), 6000);
     } finally {
       setDeepAudioLoading(false);
     }
@@ -250,7 +278,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
             }`}
           >
             {audioLoading ? <Loader2 size={12} className="animate-spin" /> : playing ? <Pause size={12} /> : <Play size={12} />}
-            {audioLoading ? "Generating…" : audioError ? "Audio unavailable" : playing ? "Pause" : "Listen"}
+            {audioLoading ? "Generating…" : audioError ? audioError : playing ? "Pause" : "Listen"}
           </button>
         </div>
       </div>
@@ -276,7 +304,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
                 }`}
               >
                 {deepAudioLoading ? <Loader2 size={12} className="animate-spin" /> : deepPlaying ? <Pause size={12} /> : <Play size={12} />}
-                {deepAudioLoading ? "Generating…" : deepAudioError ? "Audio unavailable" : deepPlaying ? "Pause" : "Listen to Full Analysis"}
+                {deepAudioLoading ? "Generating…" : deepAudioError ? deepAudioError : deepPlaying ? "Pause" : "Listen to Full Analysis"}
               </button>
             </div>
           </>

@@ -451,6 +451,13 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 },
               },
               {
+                key: "audioHealth",
+                icon: Music2,
+                label: "Check Audio / TTS Chain",
+                desc: "Answers \"why is there no sound?\" with a fact. Story narration is ElevenLabs TTS generated ON DEMAND at play time and cached in Blob — it needs ELEVENLABS_API_KEY and Blob headroom; anthems are imported mp3s and need the Drive key. Runs a real ~20-char synthesis round-trip, so a full Blob store (which mimics a missing key exactly — gotcha #15) is told apart from an unset key.",
+                action: () => runSeed("audioHealth", "/api/admin/audio-health?synth=true", "POST"),
+              },
+              {
                 key: "discoverAnthems",
                 icon: Music2,
                 label: "Discover Anthems (dry run)",
