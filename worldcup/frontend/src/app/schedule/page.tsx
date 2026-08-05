@@ -7,6 +7,15 @@ import ScheduleView from "./ScheduleView";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { prisma } from "@/lib/prisma";
+import { SPORT } from "@/lib/sportConfig";
+
+const HAS_GROUPS = Object.keys(SPORT.teamGroups).length > 0;
+const HAS_BRACKET = SPORT.calendar.rounds.length > 0;
+const SCHEDULE_SUBTITLE = HAS_GROUPS && HAS_BRACKET
+  ? "Full group stage & knockout bracket"
+  : HAS_BRACKET
+    ? "Full league phase & knockout bracket"
+    : "Every fixture in the league phase";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -63,7 +72,10 @@ export default async function SchedulePage() {
             podiumMetrics <span className="text-brand-gold">Schedule</span>
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Live scores · Countdowns · Full group stage & knockout bracket
+            {/* Copy must describe the format this deployment actually has —
+                LC26 runs a single league phase with no groups and no published
+                bracket, so "Full group stage & knockout bracket" was wrong. */}
+            Live scores · Countdowns · {SCHEDULE_SUBTITLE}
           </p>
         </div>
 

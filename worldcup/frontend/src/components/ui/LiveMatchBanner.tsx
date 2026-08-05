@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Play, Pause, SkipBack, SkipForward, Music2 } from "lucide-react";
 import { useAudio } from "@/lib/AudioContext";
-import { getFlag } from "@/lib/flags";
+import FlagImg from "@/components/ui/FlagImg";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -15,16 +15,19 @@ interface LiveMatch {
   awayScore: number;
   elapsed: number;
   status: string;
-  homeTeam: { name: string; flagEmoji: string; code: string };
-  awayTeam: { name: string; flagEmoji: string; code: string };
+  // afTeamId/logoUrl are the club-crest source. Team.flagEmoji is a COUNTRY flag
+  // on club deployments, which reads as "USA vs Mexico" rather than naming the
+  // two clubs — the crest is the badge that actually identifies a club.
+  homeTeam: { name: string; flagEmoji: string; code: string; afTeamId?: number | null; logoUrl?: string };
+  awayTeam: { name: string; flagEmoji: string; code: string; afTeamId?: number | null; logoUrl?: string };
 }
 
 interface ScheduleMatch {
   id: number;
   utcDate: string;
   status: "NS" | "LIVE" | "HT" | "FT";
-  homeTeam: { name: string; tla: string };
-  awayTeam: { name: string; tla: string };
+  homeTeam: { name: string; tla: string; afId?: number | null };
+  awayTeam: { name: string; tla: string; afId?: number | null };
   homeScore: number | null;
   awayScore: number | null;
 }
@@ -57,11 +60,11 @@ function LiveSection({ liveMatch }: { liveMatch: LiveMatch | null }) {
           LIVE
         </span>
         <span className="flex items-center gap-2 text-lg sm:text-xl text-s0x-text/90 font-medium">
-          <span className="text-2xl">{liveMatch.homeTeam.flagEmoji}</span>
+          <FlagImg tla={liveMatch.homeTeam.code} logoUrl={liveMatch.homeTeam.logoUrl} afId={liveMatch.homeTeam.afTeamId} size={24} />
           <span className="s0x-data font-bold text-s0x-text s0x-neon-rosa">
             {liveMatch.homeScore}–{liveMatch.awayScore}
           </span>
-          <span className="text-2xl">{liveMatch.awayTeam.flagEmoji}</span>
+          <FlagImg tla={liveMatch.awayTeam.code} logoUrl={liveMatch.awayTeam.logoUrl} afId={liveMatch.awayTeam.afTeamId} size={24} />
         </span>
         <span className="s0x-data text-sm text-s0x-teal font-bold shrink-0">{minute}</span>
       </Link>
@@ -106,11 +109,11 @@ function PastResultsChips() {
             href={`/schedule/${m.id}`}
             className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <span className="text-xl">{getFlag(m.homeTeam.tla)}</span>
+            <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={20} />
             <span className="s0x-data text-s0x-text font-bold">
               {m.homeScore}–{m.awayScore}
             </span>
-            <span className="text-xl">{getFlag(m.awayTeam.tla)}</span>
+            <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={20} />
             <span className="s0x-mono ml-0.5 text-[9px] font-semibold text-s0x-muted">FT</span>
           </Link>
         </span>
