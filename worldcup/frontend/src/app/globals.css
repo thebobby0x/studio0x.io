@@ -453,7 +453,6 @@ h1, h2, h3, h4, h5, h6 {
 .s0x-moment:hover .s0x-moment-icon { filter: drop-shadow(0 0 6px currentColor); }
 @media (prefers-reduced-motion: reduce) {
   .s0x-moment, .s0x-moment:hover, .s0x-moment-mirror:hover { transform: none; }
-  .s0x-versus > span { transition: none; }
 }
 [data-theme="light"] .s0x-moment::before,
 [data-theme="light"] .s0x-moment-teal::before { box-shadow: none; }

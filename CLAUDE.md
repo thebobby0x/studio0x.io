@@ -1091,6 +1091,68 @@ licensed Leagues Cup marks (SUM owns those). Don't flip it to `true`.
 
 ---
 
+## SEGMENTED HATCH BARS (owner spec + reference image, 2026-08-05)
+
+Every smooth/gradient progress fill in the stats surfaces is now a **discrete
+segmented hatch bar**. One reusable component owns it:
+`src/components/ui/SegmentedBar.tsx` (geometry + data) backed by the `.seg-*`
+block in `globals.css` (every pixel of the look).
+
+```tsx
+<SegmentedBar value={73} maxValue={100} direction="ltr" color="cyan"
+              label="73%" segments={20} height={16} circuit />
+
+<SegmentedVersusBar home={62} away={38} homeLabel="62%" awayLabel="38%" />
+```
+
+- `SegmentedBar` — one fill. `direction: 'ltr' | 'rtl'`, `color: 'cyan' | 'red'`,
+  `circuit` wraps it in the neon circuit-board frame (`.s0x-circuit`).
+- `SegmentedVersusBar` — the opposing pair on ONE track: home fills cyan from
+  the left, away fills red from the right, meeting at the split point.
+  `normalize={false}` makes home/away literal track percentages instead of
+  shares, so any remainder stays unlit — that middle gap is how the three-way
+  Live Win Meter renders the DRAW probability.
+
+**The fill is never quantised.** The lit element's width is the exact
+percentage; `.seg-grid` paints the block gaps *on top* of both lit and unlit
+regions. Segmentation is a texture, not a rounding of the data — a 47% value is
+drawn at 47%.
+
+**⚠ PALETTE — the one place this deployment leaves the studio0x brand.**
+The owner specified the reference image's hexes literally:
+
+| Token | Value | Nearest brand token |
+|---|---|---|
+| `--seg-cyan` | `#00D9FF` | Riptide `#5DCBD1` |
+| `--seg-red` | `#E94560` | Rosa 700 `#CA358B` |
+| `--seg-plate` | `#1A1A2E` | Noir 900 `#0F0C0E` |
+
+`#1A1A2E` is a COOL indigo-black sitting inside otherwise WARM Noir surfaces —
+the bars read as a distinct instrument panel rather than blending in. That is a
+deliberate, owner-directed exception to the LC26 SKIN section's "no arbitrary
+colors" rule, isolated to three CSS variables so it is reversible: **to put the
+bars back on brand, change only those three values in `globals.css`.** No
+component file contains a bar hex — they reference `var(--seg-*)`. Keep it that
+way when adding surfaces.
+
+**Applied to:** Match DNA (Live Pressure, all six stat duels, the momentum
+timeline track, Clutch Index), LiveMatchCard (possession + every stat row),
+Live Win Meter, Power Rankings™, Upset Factor™, Goal Gravity™, Pressing
+Intensity Index™, Transition Danger Rating™, Club Contribution Index™, Club WC
+Impact™, Player Performance Index™, Elimination Proximity™, Tournament
+Records™, Tournament X-Metrics.
+
+**Lite mode** keeps the segment geometry and drops the plate/glow to light
+neutrals (`--seg-plate` → `#E9DFE4`), so the bars stay legible on Bone paper.
+
+**Provenance note:** this work was authored in one session but landed in commit
+`a24d5be` (a concurrent session's Roundtable commit swept up the in-progress
+files). The code is correct and verified; only the commit message is
+misleading. `git log -- worldcup/frontend/src/components/ui/SegmentedBar.tsx`
+will point at that commit rather than a bar-related one.
+
+---
+
 ## STORE SESSION NOTES (appended by the store session — store lane only)
 
 *Per the append-only protocol: this section is the store's; other tenant sessions please don't edit it, and I won't edit yours.*
