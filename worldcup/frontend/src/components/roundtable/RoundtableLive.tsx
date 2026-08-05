@@ -8,6 +8,11 @@ import { PERSONAS_360, type Speaker360 } from "@/lib/roundtable360/personas";
 // ─────────────────────────────────────────────────────────────────────────────
 // AI Live 360 Roundtable — the player.
 //
+// The cast is THE Roundtable — Lorraine, Henry, Roberto and Ricky, the same four
+// voices as the pregame panel and the live commentary booth (owner directive:
+// one familiar broadcast team across every tournament). See lib/roundtable360/
+// personas.ts; do not re-cast this surface.
+//
 // One "GO LIVE" button is the entire entry point. Browsers block audio until a
 // user gesture, so the gate is non-negotiable — and it is also the thing that
 // makes this feel like tuning into a radio station rather than a page that
@@ -127,8 +132,8 @@ export default function RoundtableLive() {
     let played = new Set<string>();
     // The next segment is requested BEFORE the current one runs out (see the
     // tail of the line loop), so the handover is seamless. A Claude call takes a
-    // few seconds; asking for it only once Jamie has signed off would put that
-    // gap on air every single segment.
+    // few seconds; asking for it only once Lorraine has signed off would put
+    // that gap on air every single segment.
     let pending: Promise<CurrentPayload | null> | null = null;
 
     while (running.current) {
@@ -163,7 +168,7 @@ export default function RoundtableLive() {
       if (played.size > 40) played = new Set([ep.id]); // bound the memo
 
       // Stinger first: the segment leads with a goal / red card / lead change,
-      // so the roar lands before Marcus opens his mouth.
+      // so the roar lands before Lorraine opens her mouth.
       const kind = stingerFor(ep.leadMomentType);
       if (kind && ep.leadMomentKey && !stung.current.has(ep.leadMomentKey)) {
         stung.current.add(ep.leadMomentKey);
@@ -281,7 +286,7 @@ export default function RoundtableLive() {
           </button>
           <p className="text-[11px] leading-relaxed text-s0x-muted">
             {onAir
-              ? "Three AI pundits calling every match in play, with stadium atmosphere underneath. Audio starts on your click — browsers require it."
+              ? "Lorraine, Henry, Roberto and Ricky calling every match in play, with stadium atmosphere underneath. Audio starts on your click — browsers require it."
               : data?.nextKickoff
                 ? `Nothing in play right now. Next broadcast: ${data.nextKickoff.matchup} · ${kickoffLabel(data.nextKickoff.utcDate)}.`
                 : "Nothing in play right now. The booth opens when the next match kicks off."}

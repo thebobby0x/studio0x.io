@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { ROUNDTABLE_VOICES, isSpeaker360, respellForAudio } from "@/lib/roundtable360/personas";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/roundtable/tts?speaker=marcus&text=…  → audio/mpeg stream
+// GET /api/roundtable/tts?speaker=lorraine&text=…  → audio/mpeg stream
 //
 // NO BLOB WRITES. The pregame Roundtable synthesises to a file and caches it in
 // Vercel Blob; the ElevenLabs/Blob storage quota is full and, more importantly,
@@ -32,10 +32,17 @@ const ELEVENLABS_STREAM = "https://api.elevenlabs.io/v1/text-to-speech";
 const MAX_TTS_CHARS = 900;
 
 // eleven_turbo_v2_5 is the LATENCY choice, deliberately. This is live radio: the
-// gap between "Marcus finishes" and "Carlos starts" is the product. The known
-// trade-off (CLAUDE.md gotcha #24) is that turbo flattens designed accents,
-// which matters most for Carlos — swap the env var to eleven_multilingual_v2 if
-// BK prefers accent fidelity over responsiveness.
+// gap between "Lorraine finishes" and "Ricky starts" is the product.
+//
+// ⚠ THIS IS THE ONE REAL TENSION WITH REUSING THE WC26 CAST. Gotcha #24 records
+// three rounds of owner-verified work establishing that turbo FLATTENS these
+// voices' designed accents and that the panel belongs on eleven_v3 with a
+// per-persona accent tag. That finding stands; the panel is the same panel. It
+// is traded here only because v3 is materially slower and this show cannot
+// tolerate a gap between speakers the way a pregame podcast can. Flip
+// ELEVENLABS_ROUNDTABLE_MODEL to eleven_multilingual_v2 (or eleven_v3, if the
+// streaming endpoint serves it acceptably) the moment BK judges the accents
+// worse than the latency — this is BK's call, not a settled one.
 const MODEL = process.env.ELEVENLABS_ROUNDTABLE_MODEL ?? "eleven_turbo_v2_5";
 
 export async function GET(req: Request) {

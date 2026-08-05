@@ -65,11 +65,19 @@ function leadKey(m: RankedMoment): string {
 // ── Prompt ───────────────────────────────────────────────────────────────────
 
 function systemPrompt(): string {
-  const cast = SPEAKER_KEYS.map((k) => `- ${k} — ${PERSONAS_360[k].brief}`).join("\n");
+  // Character brief + this show's beat, per panelist. The brief is byte-shared
+  // with the live-commentary booth so the same person turns up on both.
+  const cast = SPEAKER_KEYS.map(
+    (k) => `- ${PERSONAS_360[k].brief}\n    ON THIS SHOW: ${PERSONAS_360[k].beat}`,
+  ).join("\n");
   const callback = renderCallbackBlock();
 
-  return `You write the script for a LIVE multi-match football radio show — a rolling whip-around covering every match in play at once, in the style of a broadcast "360" show. Three fixed fictional pundits:
+  return `You write the script for a LIVE multi-match football radio show — a rolling whip-around covering every match in play at once, in the style of a broadcast "360" show. The booth is the FIXED four-person cast (fictional personas, disclaimed on the surface):
 ${cast}
+
+The panel's comedy: Lorraine keeps order she secretly loves losing; Henry and Roberto feed each other's chaos; Ricky deadpans over the top of everyone and then erupts.
+Persona-backstory rule: they may colour commentary with VAGUE nostalgia ("in my playing days", "as a keeper I hated this") but must NEVER invent specific career matches, opponents, teammates, dates or statistics for themselves.
+Code-switch rule: foreign phrases are seasoning, not the meal — every line must be fully understandable to an English-only listener.
 
 ${tournamentBrief()}
 
@@ -89,19 +97,19 @@ HARD GROUNDING RULES (a violation is a publication error):
 
 WHAT THIS SEGMENT MUST DO:
 1. Reference at least one SPECIFIC event from the MOMENT FEED, by match, minute and what happened. Lead with the highest-importance one if the feed is not empty.
-2. Cover the wider board — do not spend the whole segment on one match when several are live. Marcus hard-cuts between games.
+2. Cover the wider board — do not spend the whole segment on one match when several are live. Lorraine hard-cuts between games.
 3. NO DEAD AIR. If nothing dramatic has just happened, that is not an excuse to be short: analyse the scorelines on the board, argue about what the pattern means, set up what is coming, or run rivalry banter. The segment is always full length.
 ${callback ? `4. Work in at least one callback to the callback event above — as banter, a needle, or a comparison. Keep it light and keep it inside the permitted facts.` : ""}
 
 WRITE FOR PERFORMANCE — every line is spoken aloud by a TTS voice:
 - Short sentences that land. Exclamation marks where the emotion is real. Rhetorical questions.
-- They talk to each other BY NAME, interrupt, disagree, and laugh in words ("ha!", "oh come on, Carlos").
+- They talk to each other BY NAME, interrupt, disagree, and laugh in words ("ha!", "oh come on, Ricky").
 - At most one ALL-CAPS word per big moment for emphasis.
 - NEVER use stage directions, brackets, asterisks, emoji, speaker labels inside the text, or sound-effect notes — the voices read them aloud literally.
 
 FORMAT: return ONLY valid JSON, no prose before or after:
-{"lines": [{"speaker": "marcus"|"carlos"|"jamie", "text": string}]}
-10-16 lines. Marcus opens. Every voice appears at least three times. Each line 1-3 sentences — this is roughly 45-90 seconds of speech.`;
+{"lines": [{"speaker": "lorraine"|"henry"|"roberto"|"ricky", "text": string}]}
+12-18 lines. Lorraine opens and closes. Every voice appears at least three times. Each line 1-3 sentences — this is roughly 45-90 seconds of speech.`;
 }
 
 function userPrompt(ctx: Live360Context, recentlyCovered: string[]): string {
@@ -160,9 +168,11 @@ async function callClaude(ctx: Live360Context, recentlyCovered: string[]): Promi
       return { speaker, text: (l.text as string).trim(), voiceId: ROUNDTABLE_VOICES[speaker] };
     });
 
-  // A two-line "segment" is dead air with extra steps — reject and let the
-  // caller keep the previous episode on air rather than airing a stub.
-  return lines.length >= 4 ? lines : null;
+  // A three-line "segment" is dead air with extra steps — reject and let the
+  // caller keep the previous episode on air rather than airing a stub. Floor is
+  // half the requested 12, not the full 12: a slightly short segment still fills
+  // the airtime, and rejecting it would replay the previous one instead.
+  return lines.length >= 6 ? lines : null;
 }
 
 /** The newest episode for this deployment, or null. */
