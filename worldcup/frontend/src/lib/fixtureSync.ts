@@ -40,7 +40,7 @@ interface AFFixture {
     date: string;
     referee: string | null;
     status: { short: string; elapsed: number | null };
-    venue: { name: string | null; city: string | null };
+    venue: { id: number | null; name: string | null; city: string | null };
   };
   league: { round: string };
   teams: { home: { id: number; name: string }; away: { id: number; name: string } };
@@ -190,7 +190,7 @@ export async function syncFixtures(): Promise<SyncResult> {
 
   // ── 3. Diff-aware match upsert by fixture id ───────────────────────────────
   const existing = await prisma.match.findMany({
-    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true, leagueId: true, venue: true, city: true },
+    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true, leagueId: true, venue: true, city: true, venueId: true },
   });
   const existingByFixture = new Map(existing.map((m) => [m.fixture, m]));
 
@@ -233,6 +233,10 @@ export async function syncFixtures(): Promise<SyncResult> {
     // Prefer OUR canonical city name (matches travel-stats/venue maps); the
     // feed's raw city string is the fallback.
     const city = getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "";
+    // The feed supplies a venue id far more reliably than a city (40 of 54 LC26
+    // fixtures had no city). Storing the id lets lib/venueGeo resolve the city
+    // and coordinates once per venue, which is what unblocks weather ingest.
+    const venueId = f.fixture.venue.id ?? null;
 
     const cur = existingByFixture.get(f.fixture.id);
     try {
@@ -245,6 +249,7 @@ export async function syncFixtures(): Promise<SyncResult> {
             awayTeamId: effAwayTeamId,
             venue,
             city,
+            venueId,
             date,
             status,
             homeScore,
@@ -273,6 +278,7 @@ export async function syncFixtures(): Promise<SyncResult> {
           // a non-empty feed value; never blank a known venue/city.
           (!!venue && cur.venue !== venue) ||
           (!!city && cur.city !== city) ||
+          (venueId !== null && cur.venueId !== venueId) ||
           (penHome !== null && cur.penHome !== penHome) ||
           (penAway !== null && cur.penAway !== penAway) ||
           (referee !== null && cur.referee !== referee); // don't null-out a known ref
@@ -280,7 +286,7 @@ export async function syncFixtures(): Promise<SyncResult> {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
             // Only write pens when the feed has them (never null-out a shootout result).
-            data: { status, homeScore, awayScore, elapsed, date, leagueId: AF_LEAGUE, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(venue ? { venue } : {}), ...(city ? { city } : {}), ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
+            data: { status, homeScore, awayScore, elapsed, date, leagueId: AF_LEAGUE, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(venue ? { venue } : {}), ...(city ? { city } : {}), ...(venueId !== null ? { venueId } : {}), ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {

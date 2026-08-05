@@ -370,6 +370,20 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 action: () => runSeed("seedTeams", "/api/admin/seed-teams", "POST"),
               },
               {
+                key: "liveSync",
+                icon: Activity,
+                label: "Live Sync Now",
+                desc: "Pulls team statistics + match events for every match currently in play (possession, shots, fouls, corners, cards, saves, pass accuracy). Runs automatically every minute during match windows — this is the manual on-demand refresh. Costs 2 api-football calls per live match; zero when nothing is in play.",
+                action: () => runSeed("liveSync", "/api/cron/live-sync", "POST"),
+              },
+              {
+                key: "venueGeo",
+                icon: Thermometer,
+                label: "Resolve Venues (city + coords)",
+                desc: "Fills the empty Match.city values the fixture feed never supplied, and geocodes each venue so weather ingest can locate it. Weather was skipping every match because the curated venue table only covers the 16 World Cup stadiums. Run this before Backfill Match Weather.",
+                action: () => runSeed("venueGeo", "/api/admin/resolve-venues", "POST"),
+              },
+              {
                 key: "ingest",
                 icon: Activity,
                 label: "Ingest Player Stats",

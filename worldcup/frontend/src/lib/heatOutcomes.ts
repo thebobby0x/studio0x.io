@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
+import { resolveVenueGeo } from "@/lib/venueGeo";
 import { CLIMATE_CONTROLLED, heatBand } from "@/lib/heat";
 
 // ── Heat vs. Outcomes (backlog §16) ──────────────────────────────────────────
@@ -68,6 +69,8 @@ async function fetchKickoffWeather(
 interface HourlyAir {
   aqi: number;
   pm25: number;
+  /** Kickoff-hour UV index. Null when the service had no reading. */
+  uvIndex: number | null;
 }
 
 // Kickoff-hour air quality (US AQI + PM2.5) — the wildfire-smoke signal.
@@ -81,7 +84,7 @@ async function fetchKickoffAir(
   const day = kickoff.toISOString().slice(0, 10);
   const url =
     `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}` +
-    `&hourly=us_aqi,pm2_5&start_date=${day}&end_date=${day}&timezone=UTC`;
+    `&hourly=us_aqi,pm2_5,uv_index&start_date=${day}&end_date=${day}&timezone=UTC`;
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 6000);
@@ -94,8 +97,10 @@ async function fetchKickoffAir(
     if (i < 0) return null;
     const aqi = json.hourly.us_aqi?.[i];
     const pm25 = json.hourly.pm2_5?.[i];
+    // UV is optional: a missing reading must not discard the AQI we did get.
+    const uvIndex = json.hourly.uv_index?.[i] ?? null;
     if (aqi == null || pm25 == null) return null;
-    return { aqi, pm25 };
+    return { aqi, pm25, uvIndex };
   } catch {
     return null;
   }
@@ -150,7 +155,7 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
   const played = await prisma.match.findMany({
     where: { date: { lte: new Date() }, fixture: { gt: 0 } },
     orderBy: { date: "asc" },
-    select: { fixture: true, date: true, status: true, venue: true },
+    select: { fixture: true, date: true, status: true, venue: true, city: true, venueId: true },
   });
   const todo = played.filter((m) => {
     const row = byFixture.get(m.fixture);
@@ -169,7 +174,10 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
       const row = byFixture.get(m.fixture);
 
       if (!row) {
-        const info = getVenueInfo(m.venue);
+        // resolveVenueGeo falls back from the curated stadium table to the
+        // venue's city coordinates, so a competition outside WC26's 16 stadiums
+        // still gets weather instead of skippedNoVenue on every match.
+        const info = await resolveVenueGeo(m.venue, m.city, m.venueId);
         if (!info) { result.skippedNoVenue++; continue; }
         const wx = await fetchKickoffWeather(info.lat, info.lng, m.date);
         if (!wx) { result.skippedNoData++; continue; }
@@ -197,10 +205,10 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
         // Row exists but outcomes were missing when it was created (match was
         // live at the time) — fill them in now that it's FT. Piggyback the
         // air-quality fill for rows stamped before the AQ columns existed.
-        const info = getVenueInfo(m.venue);
+        const info = row.aqi === null ? await resolveVenueGeo(m.venue, m.city, m.venueId) : null;
         const [facts, air] = await Promise.all([
           fetchOutcomeFacts(m.fixture),
-          row.aqi === null && info ? fetchKickoffAir(info.lat, info.lng, m.date) : Promise.resolve(null),
+          info ? fetchKickoffAir(info.lat, info.lng, m.date) : Promise.resolve(null),
         ]);
         if (!facts && !air) { result.skippedNoData++; continue; }
         await prisma.matchWeather.update({

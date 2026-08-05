@@ -229,6 +229,11 @@ model Match {
   awayTeam     Team              @relation("AwayTeam", fields: [awayTeamId], references: [id])
   venue        String
   city         String
+  // api-football venue id. Added 8/5: the fixture feed omits `venue.city` for
+  // most Leagues Cup fixtures (40 of 54 had an empty city), and weather ingest
+  // needs COORDINATES, which the feed never supplies. The id lets us resolve the
+  // venue once via /venues and cache its city + geocoded lat/lng (see Venue).
+  venueId      Int?
   date         DateTime
   status       String            @default("NS")
   homeScore    Int               @default(0)
@@ -391,6 +396,8 @@ model MatchEventLog {
   detail      String
   team        String
   player      String?
+  // Assisting player on a goal (null for cards, subs, and unassisted goals).
+  assist      String?
   firstSeenAt DateTime @default(now())
 
   @@unique([fixture, eventKey])
@@ -451,6 +458,9 @@ model MatchWeather {
   // Catches wildfire smoke. null = service had no data — never fabricated.
   aqi               Float?
   pm25              Float?
+  // Kickoff-hour UV index (Open-Meteo air-quality service). Null = the service
+  // had no reading for that hour — never fabricated, same contract as aqi/pm25.
+  uvIndex           Float?
   // Outcome facts — null until the match is FT and events were ingested
   totalGoals        Int?
   lateGoals         Int?     // goals scored 75'+ (excl. missed pens)
@@ -459,4 +469,85 @@ model MatchWeather {
   capturedAt        DateTime @default(now())
 
   @@index([band])
+}
+
+// ── Team match statistics (api-football /fixtures/statistics) ────────────────
+// One row per fixture holding BOTH sides' team-level stats. Written by the
+// live-sync cron while a match is in play and rewritten from the post-match
+// pull, which is more complete (the provider fills blanks after FT).
+//
+// Every field is nullable on purpose: the provider omits stats it doesn't have
+// for a given fixture, and a missing stat must stay missing rather than being
+// coerced to 0 — "0 shots on target" and "the feed didn't report shots" are
+// different claims (CLAUDE.md CONTENT TRUTH). The UI must render null as "—".
+model MatchStats {
+  id                String   @id @default(cuid())
+  fixture           Int      @unique
+  matchId           String?  // internal Match.id once resolved
+
+  possessionHome    Int?     // percent
+  possessionAway    Int?
+
+  shotsTotalHome    Int?
+  shotsTotalAway    Int?
+  shotsOnHome       Int?
+  shotsOnAway       Int?
+  shotsOffHome      Int?
+  shotsOffAway      Int?
+  shotsBlockedHome  Int?
+  shotsBlockedAway  Int?
+
+  foulsHome         Int?
+  foulsAway         Int?
+  cornersHome       Int?
+  cornersAway       Int?
+  offsidesHome      Int?
+  offsidesAway      Int?
+
+  yellowHome        Int?
+  yellowAway        Int?
+  redHome           Int?
+  redAway           Int?
+
+  savesHome         Int?
+  savesAway         Int?
+
+  passAccuracyHome  Int?     // percent
+  passAccuracyAway  Int?
+
+  /// "live" while the match is in play, "final" once ingested after FT.
+  phase             String   @default("live")
+  capturedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([matchId])
+}
+
+// ── Venue metadata + coordinates ────────────────────────────────────────────
+// api-football gives a venue NAME on every fixture, a city on only some, and
+// coordinates on none. lib/venues.ts has exact coordinates, but only for the 16
+// World Cup stadiums — so on any other competition the weather ingest resolved
+// no venue and skipped every match (`skippedNoVenue`).
+//
+// This caches, per venue: the city/country from /venues, and lat/lng from
+// Open-Meteo's geocoding service. `source` records where the coordinates came
+// from so a city-level reading is never presented as stadium-exact.
+model Venue {
+  id          String   @id @default(cuid())
+  /// api-football venue id when known; name is the stable fallback key.
+  afVenueId   Int?     @unique
+  name        String   @unique
+  city        String   @default("")
+  country     String   @default("")
+  capacity    Int?
+  lat         Float?
+  lng         Float?
+  /// "venue-table" = exact stadium coords from lib/venues.ts.
+  /// "geocoded-city" = city centroid from Open-Meteo geocoding (approximate).
+  /// "unresolved" = looked up and found nothing; retried on a later run.
+  source      String   @default("unresolved")
+  resolvedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([city])
 }
