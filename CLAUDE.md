@@ -409,7 +409,7 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 | `POST /api/seed` | Full re-seed of match data (kalshi/liveMetric/playerMatchStat/match wiped + rebuilt). Teams/players/anthems are PRESERVED (upserted by code, stable IDs). Use sync-fixtures unless you need a hard reset. |
 | `POST /api/admin/seed-players?mock=true` | Seeds 30+ key players with club/league data (mock mode, no API needed) |
 | `POST /api/admin/seed-players` | Seeds players from api-football live squad data |
-| `POST /api/admin/seed-full-squads` | Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players) |
+| `POST /api/admin/seed-full-squads` | **NATION deployments only.** Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players). Pinned to league 1 and keyed by nation TLA — on a club deployment the code collisions (COL/POR/CHI/GUA/SAL) would write national squads into club rosters, so the button is hidden and the route 400s (8/4). |
 | `POST /api/ai/stories` | Force-regenerates story cache (also invalidated after 1hr) |
 | `PATCH /api/admin/users` | Updates user role (SUPER_ADMIN only) |
 | `POST /api/admin/view-as` | Sets impersonation cookie |
@@ -1037,6 +1037,30 @@ on-accent anchors are identical in both modes.
 **Third-party marks kept as-is** (deliberate, not an oversight): the social
 share buttons in `AnthemHub.tsx` retain TikTok / Instagram / Facebook / YouTube
 brand colors — those are the platforms' identity, not our chrome.
+
+**DEPLOYMENT BRAND NAME (owner directive 2026-08-04) — `brandName` + `wordmark`
+in `sportConfig.ts`.** LC26 leads with **"Leagues Cup 2026"** as the primary
+user-facing name (nav wordmark, headings, footers, share titles, `<title>`).
+This is a per-deployment override of the older BRANDING block's "in-app brand
+today remains plain podiumMetrics" line — that line still governs **WC26 and
+F1**, whose names are FIFA / Formula One marks and need explicit owner sign-off
+before becoming a product title. Never hardcode `"podiumMetrics"` into a
+surface again: import `BRAND_NAME` / `WORDMARK` / `BRAND_IS_PLATFORM`.
+Platform lineage moved, not dropped — the nav subline reads "podiumMetrics ·
+studio0x.io" and the sportOS strip reads "… — powered by podiumMetrics, part of
+sportOS by studio0x". Nothing claims to be official; SUM owns the LC26 marks.
+
+**VENUE COORDS ARE THE PREREQUISITE FOR WEATHER, NOT CITY STRINGS (8/4).**
+"Resolve Venues" used to resolve only venues belonging to matches with an empty
+`city`, so the 14 LC26 fixtures whose city the feed DID supply left their venues
+uncached — and it still returned `ok:true`. Weather backfill then geocoded them
+inline (api-football /venues + Nominatim + Open-Meteo, 8s each, sequential) and
+blew the 60s function limit. Check **`venuesWithCoords`** in the Resolve Venues
+response, not `matchesUpdated`. Weather chunking is now offset-based
+(`nextOffset`): a match that can't be stamped writes no row and would otherwise
+sit at the head of the queue forever — the old loop re-processed the same 8
+fixtures 25 times and then reported a failure that wasn't one. Zero rows created
+is a legitimate SUCCESS on an already-backfilled deployment.
 
 **`LEAGUES_CUP.branding` in `sportConfig.ts`** now carries the studio0x values
 (`primary` Rosa 700, `secondary` Noir 900, `accent` Riptide) with
