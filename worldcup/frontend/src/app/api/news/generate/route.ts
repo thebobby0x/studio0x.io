@@ -5,6 +5,7 @@ import { isAdminAuthed as authed } from "@/lib/adminAuth";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 import { AF_LEAGUE, SPORT } from "@/lib/sportConfig";
 import { coveringLine, tournamentBrief } from "@/lib/promptContext";
+import { storyScope } from "@/lib/storyScope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -145,7 +146,8 @@ async function handler(req: Request) {
 
   // ── Existing recaps (for idempotent skipping) ────────────────────────────
   const existing = await prisma.newsStory.findMany({
-    where: { category: { in: ["GAME RECAP", "DAILY RECAP"] } },
+    // Scoped: another tournament's leftover recap must not mark this fixture done.
+    where: { category: { in: ["GAME RECAP", "DAILY RECAP"] }, ...storyScope() },
     select: { fixture: true, category: true, date: true },
   });
   const haveGame = new Set(existing.filter(s => s.category === "GAME RECAP" && s.fixture != null).map(s => s.fixture));

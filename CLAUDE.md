@@ -652,6 +652,34 @@ knockout showdown" on a Leagues Cup league-phase fixture.
 `afTeamId` is indexed, NOT `@unique`: Vercel's build runs `prisma db push` WITHOUT
 `--accept-data-loss`, and adding a unique constraint to a populated table fails the deploy.
 
+**CLUB CRESTS:** `Team.logoUrl` (api-football `/teams` → `team.logo`) is a club's
+badge — it has no national flag. Populate with the **"Seed Team Crests + Country"**
+admin button (`/api/admin/seed-teams`); fixture sync also writes it. Pass it to
+`FlagImg logoUrl=` / `afId=`; a bare `tla` renders a neutral monogram on club
+deployments, never a country's flag.
+
+**ANTHEMS ARE PER-DEPLOYMENT:**
+- WC26 → `src/lib/anthemManifest.ts`, 54 tracks enumerated by Drive FILE id.
+- Club deployments → **discovered by walking a Drive FOLDER TREE**
+  (`src/lib/clubAnthemDrive.ts` + `src/lib/driveFolder.ts`), because BK adds Suno
+  tracks continuously and a static manifest would go stale. Filenames follow
+  `{Club Name} — _{Anthem Title}_ v{n}.mp3`; the folder decides MLS / Liga MX /
+  generic. Unmatched filenames are REPORTED, never attached to a guessed club.
+- `PRESET` was `ANTHEM_MANIFEST` unconditionally, so "Reimport ALL Anthems" on
+  LC26 would have imported **54 World Cup national anthems** and pruned to them.
+- **Listing a Drive folder needs `GOOGLE_DRIVE_API_KEY`** (downloading a public
+  file does not). Missing key / unshared folder → discovery fails CLOSED: nothing
+  imported, **nothing pruned**. Never treat an empty listing as "no anthems"
+  (CLAUDE.md gotcha #17: import-then-prune, never wipe-first).
+- `?discover=true` on `/api/admin/batch-anthem` is a safe dry run — the first
+  thing to check when a track is missing. Admin button: "Discover Anthems".
+
+**NEWS PROVENANCE:** read paths MUST use `storyScope()` (`src/lib/storyScope.ts`).
+Generation is idempotent — it SKIPS fixtures that already have a story — so a
+corrected prompt never reaches copy written by a broken one. Scoping the
+idempotency checks too means the app self-heals; the untagged (`""`) rows are
+legacy World Cup copy on any non-WC deployment and are hidden there.
+
 **Admin recovery (SUPER_ADMIN, `/admin` → "Tournament Data"):**
 `/api/admin/clear-foreign-data` (feed-verified: asks api-football which fixtures are
 ours, deletes the rest; refuses on an empty feed) · `/api/admin/seed-fixtures` ·

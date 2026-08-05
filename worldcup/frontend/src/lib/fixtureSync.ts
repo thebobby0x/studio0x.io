@@ -48,7 +48,7 @@ interface AFFixture {
   score?: { penalty?: { home: number | null; away: number | null } };
 }
 
-interface AFTeam { team: { id: number; name: string; code: string | null; country: string | null } }
+interface AFTeam { team: { id: number; name: string; code: string | null; country: string | null; logo: string | null } }
 
 export interface SyncResult {
   ok: boolean;
@@ -96,7 +96,7 @@ export async function syncFixtures(): Promise<SyncResult> {
   // /teams omits still resolves.
   const feedTeams = new Map<number, FeedTeam>();
   for (const t of teamsJson.response ?? []) {
-    feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country });
+    feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country, logo: t.team.logo });
   }
   for (const f of afFixtures) {
     for (const side of [f.teams.home, f.teams.away]) {
@@ -163,11 +163,13 @@ export async function syncFixtures(): Promise<SyncResult> {
       if (existing) {
         await prisma.team.update({
           where: { id: existing.id },
-          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage },
+          // Never blank a known crest with an empty feed value.
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage, ...(t.logoUrl ? { logoUrl: t.logoUrl } : {}) },
         });
       } else {
         await prisma.team.create({
-          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage },
+          // Never blank a known crest with an empty feed value.
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage, ...(t.logoUrl ? { logoUrl: t.logoUrl } : {}) },
         });
       }
       result.teamsUpserted++;

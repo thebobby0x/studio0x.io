@@ -5,6 +5,7 @@ import { maybeScheduleRefresh } from "@/lib/storyRefresh";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 import { coveringLine, tournamentBrief } from "@/lib/promptContext";
+import { storyScope } from "@/lib/storyScope";
 
 export const dynamic = "force-dynamic";
 
@@ -369,6 +370,7 @@ export async function GET() {
       where: {
         date: { gte: since },
         category: { in: ["MATCH PREVIEW", "GAME RECAP", "DAILY RECAP"] },
+        ...storyScope(),
       },
       orderBy: { generatedAt: "desc" },
       take: 15,

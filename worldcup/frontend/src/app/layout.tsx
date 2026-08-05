@@ -8,6 +8,7 @@ import FloatingMiniPlayer from "@/components/ui/FloatingMiniPlayer";
 import AdminBanner from "@/components/admin/AdminBanner";
 import BottomNav from "@/components/ui/BottomNav";
 import SportOSFooter from "@/components/ui/SportOSFooter";
+import { SPORT } from "@/lib/sportConfig";
 
 // ── studio0x type stack (LC26 Gaming-UI skin) ────────────────────────────────
 // Archivo is loaded with its `wdth` axis so display type can run EXPANDED —
@@ -36,17 +37,34 @@ const plexMono = IBM_Plex_Mono({
 
 const FONT_VARS = `${archivo.variable} ${instrumentSans.variable} ${plexMono.variable}`;
 
-const SITE_URL = "https://podiummetrics.studio0x.io";
+// Per-deployment site identity. Every LC26 page shipped with the World Cup
+// deployment's title ("podiumMetrics · live tournament stats by studio0x", and a
+// description about "the 2026 tournament across North America" written for WC26)
+// because these were plain string literals.
+//
+// SPORT.brandSubtitle is the nominative-use deployment name ("podiumMetrics –
+// Leagues Cup 2026"). Per CLAUDE.md BRANDING, the tournament name belongs in the
+// deployment SUBTITLE, never in the product mark itself, and nothing here may
+// claim to be official.
+const SITE_URL = SPORT.id === "leaguescup"
+  ? "https://leaguescup.vercel.app"
+  : "https://podiummetrics.studio0x.io";
+
+const SITE_TITLE = `${SPORT.brandSubtitle} · live tournament stats by studio0x`;
+
+const SITE_DESCRIPTION = SPORT.entityKind === "club"
+  ? `Live match telemetry, proprietary metrics and club coverage for the ${SPORT.eventName} — MLS and Liga MX clubs across North America.`
+  : `Live match telemetry, prediction markets, proprietary metrics and team anthems for the ${SPORT.eventName} across North America`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "podiumMetrics · live tournament stats by studio0x",
-  description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   alternates: { canonical: "./" },
   openGraph: {
     siteName: "podiumMetrics",
-    title: "podiumMetrics · live tournament stats by studio0x",
-    description: "Live match telemetry, prediction markets, proprietary metrics and team anthems for the 2026 tournament across North America",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     url: SITE_URL,
     type: "website",
   },

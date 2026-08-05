@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Trophy, Wifi } from "lucide-react";
 import { getFlag } from "@/lib/flags";
 import { KNOCKOUT_START } from "@/lib/tournament";
+import { SPORT } from "@/lib/sportConfig";
 import type { TournamentWinnerMarket } from "@/lib/polymarket";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 
@@ -62,6 +63,10 @@ function ProbBar({ prob, max, featured }: { prob: number; max: number; featured:
   );
 }
 
+const NO_MARKET_NOTE = SPORT.odds.tournamentSlug
+  ? `No live winner market for the ${SPORT.eventName} right now. Odds appear here as soon as the market is trading.`
+  : `${SPORT.eventName} has no winner market on ${SPORT.odds.provider}. We show nothing rather than another competition's prices.`;
+
 interface Props {
   highlightTlas?: string[];
   limit?: number;
@@ -105,7 +110,23 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
     );
   }
 
-  if (!data || data.markets.length === 0) return null;
+  // No market for this competition. Polymarket lists a World Cup winner market
+  // and no Leagues Cup one, so this used to render the OTHER tournament's odds
+  // (Spain, England, France… at WC26's settled prices) on a club competition.
+  // The slug is config-driven now and null here, so say so plainly instead of
+  // collapsing to an empty panel under a "Tournament Odds" heading.
+  if (!data || data.markets.length === 0) {
+    return (
+      <div className="s0x-card p-4">
+        <div className="text-[11px] font-black uppercase tracking-widest text-s0x-text/60 mb-1">
+          No market listed
+        </div>
+        <div className="text-xs text-s0x-text/50 leading-relaxed">
+          {NO_MARKET_NOTE}
+        </div>
+      </div>
+    );
+  }
 
   const displayCount = expanded ? data.markets.length : limit;
   const visible = data.markets.slice(0, displayCount);

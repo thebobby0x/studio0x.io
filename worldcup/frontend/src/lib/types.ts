@@ -4,6 +4,11 @@ export interface Team {
   code: string
   flagEmoji: string
   groupStage: string
+  /** api-football team id — crest source on club deployments. */
+  afTeamId?: number | null
+  /** Club crest URL from the feed. A club has no national flag, so this is its badge. */
+  logoUrl?: string
+  country?: string
 }
 
 export interface Match {

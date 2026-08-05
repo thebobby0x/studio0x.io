@@ -25,6 +25,7 @@ import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/FinalWeekendSpotlight";
 import FinalRoundtable from "@/components/news/FinalRoundtable";
 import MatchdayTape from "@/components/match/MatchdayTape";
+import { storyScope } from "@/lib/storyScope";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -250,7 +251,7 @@ function MatchListRow({ m, isFeatured, takeaway }: { m: Match; isFeatured: boole
     >
       <div className="flex items-center gap-3">
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <FlagImg tla={m.homeTeam.code} size={24} className="shrink-0" />
+        <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={24} className="shrink-0" />
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.homeTeam.name}
         </span>
@@ -264,7 +265,7 @@ function MatchListRow({ m, isFeatured, takeaway }: { m: Match; isFeatured: boole
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.awayTeam.name}
         </span>
-        <FlagImg tla={m.awayTeam.code} size={24} className="shrink-0" />
+        <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={24} className="shrink-0" />
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {isLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
@@ -383,8 +384,8 @@ export default async function DashboardPage({
       fixture: m.fixture,
       date: new Date(m.date).toISOString(),
       status: m.status,
-      home: { name: m.homeTeam.name, code: m.homeTeam.code },
-      away: { name: m.awayTeam.name, code: m.awayTeam.code },
+      home: { name: m.homeTeam.name, code: m.homeTeam.code, logoUrl: m.homeTeam.logoUrl, afTeamId: m.homeTeam.afTeamId },
+      away: { name: m.awayTeam.name, code: m.awayTeam.code, logoUrl: m.awayTeam.logoUrl, afTeamId: m.awayTeam.afTeamId },
       homeScore: m.homeScore ?? 0,
       awayScore: m.awayScore ?? 0,
       elapsed: m.elapsed ?? 0,
@@ -450,17 +451,17 @@ export default async function DashboardPage({
       const liveOrNext = inProgress[0] ?? nextNs;
       if (liveOrNext) {
         const preview = await prisma.newsStory.findFirst({
-          where: { fixture: liveOrNext.fixture },
+          where: { fixture: liveOrNext.fixture, ...storyScope() },
           orderBy: { generatedAt: "desc" },
         });
         if (preview) return preview;
         const teamStory = await prisma.newsStory.findFirst({
-          where: { teamsInvolved: { hasSome: [liveOrNext.homeTeam.code, liveOrNext.awayTeam.code] } },
+          where: { teamsInvolved: { hasSome: [liveOrNext.homeTeam.code, liveOrNext.awayTeam.code] }, ...storyScope() },
           orderBy: { generatedAt: "desc" },
         });
         if (teamStory) return teamStory;
       }
-      return await prisma.newsStory.findFirst({ orderBy: { generatedAt: "desc" } });
+      return await prisma.newsStory.findFirst({ where: storyScope(), orderBy: { generatedAt: "desc" } });
     } catch {
       return null;
     }
@@ -810,7 +811,7 @@ export default async function DashboardPage({
                           className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 hover:bg-red-500/15 transition-colors group"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                          <FlagImg tla={m.homeTeam.code} size={20} className="shrink-0" />
+                          <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={20} className="shrink-0" />
                           <span className="text-sm font-semibold text-slate-300 truncate">
                             {m.homeTeam.name}
                           </span>
@@ -820,7 +821,7 @@ export default async function DashboardPage({
                           <span className="text-sm font-semibold text-slate-300 truncate">
                             {m.awayTeam.name}
                           </span>
-                          <FlagImg tla={m.awayTeam.code} size={20} className="shrink-0" />
+                          <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={20} className="shrink-0" />
                           <span className="ml-auto text-[10px] font-mono text-red-400 shrink-0">
                             {m.elapsed}&apos;
                           </span>
@@ -844,10 +845,10 @@ export default async function DashboardPage({
                               : "text-slate-400 hover:text-white"
                           }`}
                         >
-                          <FlagImg tla={m.homeTeam.code} size={14} className="shrink-0" />
+                          <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={14} className="shrink-0" />
                           <span className="hidden sm:inline">{m.homeTeam.name}</span>
                           <span className="font-black tabular-nums">{m.homeScore ?? 0}–{m.awayScore ?? 0}</span>
-                          <FlagImg tla={m.awayTeam.code} size={14} className="shrink-0" />
+                          <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={14} className="shrink-0" />
                         </Link>
                       ))}
                     </div>

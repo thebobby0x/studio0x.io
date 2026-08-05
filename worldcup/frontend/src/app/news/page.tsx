@@ -3,6 +3,7 @@ import StoryCard, { type StoryCardData } from "@/components/news/StoryCard";
 import AppNav from "@/components/ui/AppNav";
 import { Newspaper } from "lucide-react";
 import { maybeScheduleRefresh } from "@/lib/storyRefresh";
+import { storyScope } from "@/lib/storyScope";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function NewsPage() {
   let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
   try {
     stories = await prisma.newsStory.findMany({
+      where: storyScope(),
       orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
       take: 400,
     });

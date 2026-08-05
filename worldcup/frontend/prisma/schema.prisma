@@ -113,6 +113,10 @@ model Team {
   // table makes push refuse and the deploy fail. Uniqueness is maintained by
   // the sync (one row per feed team) and by Team.name being unique.
   afTeamId    Int?
+  // Club crest URL from the api-football /teams feed. Added 8/4: a club has no
+  // national flag, so the crest IS its badge. Empty for nation deployments,
+  // which render a flag from the FIFA TLA.
+  logoUrl     String        @default("")
   anthem      AudioStream?
   homePlayers Player[]
   homeMatches Match[]       @relation("HomeTeam")

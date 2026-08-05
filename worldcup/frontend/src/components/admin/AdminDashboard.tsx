@@ -363,11 +363,11 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 action: () => runSeed("fullSquads", "/api/admin/seed-full-squads", "POST"),
               },
               {
-                key: "playersLive",
+                key: "seedTeams",
                 icon: UserCheck,
-                label: "Seed Clubs (Live API)",
-                desc: "Pull real club/caps/goals data from api-football for all WC 2026 players.",
-                action: () => runSeed("playersLive", "/api/admin/seed-players", "POST"),
+                label: "Seed Team Crests + Country",
+                desc: `Pulls /teams for league ${tournament.leagueId}, season ${tournament.season} and writes each team's crest URL and country. A club has no national flag — the crest IS its badge, and without this every club renders a blank placeholder. Non-destructive; safe to re-run.`,
+                action: () => runSeed("seedTeams", "/api/admin/seed-teams", "POST"),
               },
               {
                 key: "ingest",
@@ -402,10 +402,17 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 },
               },
               {
+                key: "discoverAnthems",
+                icon: Music2,
+                label: "Discover Anthems (dry run)",
+                desc: "Walks the Drive anthem folders and reports exactly what WOULD import — folders visited, file count per folder, and any filename whose club could not be matched. Writes nothing. Run this before a reimport, and first whenever a track is missing from the hub.",
+                action: () => runSeed("discoverAnthems", "/api/admin/batch-anthem?discover=true", "GET"),
+              },
+              {
                 key: "resetAnthems",
                 icon: Music2,
-                label: "Wipe + Reimport ALL Anthems (Drive)",
-                desc: "Re-imports every manifest track fresh from Google Drive in small chunks, then prunes stale records — correct teams, flags and titles.",
+                label: "Reimport ALL Anthems (Drive)",
+                desc: "Imports every track for THIS deployment from Google Drive in small chunks, then prunes stale records. On club deployments the track list is discovered by walking the anthem folder tree (MLS / Liga MX / generic subfolders) — run \"Discover Anthems\" first to see what it will find. Import-then-prune: if discovery fails, nothing is imported and nothing is deleted.",
                 action: async () => {
                   setSeedStatus(s => ({ ...s, resetAnthems: "loading" }));
                   try {

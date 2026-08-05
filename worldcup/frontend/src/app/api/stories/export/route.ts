@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { storyScope } from "@/lib/storyScope";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
   let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
   try {
     stories = await prisma.newsStory.findMany({
-      where,
+      where: { ...where, ...storyScope() },
       orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
       take: limit,
     });

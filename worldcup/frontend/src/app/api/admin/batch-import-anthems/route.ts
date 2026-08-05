@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { ANTHEM_MANIFEST } from "@/lib/anthemManifest";
 import { isAdminAuthed as checkAuth } from "@/lib/adminAuth";
+import { SPORT } from "@/lib/sportConfig";
 
 
 // Derived from the shared manifest — the 12 "newer" team anthems (BEL…UZB).
@@ -15,6 +16,17 @@ const BATCH = ANTHEM_MANIFEST
 
 async function runImport(req: Request) {
   if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Legacy WC26-only route: BATCH is a fixed slice of the NATIONAL anthem
+  // manifest. Running it on a club deployment would import World Cup national
+  // anthems onto a club competition. Use /api/admin/batch-anthem, which
+  // discovers this deployment's tracks from Drive.
+  if (SPORT.features.anthems !== "national") {
+    return NextResponse.json({
+      error: `This route imports WC26 national anthems and is not valid for the ${SPORT.eventName} deployment. Use /api/admin/batch-anthem instead.`,
+      deployment: SPORT.id,
+    }, { status: 400 });
+  }
 
   const results: { code: string; title: string; status: "ok" | "error"; detail?: string; url?: string }[] = [];
 

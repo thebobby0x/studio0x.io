@@ -82,6 +82,8 @@ export interface FeedTeam {
   name: string;
   code?: string | null;
   country?: string | null;
+  /** Crest URL from the api-football /teams feed. */
+  logo?: string | null;
 }
 
 export interface ResolvedTeam {
@@ -90,6 +92,8 @@ export interface ResolvedTeam {
   name: string;
   country: string;
   flagEmoji: string;
+  /** Club crest URL from the feed ("" when the feed has none). */
+  logoUrl: string;
   /** Group letter, or "" when the format has no groups. */
   groupStage: string;
 }
@@ -119,6 +123,7 @@ export function resolveTeams(
         code,
         name: t.name,
         country: t.country ?? "",
+        logoUrl: t.logo ?? "",
         flagEmoji: nationFlag(code),
         groupStage: cfg.teamGroups[code] ?? "",
       });
@@ -145,6 +150,7 @@ export function resolveTeams(
       code,
       name: t.name,
       country,
+      logoUrl: t.logo ?? "",
       flagEmoji: countryFlag(country),
       // Club formats declare their groups in config; LC26's map is empty.
       groupStage: cfg.teamGroups[code] ?? "",

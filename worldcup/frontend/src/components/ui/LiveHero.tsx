@@ -11,8 +11,9 @@ export interface HeroMatch {
   fixture: number;
   date: string; // ISO
   status: string; // NS | LIVE | HT | FT
-  home: { name: string; code: string };
-  away: { name: string; code: string };
+  // logoUrl/afId are the club-crest source — a club has no national flag.
+  home: { name: string; code: string; logoUrl?: string; afTeamId?: number | null };
+  away: { name: string; code: string; logoUrl?: string; afTeamId?: number | null };
   homeScore: number;
   awayScore: number;
   elapsed: number;
@@ -75,7 +76,7 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
         {/* home */}
         <div className="flex flex-col items-center text-center gap-2 min-w-0">
-          <FlagImg tla={m.home.code} size={56} className="shadow-lg" />
+          <FlagImg tla={m.home.code} logoUrl={m.home.logoUrl} afId={m.home.afTeamId} size={56} className="shadow-lg" />
           <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text truncate max-w-full transition-colors group-hover:text-s0x-accent">
             {m.home.name}
           </div>
@@ -117,7 +118,7 @@ function BigMatchCard({ m, now, mode }: { m: HeroMatch; now: number; mode: BigMo
 
         {/* away */}
         <div className="flex flex-col items-center text-center gap-2 min-w-0">
-          <FlagImg tla={m.away.code} size={56} className="shadow-lg" />
+          <FlagImg tla={m.away.code} logoUrl={m.away.logoUrl} afId={m.away.afTeamId} size={56} className="shadow-lg" />
           <div className="s0x-display text-sm sm:text-base font-bold text-s0x-text truncate max-w-full transition-colors group-hover:text-s0x-accent">
             {m.away.name}
           </div>
@@ -136,7 +137,7 @@ function SideRow({ m, now, kind }: { m: HeroMatch; now: number; kind: "upcoming"
       href={isTbd ? "/bracket" : `/schedule/${m.fixture || m.id}`}
       className="s0x-row flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors hover:bg-s0x-ink/10"
     >
-      <FlagImg tla={m.home.code} size={18} className="shrink-0" />
+      <FlagImg tla={m.home.code} logoUrl={m.home.logoUrl} afId={m.home.afTeamId} size={18} className="shrink-0" />
       <span className="s0x-mono text-[11px] font-semibold text-s0x-text/85 w-10 shrink-0">{m.home.code}</span>
       {kind === "result" ? (
         <span className="s0x-data text-xs font-bold text-s0x-text shrink-0">
@@ -146,7 +147,7 @@ function SideRow({ m, now, kind }: { m: HeroMatch; now: number; kind: "upcoming"
         <span className="s0x-mono text-[9px] text-s0x-muted shrink-0">v</span>
       )}
       <span className="s0x-mono text-[11px] font-semibold text-s0x-text/85 w-10 shrink-0">{m.away.code}</span>
-      <FlagImg tla={m.away.code} size={18} className="shrink-0" />
+      <FlagImg tla={m.away.code} logoUrl={m.away.logoUrl} afId={m.away.afTeamId} size={18} className="shrink-0" />
       <span
         suppressHydrationWarning
         className={`s0x-data ml-auto text-[11px] shrink-0 ${

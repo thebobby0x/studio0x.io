@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { KNOCKOUT_START, classifyRound } from "@/lib/tournament";
 import { SPORT } from "@/lib/sportConfig";
 import { coveringLine, tournamentBrief } from "@/lib/promptContext";
+import { storyScope } from "@/lib/storyScope";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -115,7 +116,9 @@ export async function runStoryRefresh(): Promise<{ ok: boolean; previewsWritten:
   if (upcoming.length > 0) {
     const fixtures = upcoming.map(m => m.fixture);
     const existingPreviews = await prisma.newsStory.findMany({
-      where: { fixture: { in: fixtures }, category: "MATCH PREVIEW" },
+      // Scoped: a leftover story from another tournament must NOT count as
+      // "already previewed", or the corrected prompt never runs for that fixture.
+      where: { fixture: { in: fixtures }, category: "MATCH PREVIEW", ...storyScope() },
       select: { fixture: true },
     });
     const havePreview = new Set(existingPreviews.map(s => s.fixture));
@@ -197,7 +200,7 @@ Return ONLY valid JSON, no other text:
   if (recentFT.length > 0) {
     const fixtures = recentFT.map(m => m.fixture);
     const existingRecaps = await prisma.newsStory.findMany({
-      where: { fixture: { in: fixtures }, category: "GAME RECAP" },
+      where: { fixture: { in: fixtures }, category: "GAME RECAP", ...storyScope() },
       select: { fixture: true },
     });
     const haveRecap = new Set(existingRecaps.map(s => s.fixture));

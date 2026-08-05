@@ -12,6 +12,9 @@ interface FlagImgProps {
   /** api-football team id. On club deployments this yields the club crest —
    *  the only correct badge for a club. */
   afId?: number | null;
+  /** Crest URL straight from Team.logoUrl. Preferred over afId when present:
+   *  it is the exact URL the feed gave us rather than a derived path. */
+  logoUrl?: string | null;
 }
 
 // A 3-letter code identifies a NATION only on a nation deployment. On a club
@@ -28,12 +31,13 @@ function crestUrl(afId: number): string {
   return `https://media.api-sports.io/football/teams/${afId}.png`;
 }
 
-export default function FlagImg({ tla, size = 40, className = "", afId }: FlagImgProps) {
+export default function FlagImg({ tla, size = 40, className = "", afId, logoUrl }: FlagImgProps) {
   if (!CODES_ARE_NATIONS) {
-    if (afId) {
+    const crest = logoUrl || (afId ? crestUrl(afId) : null);
+    if (crest) {
       return (
         <Image
-          src={crestUrl(afId)}
+          src={crest}
           alt={tla ?? "crest"}
           width={size}
           height={size}

@@ -397,7 +397,7 @@ async function seed(req: Request) {
     // Leagues Cup clubs; code-keyed resolution silently dropped their fixtures.
     const feedTeams = new Map<number, FeedTeam>();
     for (const t of afTeams) {
-      feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country });
+      feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country, logo: t.team.logo });
     }
     for (const f of afFixtures) {
       for (const side of [f.teams.home, f.teams.away]) {
@@ -460,6 +460,7 @@ async function seed(req: Request) {
       name: t.name,
       flagEmoji: t.flagEmoji,
       country: t.country,
+      logoUrl: t.logoUrl,
       // Empty on a groupless format — never "KO", and never a stale WC letter.
       groupStage: hasGroups ? (t.groupStage || groupByCode.get(t.code) || "KO") : "",
     }));
