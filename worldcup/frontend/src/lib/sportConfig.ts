@@ -69,6 +69,33 @@ export interface OddsConfig {
   groupSlugFor: ((group: string) => string) | null;
 }
 
+/**
+ * A PAST event this deployment's pundits may reference as banter/callback, plus
+ * the ONLY facts about it they may cite.
+ *
+ * WHY THIS EXISTS: `promptContext.tournamentBrief()` forbids naming any other
+ * competition, because the LC26 launch bug framed Leagues Cup fixtures AS World
+ * Cup fixtures. The Live 360 Roundtable deliberately wants World Cup callbacks
+ * ("no dead air" filler with real cultural memory) — so the exemption is
+ * NARROW and DATA-BOUND: a named callback event with an explicit fact list.
+ * Anything not in `facts` remains an invention and is banned (CONTENT TRUTH).
+ * Deployments without a callback event omit this and the ban stays absolute.
+ */
+export interface CallbackEvent {
+  /** Nominative name, e.g. "the 2026 World Cup". */
+  name: string;
+  /** The COMPLETE set of citable facts. Verified, never generated. */
+  facts: string[];
+}
+
+/** Live 360 Roundtable hooks — the multi-match audio show's per-deployment config. */
+export interface RoundtableConfig {
+  /** Show title in the player chrome. */
+  showTitle: string;
+  /** Past event the panel may reference in banter. Omit → no other event may be named. */
+  callbackEvent?: CallbackEvent;
+}
+
 export interface DeploymentConfig {
   /** Stable internal id. Never user-facing. */
   id: "worldcup" | "leaguescup" | "f1-2026";
@@ -86,6 +113,8 @@ export interface DeploymentConfig {
   momentTypes: MomentType[];
   /** Ambient audio bed for the live experience. */
   audioBed: AudioBed;
+  /** Live 360 Roundtable config. Omit → the multi-match audio show is off. */
+  roundtable?: RoundtableConfig;
   branding: Branding;
   /** Optional deployment display/mono fonts (defaults to Inter when omitted). */
   fonts?: { display: string; mono: string };
@@ -204,6 +233,23 @@ const FOOTBALL_MOMENTS: MomentType[] = [
   "PENALTY_MISSED", "SHOOTOUT_KICK", "RED_CARD", "YELLOW_CARD", "VAR_DECISION",
 ];
 
+// ── World Cup 2026 result set — the ONLY WC26 facts the LC26 panel may cite ──
+// Recorded, verified outcomes (CLAUDE.md "Current Production State", 2026-07-20).
+// This list IS the guardrail: the Live 360 pundits are told they may reference
+// the World Cup ONLY using these lines. Anything else — a scoreline, a scorer, a
+// minute, "so-and-so had a great tournament" — is an invention and is banned.
+// Extend it only with facts you have verified; never with plausible ones.
+const WC26_CALLBACK: CallbackEvent = {
+  name: "the 2026 World Cup",
+  facts: [
+    "Spain beat Argentina 1–0 in the final, after extra time.",
+    "Ferrán Torres scored the winning goal in the 106th minute.",
+    "Kylian Mbappé won the Golden Boot with 10 goals; Lionel Messi finished on 8.",
+    "England beat France 6–4 in the third-place play-off.",
+    "It was hosted across the United States, Canada and Mexico in June and July 2026.",
+  ],
+};
+
 // ── World Cup 2026 — the reference deployment (current live values) ──────────────
 export const WORLDCUP: DeploymentConfig = {
   id: "worldcup",
@@ -253,6 +299,13 @@ export const LEAGUES_CUP: DeploymentConfig = {
   metrics: ["matchDNA", "crampIndex", "rivalryIndex"], // rivalryIndex = Border Clash Index™ (MLS vs LigaMX)
   momentTypes: FOOTBALL_MOMENTS,
   audioBed: "stadium",
+  // AI Live 360 Roundtable — the multi-match audio show. Enabled on LC26 ONLY:
+  // WC26 is a FROZEN proof-of-concept (CLAUDE.md, 8/5) and gets no new dashboard
+  // surface, and F1 needs its own persona/moment brief first.
+  roundtable: {
+    showTitle: "Live 360 Roundtable",
+    callbackEvent: WC26_CALLBACK,
+  },
   branding: {
     // OFFICIAL studio0x brand palette (owner 8/4) — supersedes the 7/29 Miami-pink
     // / electric-blue placeholders. Gaming-UI / dark-HUD skin; see globals.css for

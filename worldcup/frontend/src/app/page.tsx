@@ -25,8 +25,9 @@ import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/FinalWeekendSpotlight";
 import FinalRoundtable from "@/components/news/FinalRoundtable";
 import MatchdayTape from "@/components/match/MatchdayTape";
+import RoundtableLive from "@/components/roundtable/RoundtableLive";
 import { storyScope } from "@/lib/storyScope";
-import { BRAND_NAME } from "@/lib/sportConfig";
+import { BRAND_NAME, SPORT } from "@/lib/sportConfig";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -494,6 +495,11 @@ export default async function DashboardPage({
       <LiveRefresh isLive={isAnyMatchLive} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {/* AI Live 360 Roundtable — leads the dashboard so it is visible on
+            desktop without scrolling. Config-gated (SPORT.roundtable): enabled
+            on LC26 only, so the frozen WC26 site is unchanged. */}
+        {SPORT.roundtable && <RoundtableLive />}
+
         {(spotlightThird || spotlightFinal) && (
           <FinalWeekendSpotlight third={spotlightThird} final={spotlightFinal} />
         )}

@@ -292,6 +292,34 @@ model RoundtableEpisode {
   generatedAt DateTime @default(now())
 }
 
+// ── AI Live 360 Roundtable — the multi-match audio show ──────────────────────
+// RoundtableEpisode above is PER-FIXTURE (`fixture @unique`): one frozen pregame
+// episode per match. The 360 show is the opposite shape — a rolling broadcast
+// covering EVERY live fixture at once, regenerated every ~30-90s for as long as
+// anything is in play. So it gets its own table rather than a synthetic fixture
+// id squatting on the pregame archive's unique key.
+//
+// Rows are a broadcast LOG, not a cache: each is the script that actually aired
+// at that moment, which is what makes "what did the booth say when X happened?"
+// answerable after the fact. Additive-only — `prisma db push` in the Vercel build
+// creates it without touching any existing table.
+model Live360Episode {
+  id           String   @id @default(cuid())
+  tournamentId String // DeploymentConfig.id — scopes rows per deployment
+  fixtures     Int[] // every fixture this episode covered
+  lines        Json // [{ speaker, text }] — speaker is a persona key
+  matchContext Json // grounded snapshot fed to the model (scores, minutes, moments)
+  // Highest-significance moment this episode leads with, as `${fixture}|${momentKey}`.
+  // Drives the stinger cue AND stops the next episode re-leading with the same goal.
+  leadMomentKey String?
+  // Moment type behind leadMomentKey (GOAL / RED_CARD / …) — the stinger to fire.
+  leadMomentType String?
+  promptRev    String   @default("v1")
+  generatedAt  DateTime @default(now())
+
+  @@index([tournamentId, generatedAt])
+}
+
 model LiveMetric {
   id         String   @id @default(cuid())
   matchId    String
