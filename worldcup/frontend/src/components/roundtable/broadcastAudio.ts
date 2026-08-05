@@ -124,6 +124,9 @@ export class BroadcastAudio {
   private bedLevel: number;
   private voiceLevel: number;
   private disposed = false;
+  /** Cancellers for in-flight silence() waits, so dispose() never leaves the
+   *  broadcast loop parked in a pause that will never end. */
+  private pending = new Set<() => void>();
 
   constructor(levels: Partial<BroadcastLevels> = {}) {
     // Constructed inside the user's click handler — the autoplay gate. Every
@@ -259,6 +262,22 @@ export class BroadcastAudio {
     });
   }
 
+  /**
+   * Hold for `ms` with only the bed audible — the natural pause between
+   * conversation bursts. Resolves early if the show is stopped, so pressing stop
+   * during a pause is instant rather than waiting out the silence.
+   */
+  silence(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (this.disposed) return resolve();
+      const t = setTimeout(resolve, ms);
+      this.pending.add(() => {
+        clearTimeout(t);
+        resolve();
+      });
+    });
+  }
+
   stopLine(): void {
     if (!this.voiceSource) return;
     try {
@@ -378,6 +397,8 @@ export class BroadcastAudio {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const cancel of this.pending) cancel();
+    this.pending.clear();
     this.stopLine();
     if (this.bedSource) {
       try {

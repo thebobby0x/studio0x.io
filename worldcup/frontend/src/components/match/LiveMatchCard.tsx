@@ -10,6 +10,7 @@ import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
 import FlagImg from "@/components/ui/FlagImg";
+import { SegmentedVersusBar } from "@/components/ui/SegmentedBar";
 import ShareButton from "@/components/ui/ShareButton";
 import { BRAND_NAME } from "@/lib/sportConfig";
 
@@ -228,18 +229,21 @@ function StatRow({ label, homeVal, awayVal, unit = "" }: {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className={`s0x-data text-sm font-bold tabular-nums ${leading === "home" ? "text-s0x-teal" : "text-s0x-text"}`}>
+        <span className="s0x-data text-sm font-bold tabular-nums" style={leading === "home" ? { color: "var(--seg-cyan)" } : undefined}>
           {homeVal}{unit}
         </span>
         <span className="s0x-mono text-[9px] text-s0x-muted text-center flex-1">{label}</span>
-        <span className={`s0x-data text-sm font-bold tabular-nums ${leading === "away" ? "text-s0x-accent" : "text-s0x-text"}`}>
+        <span className="s0x-data text-sm font-bold tabular-nums" style={leading === "away" ? { color: "var(--seg-red)" } : undefined}>
           {awayVal}{unit}
         </span>
       </div>
-      <div className="s0x-versus" role="img" aria-label={`${label}: ${homeVal}${unit} to ${awayVal}${unit}`}>
-        <span className="s0x-versus-home" style={{ width: `${homeW}%`, opacity: total > 0 ? 1 : 0.25 }} />
-        <span className="s0x-versus-away" style={{ width: `${100 - homeW}%`, opacity: total > 0 ? 1 : 0.25 }} />
-      </div>
+      <SegmentedVersusBar
+        home={homeVal}
+        away={awayVal}
+        segments={16}
+        height={9}
+        ariaLabel={`${label}: ${homeVal}${unit} to ${awayVal}${unit}`}
+      />
     </div>
   );
 }
@@ -264,23 +268,29 @@ function PossessionBar({ homeCode, awayCode, home, away }: {
     <div className="space-y-2">
       <div className="flex items-end justify-between gap-3">
         <div className="text-left">
-          <div className="s0x-data text-2xl font-bold tabular-nums text-s0x-teal s0x-neon-teal leading-none">
+          <div className="s0x-data text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--seg-cyan)", textShadow: "0 0 10px rgb(var(--seg-cyan-glow) / .8)" }}>
             {Math.round(home)}<span className="text-base">%</span>
           </div>
           <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{homeCode}</div>
         </div>
         <div className="s0x-mono text-[9px] text-s0x-muted pb-1">Possession</div>
         <div className="text-right">
-          <div className="s0x-data text-2xl font-bold tabular-nums text-s0x-accent leading-none">
+          <div className="s0x-data text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--seg-red)", textShadow: "0 0 10px rgb(var(--seg-red-glow) / .8)" }}>
             {Math.round(away)}<span className="text-base">%</span>
           </div>
           <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{awayCode}</div>
         </div>
       </div>
-      <div className="s0x-versus" style={{ height: 10 }} role="img" aria-label={`Possession: ${Math.round(home)}% ${homeCode}, ${Math.round(away)}% ${awayCode}`}>
-        <span className="s0x-versus-home" style={{ width: `${homeW}%` }} />
-        <span className="s0x-versus-away" style={{ width: `${100 - homeW}%` }} />
-      </div>
+      <SegmentedVersusBar
+        home={home}
+        away={away}
+        homeLabel={`${Math.round(homeW)}%`}
+        awayLabel={`${Math.round(100 - homeW)}%`}
+        segments={28}
+        height={18}
+        circuit
+        ariaLabel={`Possession: ${Math.round(home)}% ${homeCode}, ${Math.round(away)}% ${awayCode}`}
+      />
     </div>
   );
 }

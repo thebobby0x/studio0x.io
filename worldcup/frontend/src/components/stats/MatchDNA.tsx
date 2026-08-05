@@ -4,6 +4,7 @@ import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import InfoTip from "@/components/ui/InfoTip";
 import { teamColor } from "@/lib/teamColors";
 import type { TeamLiveStats } from "@/lib/liveStats";
+import SegmentedBar, { SegmentedVersusBar } from "@/components/ui/SegmentedBar";
 
 // ── Live Pressure (from real team stats) ──────────────────────────────────────
 // Momentum share derived from api-football live statistics so the panel moves
@@ -30,12 +31,21 @@ function computeLivePressure(home: TeamLiveStats, away: TeamLiveStats) {
 function StatDuel({ label, home, away, suffix = "" }: { label: string; home: number | null; away: number | null; suffix?: string }) {
   if (home === null && away === null) return null;
   return (
-    <div className="bg-slate-900/40 rounded-lg px-2.5 py-1.5 text-center">
-      <div className="flex items-center justify-between gap-1 text-xs font-black tabular-nums">
-        <span className="text-brand-green">{home ?? "—"}{home !== null ? suffix : ""}</span>
-        <span className="text-amber-400">{away ?? "—"}{away !== null ? suffix : ""}</span>
+    <div className="rounded-lg px-2.5 py-1.5 text-center" style={{ backgroundColor: "var(--seg-plate)" }}>
+      <div className="s0x-data flex items-center justify-between gap-1 text-xs font-bold">
+        <span style={{ color: "var(--seg-cyan)" }}>{home ?? "\u2014"}{home !== null ? suffix : ""}</span>
+        <span style={{ color: "var(--seg-red)" }}>{away ?? "\u2014"}{away !== null ? suffix : ""}</span>
       </div>
-      <div className="text-[8px] text-slate-500 uppercase tracking-wider mt-0.5">{label}</div>
+      <div className="my-1">
+        <SegmentedVersusBar
+          home={home ?? 0}
+          away={away ?? 0}
+          segments={10}
+          height={7}
+          ariaLabel={`${label}: ${home ?? "no data"} to ${away ?? "no data"}`}
+        />
+      </div>
+      <div className="s0x-mono text-[8px] text-s0x-muted">{label}</div>
     </div>
   );
 }
@@ -172,9 +182,10 @@ function MomentumTimeline({
   const DISPLAY_MAX = Math.max(maxMinute, 90);
   const pct = (m: number) => `${Math.min((m / DISPLAY_MAX) * 100, 100).toFixed(2)}%`;
   const isLive = matchStatus === "LIVE";
-  const filledPct = isLive && currentMinute != null
-    ? `${Math.min((currentMinute / DISPLAY_MAX) * 100, 100).toFixed(2)}%`
-    : "100%";
+  const filledNum = isLive && currentMinute != null
+    ? Math.min((currentMinute / DISPLAY_MAX) * 100, 100)
+    : 100;
+  const filledPct = `${filledNum.toFixed(2)}%`;
 
   const timeMarkers = [0, 15, 30, 45, 60, 75, 90];
 
@@ -188,7 +199,7 @@ function MomentumTimeline({
             className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center"
             style={{ left: pct(e.minute) }}
           >
-            <span className="text-[9px] font-black text-brand-green tabular-nums whitespace-nowrap">
+            <span className="s0x-data text-[9px] font-bold whitespace-nowrap" style={{ color: "var(--seg-cyan)" }}>
               {e.h}–{e.a}
             </span>
             <span className="text-[10px] leading-none">⚽</span>
@@ -198,26 +209,27 @@ function MomentumTimeline({
 
       {/* Timeline bar */}
       <div className="relative h-2">
-        {/* Track */}
-        <div className="absolute inset-0 bg-slate-800 rounded-full" />
-        {/* Filled portion */}
-        <div
-          className="absolute top-0 left-0 h-full bg-slate-600 rounded-full transition-all duration-500"
-          style={{ width: filledPct }}
-        />
+        {/* Track + elapsed fill — segmented hatch, one block per 5 minutes */}
+        <div className="absolute inset-0">
+          <SegmentedBar
+            value={filledNum}
+            segments={Math.max(6, Math.round(DISPLAY_MAX / 5))}
+            height={8}
+            color="cyan"
+            ariaLabel={`Match progress: ${Math.round(filledNum)} percent of ${DISPLAY_MAX} minutes`}
+          />
+        </div>
         {/* HT marker */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-px h-3.5 bg-slate-500"
+          className="absolute top-1/2 -translate-y-1/2 w-px h-3.5 bg-s0x-muted"
           style={{ left: pct(45) }}
         />
         {/* Goal dots on bar */}
         {events.map((e, i) => (
           <div
             key={i}
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-brand-dark ${
-              e.isHome ? "bg-brand-green" : "bg-amber-400"
-            }`}
-            style={{ left: pct(e.minute) }}
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-s0x-bg"
+            style={{ left: pct(e.minute), backgroundColor: e.isHome ? "var(--seg-cyan)" : "var(--seg-red)" }}
           />
         ))}
         {/* Live "now" pulsing indicator */}
@@ -226,7 +238,7 @@ function MomentumTimeline({
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
             style={{ left: filledPct }}
           >
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "var(--seg-red)", boxShadow: "0 0 8px rgb(var(--seg-red-glow) / .9)" }} />
           </div>
         )}
       </div>
@@ -240,7 +252,7 @@ function MomentumTimeline({
             style={{ left: pct(e.minute) }}
           >
             <span className="text-[10px] leading-none">⚽</span>
-            <span className="text-[9px] font-black text-amber-400 tabular-nums whitespace-nowrap">
+            <span className="s0x-data text-[9px] font-bold whitespace-nowrap" style={{ color: "var(--seg-red)" }}>
               {e.h}–{e.a}
             </span>
           </div>
@@ -430,15 +442,21 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
           {/* Live Pressure — real team stats, moves every refresh even at 0-0 */}
           {stats && pressure !== null && (
             <div className="mt-2 space-y-2">
-              <div className="flex items-center justify-between text-[10px] font-bold">
-                <span className="text-brand-green">{homeTeamCode} {pressure}%</span>
-                <span className="text-[8px] text-slate-600 uppercase tracking-wider">Live pressure</span>
-                <span className="text-amber-400">{100 - pressure}% {awayTeamCode ?? ""}</span>
+              <div className="s0x-data flex items-center justify-between text-[10px] font-bold">
+                <span style={{ color: "var(--seg-cyan)" }}>{homeTeamCode} {pressure}%</span>
+                <span className="s0x-mono text-[8px] text-s0x-muted">Live pressure</span>
+                <span style={{ color: "var(--seg-red)" }}>{100 - pressure}% {awayTeamCode ?? ""}</span>
               </div>
-              <div className="flex h-2 rounded-full overflow-hidden bg-slate-800">
-                <div className="bg-brand-green/80 transition-all duration-700" style={{ width: `${pressure}%` }} />
-                <div className="bg-amber-500/80 transition-all duration-700" style={{ width: `${100 - pressure}%` }} />
-              </div>
+              <SegmentedVersusBar
+                home={pressure}
+                away={100 - pressure}
+                homeLabel={`${pressure}%`}
+                awayLabel={`${100 - pressure}%`}
+                segments={24}
+                height={14}
+                circuit
+                ariaLabel={`Live pressure: ${homeTeamCode} ${pressure} percent, ${awayTeamCode ?? "away"} ${100 - pressure} percent`}
+              />
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                 <StatDuel label="Possession" home={stats.home.possession} away={stats.away.possession} suffix="%" />
                 <StatDuel label="Shots" home={stats.home.totalShots} away={stats.away.totalShots} />
@@ -523,13 +541,11 @@ export default function MatchDNA({ goals, homeTeamName, awayTeamName, homeTeamCo
                   <span className="text-[10px] text-slate-400 w-24 truncate">
                     {p.name.split(" ").map((w, i) => i === 0 ? w[0] + "." : w).join(" ")}
                   </span>
-                  <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-brand-gold to-amber-300 rounded-full transition-all"
-                      style={{ width: `${(p.ci / maxCI) * 100}%` }}
-                    />
+                  <div className="flex-1">
+                    <SegmentedBar value={p.ci} maxValue={maxCI} segments={12} height={8} color="cyan"
+                      ariaLabel={`Clutch Index ${p.ci}`} />
                   </div>
-                  <span className="text-[10px] font-black text-brand-gold tabular-nums w-6 text-right">{p.ci}</span>
+                  <span className="s0x-data text-[10px] font-bold w-6 text-right" style={{ color: "var(--seg-cyan)" }}>{p.ci}</span>
                   <span className="text-[8px] text-slate-700 w-8 shrink-0">{p.goals}G</span>
                 </div>
               ))}

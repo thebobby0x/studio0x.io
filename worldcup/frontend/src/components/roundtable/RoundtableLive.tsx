@@ -35,12 +35,23 @@ import { PERSONAS_360, type Speaker360 } from "@/lib/roundtable360/personas";
 
 interface Line360 { speaker: Speaker360; text: string; voiceId: string }
 
+/** One conversation burst: 2-4 lines, stored as a single stitched audio object. */
+interface Group360 {
+  index: number;
+  lineIndexes: number[];
+  url: string | null;
+  bytes: number;
+}
+
 interface Episode360 {
   id: string;
   lines: Line360[];
   fixtures: number[];
   leadMomentKey: string | null;
   leadMomentType: string | null;
+  groups: Group360[];
+  audioMode: "blob" | "stream";
+  warnings: string[];
   generatedAt: string;
 }
 
@@ -70,6 +81,8 @@ interface CurrentPayload {
   showTitle: string;
   onAir: boolean;
   episode: Episode360 | null;
+  pauseMs: number;
+  warnings: string[];
   matchSummaries: MatchSummary[];
   moments: RankedMoment[];
   nextKickoff: { fixture: number; matchup: string; utcDate: string } | null;
@@ -78,7 +91,20 @@ interface CurrentPayload {
 /** Ticker/scoreboard refresh. Matches the live-sync cadence. */
 const POLL_MS = 30_000;
 
-function ttsUrl(line: Line360): string {
+/** Fallback if the server does not send one. */
+const DEFAULT_PAUSE_MS = 5_000;
+
+/** Spacing between speakers when a burst has to be streamed line by line.
+ *  Mirrors the gap baked into a stitched group server-side. */
+const INTRA_GROUP_GAP_MS = 260;
+
+/** The stored group object — one fetch, one decode, the whole burst. */
+function groupUrl(episodeId: string, index: number): string {
+  return `/api/roundtable/tts?episodeId=${encodeURIComponent(episodeId)}&group=${index}`;
+}
+
+/** Per-line streaming — used only when a group has no stored object. */
+function lineUrl(line: Line360): string {
   return `/api/roundtable/tts?speaker=${encodeURIComponent(line.speaker)}&text=${encodeURIComponent(line.text)}`;
 }
 
@@ -176,27 +202,64 @@ export default function RoundtableLive() {
       }
       if (!running.current) return;
 
-      for (let i = 0; i < ep.lines.length; i++) {
+      // ── play the episode as conversation bursts ──────────────────────────
+      // A group is one stored object: 2-4 lines already stitched with short
+      // gaps, so the burst plays as continuous speech. Between groups the show
+      // holds on the stadium bed — that silence is the point, not a failure.
+      const pauseMs = payload.pauseMs || DEFAULT_PAUSE_MS;
+      const groups: Group360[] =
+        ep.groups?.length > 0
+          ? ep.groups
+          : // No grouping (e.g. an episode written before groups existed) —
+            // treat every line as its own burst rather than refusing to play.
+            ep.lines.map((_, i) => ({ index: i, lineIndexes: [i], url: null, bytes: 0 }));
+
+      for (let g = 0; g < groups.length; g++) {
         if (!running.current) return;
-        const line = ep.lines[i];
-        setSpeaking({ line, index: i });
-        setNextSpeaker(ep.lines[i + 1]?.speaker ?? null);
+        const group = groups[g];
+        const first = ep.lines[group.lineIndexes[0]];
+        if (!first) continue;
+
+        setSpeaking({ line: first, index: group.lineIndexes[0] });
+        setNextSpeaker(ep.lines[groups[g + 1]?.lineIndexes[0] ?? -1]?.speaker ?? null);
         setStatus("");
 
-        // Warm the next two lines while this one plays — the gap between
-        // speakers is what separates a broadcast from a slideshow.
-        if (ep.lines[i + 1]) BroadcastAudio.prefetch(ttsUrl(ep.lines[i + 1]));
-        if (ep.lines[i + 2]) BroadcastAudio.prefetch(ttsUrl(ep.lines[i + 2]));
+        // Warm the next burst's object while this one plays.
+        const next = groups[g + 1];
+        if (next?.url) BroadcastAudio.prefetch(groupUrl(ep.id, next.index));
 
-        // Three lines out, start writing the next segment so it is ready the
+        // One group out, start writing the next segment so it is ready the
         // moment this one ends.
-        if (!pending && i === ep.lines.length - 3) pending = refresh(true);
+        if (!pending && g === groups.length - 2) pending = refresh(true);
 
         abort.current = new AbortController();
-        const ok = await engine.playLine(ttsUrl(line), abort.current.signal);
-        // A failed line is skipped, not fatal — the bed covers it and the next
-        // speaker picks up. Going silent is the one unacceptable outcome.
-        if (!ok && !running.current) return;
+        let ok = false;
+        if (group.url) {
+          ok = await engine.playLine(groupUrl(ep.id, group.index), abort.current.signal);
+        }
+        if (!ok && running.current) {
+          // Fallback: the group was never stored (Blob at capacity) or its
+          // object would not decode. The transcript is in hand, so stream the
+          // lines individually and space them ourselves — same conversation,
+          // more expensive delivery.
+          for (const li of group.lineIndexes) {
+            if (!running.current) return;
+            const line = ep.lines[li];
+            if (!line) continue;
+            setSpeaking({ line, index: li });
+            abort.current = new AbortController();
+            await engine.playLine(lineUrl(line), abort.current.signal);
+            await engine.silence(INTRA_GROUP_GAP_MS);
+          }
+        }
+
+        // The natural pause — crowd only. The last thing said stays on screen
+        // rather than flipping to a spinner: this is a beat in the show, not a
+        // loading state. Skipped after the final burst so the next segment
+        // starts straight away.
+        if (running.current && g < groups.length - 1) {
+          await engine.silence(pauseMs);
+        }
       }
       setSpeaking(null);
     }
@@ -272,6 +335,20 @@ export default function RoundtableLive() {
           </span>
         )}
       </div>
+
+      {/* ── configuration warnings ───────────────────────────────────────── */}
+      {/* A missing voice id or a full Blob store degrades the show quietly at
+          runtime. Silence with no explanation reads as a bug, so it is stated
+          on the surface rather than buried in a server log. */}
+      {(data?.warnings.length ?? 0) > 0 && (
+        <div className="border-b border-s0x-ink/40 bg-s0x-ink/10 px-4 py-2">
+          {data!.warnings.map((w, i) => (
+            <p key={i} className="s0x-mono text-[10px] leading-relaxed text-s0x-accent">
+              ⚠ {w}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* ── the autoplay gate ────────────────────────────────────────────── */}
       {!live ? (

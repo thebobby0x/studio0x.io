@@ -274,29 +274,142 @@ h1, h2, h3, h4, h5, h6 {
 }
 [data-theme="light"] .s0x-circuit { background-image: none; }
 
-/* ── Versus bar ───────────────────────────────────────────────────────────────
-   The head-to-head split used by possession and every live stat row: home fills
-   Riptide from the left, away fills Rosa from the right, over a Noir track.
-   Width is set inline (it's data); everything else lives here. */
-.s0x-versus {
-  display: flex;
-  height: 6px;
+/* ── SEGMENTED HATCH BARS ─────────────────────────────────────────────────────
+   The gaming-UI progress bar (owner spec + reference image, 2026-08-05). Every
+   smooth/gradient stat fill is now DISCRETE blocks with a 45° diagonal hatch,
+   a neon glow, and an optional circuit-board frame. Driven by
+   components/ui/SegmentedBar.tsx — that file owns geometry and data, this owns
+   every pixel of the look.
+
+   ⚠ PALETTE NOTE — read before changing these three values.
+   The owner specified the reference image's hexes literally: cyan #00D9FF, red
+   #E94560, plate #1A1A2E. They are NOT studio0x brand tokens — the nearest are
+   Riptide #5DCBD1, Rosa 700 #CA358B and Noir 900 #0F0C0E, and #1A1A2E in
+   particular is a COOL indigo-black sitting inside otherwise WARM Noir
+   surfaces. They are isolated here as three variables precisely so the call is
+   reversible: to put the bars back on brand, change only the three values
+   below (the commented-out line under each) — no component touches a hex.
+
+   Anything ADDED to this block must keep that property: no raw hexes outside
+   these variables. */
+:root {
+  --seg-cyan:  #00D9FF;   /* brand equivalent: #5DCBD1 (Riptide)  */
+  --seg-red:   #E94560;   /* brand equivalent: #CA358B (Rosa 700) */
+  --seg-plate: #1A1A2E;   /* brand equivalent: #0F0C0E (Noir 900) */
+
+  --seg-cyan-glow: 0 217 255;
+  --seg-red-glow:  233 69 96;
+  /* Empty-block tint — the unlit part of the track. */
+  --seg-track: 255 255 255 / .07;
+}
+/* Lite mode: the neon plate would be a black hole on Bone paper. Keep the
+   segment geometry, drop the plate and glow to the light neutrals. */
+[data-theme="light"] {
+  --seg-plate: #E9DFE4;
+  --seg-track: 26 21 23 / .10;
+}
+
+.seg {
+  position: relative;
   width: 100%;
+  height: var(--seg-h, 12px);
+  border-radius: 3px;
   overflow: hidden;
-  border-radius: 999px;
-  background-color: rgb(var(--s0x-border));
+  background-color: var(--seg-plate);
+  /* Unlit blocks read as a faint hatch so the track never looks empty/broken. */
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(var(--seg-track)) 0 2px,
+    transparent 2px 6px
+  );
+  isolation: isolate;
 }
-.s0x-versus > span { display: block; height: 100%; transition: width .7s cubic-bezier(.22,.61,.36,1); }
-.s0x-versus-home {
-  background: linear-gradient(90deg, rgb(93 203 209 / .55), rgb(93 203 209));
-  box-shadow: 0 0 10px rgb(93 203 209 / .45);
+
+/* The lit portion. Width is the EXACT percentage — segmentation is painted on
+   top by .seg-grid, so the data is never rounded to a whole block. */
+.seg-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  background-color: var(--seg-fill-color, var(--seg-cyan));
+  /* Diagonal hash marks inside the lit blocks — transparent gaps let the base
+     colour through, which is what makes it read as hatch rather than solid. */
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(0 0 0 / .42) 0 3px,
+    transparent 3px 7px
+  );
+  box-shadow:
+    0 0 10px rgb(var(--seg-fill-glow, var(--seg-cyan-glow)) / .75),
+    0 0 22px rgb(var(--seg-fill-glow, var(--seg-cyan-glow)) / .35),
+    inset 0 0 10px rgb(255 255 255 / .18);
+  transition: width .7s cubic-bezier(.22, .61, .36, 1);
 }
-.s0x-versus-away {
-  background: linear-gradient(270deg, rgb(202 53 139 / .55), rgb(202 53 139));
-  box-shadow: 0 0 10px rgb(202 53 139 / .45);
+.seg[data-dir="rtl"] .seg-fill { left: auto; right: 0; }
+
+.seg[data-color="red"]  { --seg-fill-color: var(--seg-red);  --seg-fill-glow: var(--seg-red-glow); }
+.seg[data-color="cyan"] { --seg-fill-color: var(--seg-cyan); --seg-fill-glow: var(--seg-cyan-glow); }
+
+/* Segment gaps. One plate-coloured sliver at the right edge of each block,
+   tiled --seg-n times across the track. Painted ABOVE the fill so blocks line
+   up across the lit/unlit boundary. */
+.seg-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent calc(100% - 2px),
+    var(--seg-plate) calc(100% - 2px)
+  );
+  background-size: calc(100% / var(--seg-n, 20)) 100%;
+  background-repeat: repeat-x;
 }
-[data-theme="light"] .s0x-versus-home,
-[data-theme="light"] .s0x-versus-away { box-shadow: none; }
+
+/* Overlaid readout. Sits at the fill's anchor edge, mono, with a hard shadow
+   so it stays legible over both lit and unlit blocks. */
+.seg-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 6px;
+  z-index: 2;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: #FAF5F7;
+  text-shadow: 0 1px 3px rgb(0 0 0 / .95), 0 0 8px rgb(0 0 0 / .8);
+  white-space: nowrap;
+}
+.seg[data-dir="rtl"] .seg-label,
+.seg-label-end { left: auto; right: 6px; }
+
+/* Opposing pair — home cyan from the left, away red from the right. */
+.seg-versus .seg-fill-home { left: 0;  right: auto; --seg-fill-color: var(--seg-cyan); --seg-fill-glow: var(--seg-cyan-glow); }
+.seg-versus .seg-fill-away { right: 0; left: auto;  --seg-fill-color: var(--seg-red);  --seg-fill-glow: var(--seg-red-glow); }
+/* No data yet — dim both sides rather than implying a real 50/50. */
+.seg-empty .seg-fill { opacity: .22; box-shadow: none; }
+
+/* Circuit-board frame. .s0x-circuit paints the traces + solder nodes; this
+   supplies the padding they need and the outer neon halo. */
+.seg-frame {
+  padding: 7px 10px;
+  border-radius: var(--s0x-radius);
+  background-color: var(--seg-plate);
+  box-shadow: 0 0 16px -4px rgb(var(--seg-cyan-glow) / .35);
+}
+[data-theme="light"] .seg-frame { box-shadow: none; }
+[data-theme="light"] .seg-fill { box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-fill { transition: none; }
+}
 
 /* ── Match moment card ────────────────────────────────────────────────────────
    One event (goal, card, substitution) as a HUD row with a neon left edge.

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import InfoTip from "@/components/ui/InfoTip";
 import { preMatchWinProbFromTournamentOdds } from "@/lib/probabilities";
 import type { LiveData } from "@/lib/types";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 interface UpsetStats {
   factor: number;      // 0–100 how surprising the result was
@@ -103,12 +104,15 @@ export default function UpsetMeter({ matchId }: { matchId: string }) {
         </div>
 
         {/* Bar */}
-        <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all`}
-            style={{ width: `${stats.factor}%` }}
-          />
-        </div>
+        <SegmentedBar
+          value={stats.factor}
+          segments={20}
+          height={16}
+          color="red"
+          label={`${Math.round(stats.factor)}%`}
+          circuit
+          ariaLabel={`Upset Factor ${Math.round(stats.factor)} percent`}
+        />
 
         {/* Scale labels */}
         <div className="flex justify-between text-[8px] text-slate-700 font-mono">

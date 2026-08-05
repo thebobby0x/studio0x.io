@@ -91,19 +91,81 @@ export const PERSONAS_360: Record<Speaker360, Persona360> = {
 };
 
 // ── Voice mapping ────────────────────────────────────────────────────────────
-// EXACTLY the ids the WC26 panel already uses (see /api/ai/tts PERSONA_VOICES).
-// Same env override names too, so setting a var re-voices a panelist on BOTH
-// shows at once and the cast can never drift between them.
+// The three custom panel voices are EXACTLY the ids the WC26 panel already uses
+// (see /api/ai/tts PERSONA_VOICES), with the same env override names, so setting
+// a var re-voices a panelist on both shows and the cast cannot drift.
 //
-// `lorraine` intentionally has no dedicated var: the host has always ridden the
-// deployment's configured default voice (ELEVENLABS_VOICE_ID). That is existing
-// production behaviour, preserved here rather than "fixed".
+// ⚠ LORRAINE HAS NO ID YET, AND MUST NOT FALL BACK TO ONE.
+// Owner correction (8/5): Lorraine is FEMALE — a voice BK built for WC26. The
+// old code rendered her on `ELEVENLABS_VOICE_ID`, whose hardcoded fallback is
+// "Daniel", a deep MALE news anchor. Searched for the real id and it is not
+// recoverable from here: the whole repo, the full git history of every branch,
+// and the EOD docs all agree that PR #160 wired THREE custom voices (Ricky,
+// Roberto, Henry) and left the host on the generic default. No female id was
+// ever committed.
+//
+// So there is deliberately NO fallback. An unset var yields "", the render
+// refuses rather than substituting a voice, and the API surfaces a warning the
+// player displays. Silent-and-wrong (a man voicing Lorraine) is far worse than
+// loud-and-missing.
+//
+// TODO: Replace with Lorraine's female voice ID — check ElevenLabs dashboard.
 export const ROUNDTABLE_VOICES: Record<Speaker360, string> = {
-  lorraine: process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9", // "Daniel" — configured default
+  lorraine: process.env.ELEVENLABS_VOICE_LORRAINE ?? "", // TODO ↑ — never default this
   henry: process.env.ELEVENLABS_VOICE_HENRY ?? "3DF5pISMxWFbDQoLOBrj", // Henry Futois — French, ex-PSG
   roberto: process.env.ELEVENLABS_VOICE_ROBERTO ?? "99M1da0B26r8CknfhKDi", // Roberto Madrid — Spanish GK
   ricky: process.env.ELEVENLABS_VOICE_RICKY ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian
 };
+
+/** Panelists with no configured voice. Surfaced to the client as a warning. */
+export function missingVoices(): Speaker360[] {
+  return SPEAKER_KEYS.filter((k) => !ROUNDTABLE_VOICES[k]);
+}
+
+// ── Accent hardening ─────────────────────────────────────────────────────────
+// Owner directive (8/5): "I do not want to lose or diminish any voice accent —
+// ever." Accents dropping was the defining WC26 audio problem and three rounds
+// of work fixed it (gotcha #24); turbo is what flattened them, so turbo is gone
+// from this show entirely.
+//
+// These tags are audio-only performance direction, prepended to the SPOKEN text
+// and never displayed. They are deliberately STRONGER than the WC26 originals
+// ("[strong French accent]"), using the exact descriptors the 7/17 EOD named as
+// the next lever if accents were still weak — "thick Buenos Aires accent",
+// "heavy Catalan accent, rolls every R".
+//
+// Tags go ONLY on the eleven_v3 path. Older models read them aloud literally
+// (gotcha #24), so the multilingual_v2 fallback sends untagged text.
+export const ACCENT_TAGS_360: Record<Speaker360, string> = {
+  lorraine: "[strong British accent, bright and excitable] ",
+  henry: "[thick French accent, deep and theatrical] ",
+  roberto: "[heavy Catalan Spanish accent, rolls every R] ",
+  ricky: "[thick Buenos Aires Argentinian accent, booming and dry] ",
+};
+
+// ── Delivery settings ────────────────────────────────────────────────────────
+// Owner directive (8/5): passionate, alive and reactive — not measured. Low
+// stability for expressive variance, high style for emotion.
+//
+// This REVERSES the 7/18 decision recorded in /api/ai/tts ("the panel sends NO
+// voice_settings — each custom voice uses the owner's stored VoiceLab
+// settings"). That reversal is the owner's, made explicitly, and applies to
+// this show only; the WC26 pregame panel is untouched.
+export const VOICE_SETTINGS_360 = {
+  stability: 0.3,
+  similarity_boost: 0.75,
+  style: 0.78,
+  use_speaker_boost: true,
+} as const;
+
+/**
+ * eleven_v3 constrains `stability` to three discrete values (0.0 Creative /
+ * 0.5 Natural / 1.0 Robust) rather than the continuous scale multilingual_v2
+ * accepts. 0.3 is not sendable there, so it maps to the nearest LOWER rung —
+ * Creative — which is the expressive end the directive asks for. Override with
+ * ROUNDTABLE_V3_STABILITY=0.5 if Creative proves too loose in production.
+ */
+export const V3_STABILITY = Number(process.env.ROUNDTABLE_V3_STABILITY ?? 0);
 
 // ── Audio-only pronunciation lexicon ─────────────────────────────────────────
 // Copied verbatim from /api/ai/tts (CLAUDE.md gotcha #24). TTS models read short

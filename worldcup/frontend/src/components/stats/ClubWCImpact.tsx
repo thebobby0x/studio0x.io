@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { REAL_CLUB_WHERE } from "@/lib/clubData";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 const LEAGUE_FLAG: Record<string, string> = {
   "Premier League": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
@@ -244,12 +245,8 @@ export default async function ClubWCImpact({ limit = 12 }: { limit?: number }) {
                         <span className="text-slate-600">{l.clubs} clubs</span>
                       </div>
                     </div>
-                    <div className="h-1.5 rounded-full bg-brand-border overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-gold to-amber-600"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
+                    <SegmentedBar value={pct} segments={12} height={8} color="cyan"
+                      ariaLabel={`${l.league} share of goals`} />
                     <p className="text-[10px] text-slate-600 mt-1 italic">
                       {leagueTalkingPoint(l, i, grandTotalGoals, isLive)}
                     </p>

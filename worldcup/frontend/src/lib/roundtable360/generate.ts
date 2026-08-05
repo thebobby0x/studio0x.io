@@ -25,7 +25,15 @@ import {
   type Live360Context,
   type RankedMoment,
 } from "./liveState";
-import { PERSONAS_360, SPEAKER_KEYS, ROUNDTABLE_VOICES, isSpeaker360, type Speaker360 } from "./personas";
+import {
+  PERSONAS_360,
+  SPEAKER_KEYS,
+  ROUNDTABLE_VOICES,
+  isSpeaker360,
+  missingVoices,
+  type Speaker360,
+} from "./personas";
+import { renderEpisodeGroups, type RenderedGroup } from "./render";
 
 /** Bump when the brief changes — episodes are a log, so this only labels rows. */
 export const PROMPT_REV_360 = "v1";
@@ -55,11 +63,62 @@ export interface Episode360 {
   leadMomentKey: string | null;
   /** Moment type behind the lead — the stinger the client should fire. */
   leadMomentType: string | null;
+  /** Conversation bursts. Each is one stored audio object; the client holds
+   *  PAUSE_BETWEEN_GROUPS_MS on the stadium bed between them. */
+  groups: RenderedGroup[];
+  audioMode: "blob" | "stream";
+  /** Non-fatal problems worth showing a human (missing voice id, Blob full). */
+  warnings: string[];
   generatedAt: string;
 }
 
+/** The dead-air-that-isn't: crowd only, between conversation bursts. */
+export const PAUSE_BETWEEN_GROUPS_MS = 5_000;
+
 function leadKey(m: RankedMoment): string {
   return `${m.fixture}|${m.momentKey}`;
+}
+
+/**
+ * Split a script into conversation bursts of 2-4 lines.
+ *
+ * Not arbitrary slicing: a burst should end where the conversation naturally
+ * breathes. Two grounded signals are available without asking the model for
+ * more structure — a returning ANCHOR (Lorraine re-taking the mic is a hard cut
+ * to a new topic) and a line that ends a thought rather than trailing on. Both
+ * are heuristics over text we already have, so they cost nothing and cannot
+ * invent anything.
+ */
+export function groupLines(lines: Line360[]): number[][] {
+  const groups: number[][] = [];
+  let current: number[] = [];
+
+  const flush = () => {
+    if (current.length) groups.push(current);
+    current = [];
+  };
+
+  lines.forEach((line, i) => {
+    // Lorraine coming back after someone else, with a group already going, is a
+    // topic change — break BEFORE her so she opens the next burst.
+    const anchorReturns = line.speaker === "lorraine" && current.length >= 2;
+    if (anchorReturns) flush();
+
+    current.push(i);
+
+    const prev = lines[i - 1];
+    const settled = /[.!?]["')\]]?\s*$/.test(line.text) && line.speaker !== prev?.speaker;
+    if (current.length >= 4 || (current.length >= 3 && settled)) flush();
+  });
+  flush();
+
+  // A trailing single line is an orphan — fold it back into the group before it
+  // (a burst of five is better than someone talking alone into a 5s silence).
+  if (groups.length > 1 && groups[groups.length - 1].length === 1) {
+    const orphan = groups.pop()!;
+    groups[groups.length - 1].push(...orphan);
+  }
+  return groups;
 }
 
 // ── Prompt ───────────────────────────────────────────────────────────────────
@@ -175,6 +234,21 @@ async function callClaude(ctx: Live360Context, recentlyCovered: string[]): Promi
   return lines.length >= 6 ? lines : null;
 }
 
+/**
+ * Configuration problems that are true regardless of any one episode, recomputed
+ * on read so fixing the env var clears the warning without regenerating.
+ */
+export function standingWarnings(): string[] {
+  const missing = missingVoices();
+  if (missing.length === 0) return [];
+  return [
+    `No ElevenLabs voice configured for: ${missing
+      .map((k) => PERSONAS_360[k].name)
+      .join(", ")}. Those lines appear in the transcript but will not be spoken — ` +
+      `set ELEVENLABS_VOICE_${missing[0].toUpperCase()}. A voice is never substituted.`,
+  ];
+}
+
 /** The newest episode for this deployment, or null. */
 export async function latestEpisode(): Promise<Episode360 | null> {
   try {
@@ -190,6 +264,9 @@ export async function latestEpisode(): Promise<Episode360 | null> {
       matchContext: row.matchContext as unknown as Live360Context["matches"],
       leadMomentKey: row.leadMomentKey,
       leadMomentType: row.leadMomentType,
+      groups: (row.groups as unknown as RenderedGroup[]) ?? [],
+      audioMode: row.audioMode === "stream" ? "stream" : "blob",
+      warnings: standingWarnings(),
       generatedAt: row.generatedAt.toISOString(),
     };
   } catch {
@@ -239,6 +316,9 @@ export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateRe
 
     const lead = ctx.lead && (!previous || leadKey(ctx.lead) !== previous.leadMomentKey) ? ctx.lead : null;
 
+    // The row is created BEFORE rendering so the audio keys can be namespaced by
+    // a real episode id, and so a render that dies mid-flight still leaves the
+    // transcript behind rather than losing the whole segment.
     const row = await prisma.live360Episode.create({
       data: {
         tournamentId: SPORT.id,
@@ -251,6 +331,20 @@ export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateRe
       },
     });
 
+    // Render once, serve unlimited: every listener from here on is served these
+    // objects from the CDN. This is the expensive step and it happens exactly
+    // once per episode, no matter how many people are tuned in.
+    const grouping = groupLines(lines);
+    const render = await renderEpisodeGroups(row.id, lines, grouping);
+
+    await prisma.live360Episode.update({
+      where: { id: row.id },
+      data: {
+        groups: render.groups as unknown as Prisma.InputJsonValue,
+        audioMode: render.audioMode,
+      },
+    });
+
     return {
       id: row.id,
       lines,
@@ -258,6 +352,9 @@ export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateRe
       matchContext: ctx.matches,
       leadMomentKey: row.leadMomentKey,
       leadMomentType: row.leadMomentType,
+      groups: render.groups,
+      audioMode: render.audioMode,
+      warnings: [...standingWarnings(), ...render.warnings],
       generatedAt: row.generatedAt.toISOString(),
     } satisfies Episode360;
   })();

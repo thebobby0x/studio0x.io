@@ -314,6 +314,15 @@ model Live360Episode {
   leadMomentKey String?
   // Moment type behind leadMomentKey (GOAL / RED_CARD / …) — the stinger to fire.
   leadMomentType String?
+  // Conversation groups: [{ index, lineIndexes, url, bytes }]. Each group is
+  // 2-4 lines rendered together and stored as ONE stitched audio object, so the
+  // client plays a burst of dialogue then holds 5s on the stadium bed.
+  groups       Json?
+  // "blob"   — every group rendered once and served from CDN (the normal path)
+  // "stream" — at least one group could not be stored (Blob at capacity); the
+  //            client synthesises those lines on demand instead. Degraded, not
+  //            broken, and always accompanied by a warning.
+  audioMode    String   @default("blob")
   promptRev    String   @default("v1")
   generatedAt  DateTime @default(now())
 

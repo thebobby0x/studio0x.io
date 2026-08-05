@@ -6,6 +6,7 @@ import ShareButton from "@/components/ui/ShareButton";
 import { KNOCKOUT_START } from "@/lib/tournament";
 import TournamentRecords from "@/components/stats/TournamentRecords";
 import EliminationProximity from "@/components/stats/EliminationProximity";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
 import { getTournamentWinnerMarkets } from "@/lib/polymarket";
@@ -483,13 +484,16 @@ export default async function StandingsPage() {
                   <span className="text-base leading-none">{t.flag}</span>
                   <span className="text-xs font-semibold text-slate-200 flex-1 truncate">{t.name}</span>
                   <span className="text-[9px] text-slate-600 font-mono w-7 text-center">G{t.group}</span>
-                  <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-brand-gold to-amber-300 rounded-full"
-                      style={{ width: `${t.score}%` }}
+                  <div className="w-24 shrink-0">
+                    <SegmentedBar
+                      value={t.score}
+                      segments={12}
+                      height={9}
+                      color="cyan"
+                      ariaLabel={`${t.name} power ranking score ${t.score} of 100`}
                     />
                   </div>
-                  <span className="text-xs font-black text-brand-gold tabular-nums w-8 text-right">{t.score}</span>
+                  <span className="s0x-data text-xs font-bold w-8 text-right" style={{ color: "var(--seg-cyan)" }}>{t.score}</span>
                 </div>
               ))}
             </div>

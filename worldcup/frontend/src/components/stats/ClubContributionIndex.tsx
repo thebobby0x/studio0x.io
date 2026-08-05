@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { REAL_CLUB_WHERE } from "@/lib/clubData";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 interface ClubEntry {
   club: string;
@@ -94,11 +95,9 @@ export default async function ClubContributionIndex({ limit = 10 }: { limit?: nu
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold text-slate-200 truncate">{c.club}</div>
                 <div className="text-[9px] text-slate-600 mt-0.5">{c.league}</div>
-                <div className="mt-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-brand-green"
-                    style={{ width: `${pct}%` }}
-                  />
+                <div className="mt-1">
+                  <SegmentedBar value={pct} segments={12} height={7} color="cyan"
+                    ariaLabel={`${c.club} contribution index`} />
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0 text-[10px] text-right">

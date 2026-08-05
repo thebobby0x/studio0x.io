@@ -1,5 +1,10 @@
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Generation now also RENDERS the episode's audio (render once, serve
+// unlimited), so the budget covers a Claude call plus every group's ElevenLabs
+// synthesis. Groups and the lines inside them render in parallel, so this is
+// bounded by the slowest single line, not the sum — but v3 is deliberately the
+// slow, accurate model, so the ceiling is generous. 300s is Vercel Pro's max.
+export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
 import { SPORT } from "@/lib/sportConfig";

@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from "react";
 import InfoTip from "@/components/ui/InfoTip";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 export interface GravityGoal {
   scorer: string;
@@ -60,13 +61,17 @@ export default function GoalGravity({ goals, homeTeamName, awayTeamName }: Props
               {g.scorer.split(" ").map((w, j) => j === 0 ? w[0] + "." : w).join(" ")}
             </span>
             <span className="text-[9px] text-slate-600 w-8 font-mono text-center">{g.minute}&apos;</span>
-            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-red-500 to-orange-400 rounded-full"
-                style={{ width: `${(g.impact / maxImpact) * 100}%` }}
+            <div className="flex-1">
+              <SegmentedBar
+                value={g.impact}
+                maxValue={maxImpact}
+                segments={12}
+                height={8}
+                color="red"
+                ariaLabel={`Goal impact ${g.impact.toFixed(1)}`}
               />
             </div>
-            <span className="text-[10px] font-black text-red-400 tabular-nums w-6 text-right">{g.impact.toFixed(1)}</span>
+            <span className="s0x-data text-[10px] font-bold w-6 text-right" style={{ color: "var(--seg-red)" }}>{g.impact.toFixed(1)}</span>
             <span className="text-[8px] text-slate-700 w-16 truncate text-right hidden sm:block">{g.context}</span>
           </div>
         ))}

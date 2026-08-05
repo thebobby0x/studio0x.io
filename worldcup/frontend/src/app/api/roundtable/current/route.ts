@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// ?generate=1 runs the full generate + render path — same budget as
+// /api/roundtable/generate.
+export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
 import { SPORT } from "@/lib/sportConfig";
 import { buildLive360Context } from "@/lib/roundtable360/liveState";
-import { generateEpisode, latestEpisode } from "@/lib/roundtable360/generate";
+import { generateEpisode, latestEpisode, standingWarnings, PAUSE_BETWEEN_GROUPS_MS } from "@/lib/roundtable360/generate";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/roundtable/current[?generate=1]
@@ -58,6 +60,8 @@ export async function GET(req: Request) {
         showTitle: SPORT.roundtable.showTitle,
         onAir: ctx.matches.length > 0,
         episode,
+        pauseMs: PAUSE_BETWEEN_GROUPS_MS,
+        warnings: episode?.warnings ?? standingWarnings(),
         matchSummaries,
         // Top few ranked moments — the client shows them as the "key plays"
         // strip so the panel's talking points are visible, not just audible.
@@ -72,6 +76,8 @@ export async function GET(req: Request) {
       showTitle: SPORT.roundtable.showTitle,
       onAir: false,
       episode: null,
+      pauseMs: PAUSE_BETWEEN_GROUPS_MS,
+      warnings: standingWarnings(),
       matchSummaries: [],
       moments: [],
       nextKickoff: null,
