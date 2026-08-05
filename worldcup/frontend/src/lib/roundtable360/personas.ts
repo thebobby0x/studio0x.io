@@ -95,23 +95,14 @@ export const PERSONAS_360: Record<Speaker360, Persona360> = {
 // (see /api/ai/tts PERSONA_VOICES), with the same env override names, so setting
 // a var re-voices a panelist on both shows and the cast cannot drift.
 //
-// ⚠ LORRAINE HAS NO ID YET, AND MUST NOT FALL BACK TO ONE.
-// Owner correction (8/5): Lorraine is FEMALE — a voice BK built for WC26. The
-// old code rendered her on `ELEVENLABS_VOICE_ID`, whose hardcoded fallback is
-// "Daniel", a deep MALE news anchor. Searched for the real id and it is not
-// recoverable from here: the whole repo, the full git history of every branch,
-// and the EOD docs all agree that PR #160 wired THREE custom voices (Ricky,
-// Roberto, Henry) and left the host on the generic default. No female id was
-// ever committed.
-//
-// So there is deliberately NO fallback. An unset var yields "", the render
-// refuses rather than substituting a voice, and the API surfaces a warning the
-// player displays. Silent-and-wrong (a man voicing Lorraine) is far worse than
-// loud-and-missing.
-//
-// TODO: Replace with Lorraine's female voice ID — check ElevenLabs dashboard.
+// LORRAINE (owner-supplied 8/5): she is FEMALE, and the code used to render her
+// on `ELEVENLABS_VOICE_ID` — whose fallback is "Daniel", a deep MALE news
+// anchor. Her real custom voice id was never committed (PR #160 wired only
+// Ricky/Roberto/Henry); the owner supplied it directly. Never map her to the
+// generic default again: that var is the news/story anchor voice, and chaining
+// to it is exactly how she ended up sounding like a man.
 export const ROUNDTABLE_VOICES: Record<Speaker360, string> = {
-  lorraine: process.env.ELEVENLABS_VOICE_LORRAINE ?? "", // TODO ↑ — never default this
+  lorraine: process.env.ELEVENLABS_VOICE_LORRAINE ?? "cLJPCFydIdotiLUDM5NV", // Lorraine Footy — British host, FEMALE
   henry: process.env.ELEVENLABS_VOICE_HENRY ?? "3DF5pISMxWFbDQoLOBrj", // Henry Futois — French, ex-PSG
   roberto: process.env.ELEVENLABS_VOICE_ROBERTO ?? "99M1da0B26r8CknfhKDi", // Roberto Madrid — Spanish GK
   ricky: process.env.ELEVENLABS_VOICE_RICKY ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian
