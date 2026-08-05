@@ -451,10 +451,54 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                 },
               },
               {
+                key: "blobCleanup",
+                icon: Trash2,
+                label: "1 · Free Up Audio Storage",
+                desc: "THE fix for \"Audio storage full\". Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us. Once the Blob store hits its 1GB cap every write fails (reads keep working, so nothing looks broken) and no new narration can be saved. This purges the regenerable tts/ + deep-dive caches — on a club deployment that is World Cup narration nobody will play again — plus orphaned anthem dupes. Run this BEFORE generating story audio.",
+                action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
+              },
+              {
+                key: "storyAudio",
+                icon: Music2,
+                label: "2 · Generate Audio for All Stories",
+                desc: "Synthesises narration for every story on this deployment and PERSISTS the URL on the row, so playback stops depending on a live TTS call. Chunked and idempotent — re-run to fill gaps. Stops immediately if Blob is at quota rather than burning ElevenLabs characters on writes that cannot land.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, storyAudio: "loading" }));
+                  setSeedDetail(d => ({ ...d, storyAudio: "" }));
+                  try {
+                    let generated = 0, failed = 0, offset = 0;
+                    let blocker: string | null = null;
+                    let candidates = 0;
+                    for (let guard = 0; guard < 40; guard++) {
+                      const res = await fetch(`/api/admin/generate-story-audio?count=5&offset=${offset}`, { method: "POST" });
+                      if (!res.ok) throw new Error(`chunk failed (${res.status})`);
+                      const data = await res.json() as {
+                        candidates: number; generated: number; failed: number;
+                        nextOffset: number | null; blocker: string | null;
+                      };
+                      candidates = data.candidates ?? 0;
+                      generated += data.generated ?? 0;
+                      failed += data.failed ?? 0;
+                      if (data.blocker && !blocker) blocker = data.blocker;
+                      if (data.nextOffset == null) break;
+                      offset = data.nextOffset;
+                    }
+                    setSeedDetail(d => ({ ...d, storyAudio:
+                      `${generated}/${candidates} generated · ${failed} failed` + (blocker ? ` · ${blocker}` : "")
+                    }));
+                    // Zero to do is a success; only a real failure is an error.
+                    setSeedStatus(s => ({ ...s, storyAudio: failed > 0 ? "error" : "done" }));
+                  } catch (e) {
+                    setSeedDetail(d => ({ ...d, storyAudio: e instanceof Error ? e.message : "request failed" }));
+                    setSeedStatus(s => ({ ...s, storyAudio: "error" }));
+                  }
+                },
+              },
+              {
                 key: "audioHealth",
                 icon: Music2,
                 label: "Check Audio / TTS Chain",
-                desc: "Answers \"why is there no sound?\" with a fact. Story narration is ElevenLabs TTS generated ON DEMAND at play time and cached in Blob — it needs ELEVENLABS_API_KEY and Blob headroom; anthems are imported mp3s and need the Drive key. Runs a real ~20-char synthesis round-trip, so a full Blob store (which mimics a missing key exactly — gotcha #15) is told apart from an unset key.",
+                desc: "Answers \"why is there no sound?\" with a fact. Reports Vercel Blob usage against the 1GB cap and how much is reclaimable, whether ElevenLabs is configured, and how many stories have persisted audio — then runs a real ~20-char synthesis round-trip so a full store is told apart from an unset key (they produce identical symptoms — gotcha #15).",
                 action: () => runSeed("audioHealth", "/api/admin/audio-health?synth=true", "POST"),
               },
               {
@@ -545,13 +589,6 @@ export default function AdminDashboard({ users, tournament }: { users: User[]; t
                     }
                     setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
                   },
-                },
-                {
-                  key: "blobCleanup",
-                  icon: Trash2,
-                  label: "Free Up Blob Storage",
-                  desc: "Purges regenerable TTS/deep-dive caches + orphaned anthem dupes. Runs automatically each night — manual escape hatch if audio shows 'unavailable'.",
-                  action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
                 },
                 {
                   key: "relinkAnthems",

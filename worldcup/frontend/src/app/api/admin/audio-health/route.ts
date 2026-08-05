@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { list } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { isAdminAuthed } from "@/lib/adminAuth";
+import { storyScope } from "@/lib/storyScope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,6 +31,43 @@ export const maxDuration = 60;
 
 const PROBE_TEXT = "studio0x audio check.";
 
+// Vercel Blob Hobby ceiling. Every put() fails once the store reaches it — TTS
+// AND anthem imports — while reads keep working, so the app looks healthy while
+// nothing new can be written (CLAUDE.md gotcha #15).
+const BLOB_QUOTA_MB = 1000;
+
+/** Blob usage by prefix. tts/ + deep-dives/ are regenerable; anthems/ are not. */
+async function blobUsage(): Promise<{
+  totalMB: number; ttsMB: number; anthemsMB: number; otherMB: number;
+  reclaimableMB: number; percentOfQuota: number; count: number;
+} | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    let cursor: string | undefined;
+    let total = 0, tts = 0, anthems = 0, count = 0;
+    do {
+      const res = await list({ cursor, limit: 1000 });
+      for (const b of res.blobs) {
+        count++;
+        total += b.size;
+        if (b.pathname.startsWith("tts/") || b.pathname.startsWith("deep-dives/")) tts += b.size;
+        else if (b.pathname.startsWith("anthems/")) anthems += b.size;
+      }
+      cursor = res.cursor || undefined;
+    } while (cursor);
+    const mb = (n: number) => +(n / 1e6).toFixed(1);
+    return {
+      totalMB: mb(total), ttsMB: mb(tts), anthemsMB: mb(anthems),
+      otherMB: mb(total - tts - anthems),
+      reclaimableMB: mb(tts),
+      percentOfQuota: Math.round((total / 1e6 / BLOB_QUOTA_MB) * 100),
+      count,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function handler(req: Request) {
   if (!(await isAdminAuthed(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,15 +80,26 @@ async function handler(req: Request) {
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   const hasDriveKey = !!process.env.GOOGLE_DRIVE_API_KEY;
 
-  const [anthemCount, anthemsWithUrl] = await Promise.all([
+  const [anthemCount, anthemsWithUrl, storyCount, storiesWithAudio, blob] = await Promise.all([
     prisma.audioStream.count().catch(() => -1),
     prisma.audioStream.count({ where: { NOT: { audioUrl: "" } } }).catch(() => -1),
+    prisma.newsStory.count({ where: storyScope() }).catch(() => -1),
+    prisma.newsStory.count({ where: { ...storyScope(), NOT: { audioUrl: null } } }).catch(() => -1),
+    blobUsage(),
   ]);
 
   // Ordered worst-first: the first blocker is the one to fix.
   const blockers: string[] = [];
   if (!hasElevenLabs) blockers.push("Audio generation requires ELEVENLABS_API_KEY — set it in Vercel env.");
   if (!hasBlob) blockers.push("BLOB_READ_WRITE_TOKEN is not set — generated audio cannot be cached, so every play fails.");
+  // The quota wall is the single most common cause of "audio unavailable", and
+  // it is silent: reads keep working, so nothing looks broken until a write.
+  if (blob && blob.percentOfQuota >= 90) {
+    blockers.push(
+      `Vercel Blob is at ${blob.percentOfQuota}% of the ${BLOB_QUOTA_MB}MB quota — every new audio write fails. ` +
+      `Run "Free Up Blob Storage" to reclaim ~${blob.reclaimableMB}MB of regenerable narration cache.`,
+    );
+  }
   if (!hasVoice) blockers.push("ELEVENLABS_VOICE_ID is not set — the default narration voice is unconfigured.");
   if (anthemCount === 0) {
     blockers.push(
@@ -98,6 +148,11 @@ async function handler(req: Request) {
     },
     // Anthems — imported mp3s, a completely separate system from narration.
     anthems: { total: anthemCount, withAudioUrl: anthemsWithUrl, driveApiKey: hasDriveKey },
+    // Where the audio actually LIVES. Note this is Vercel Blob, not ElevenLabs:
+    // ElevenLabs synthesises and hands back bytes, it stores nothing for us, so
+    // clearing ElevenLabs history would free none of this.
+    blobStorage: blob ?? "unavailable (no BLOB_READ_WRITE_TOKEN, or list failed)",
+    stories: { total: storyCount, withPersistedAudio: storiesWithAudio },
     blockers,
     hint: blockers[0] ?? "Audio chain looks healthy.",
   });

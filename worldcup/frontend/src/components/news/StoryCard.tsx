@@ -56,7 +56,11 @@ export function DeepDivePanel({ text }: { text: string }) {
 function ttsMessage(status: number, error?: string): string {
   const e = (error ?? "").toLowerCase();
   if (e.includes("elevenlabs_api_key")) return "Narration isn't configured yet";
-  if (e.includes("quota") || e.includes("cache failed")) return "Audio storage full — retry later";
+  // "Audio cache failed" is the Vercel BLOB write failing — ElevenLabs already
+  // succeeded by that point and handed back the bytes. Naming the store matters:
+  // read as "ElevenLabs storage full" it sends admins to purge an ElevenLabs
+  // history that frees nothing, because we never store anything there.
+  if (e.includes("quota") || e.includes("cache failed")) return "Audio cache full — admin: free up Blob storage";
   if (status === 429 || e.includes("429")) return "Narration busy — try again";
   if (e.includes("elevenlabs")) return "Narration service unavailable";
   return "Audio unavailable";
