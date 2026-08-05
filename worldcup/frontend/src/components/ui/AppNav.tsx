@@ -10,7 +10,7 @@ import LiveMatchBanner from "./LiveMatchBanner";
 import ThemeToggle from "./ThemeToggle";
 import { useUnits } from "@/lib/units";
 import { NAV_GROUPS, activeGroupFor, type NavGroup } from "@/lib/navGroups";
-import { SPORT, WORDMARK, BRAND_IS_PLATFORM } from "@/lib/sportConfig";
+import { WORDMARK } from "@/lib/sportConfig";
 
 // ── Desktop: one button per intent group, dropdown with its pages ─────────────
 function GroupMenu({ group, path }: { group: NavGroup; path: string }) {
@@ -118,14 +118,14 @@ function UserMenu({ session }: { session: NonNullable<ReturnType<typeof useSessi
   );
 }
 
-// Nav subline, from config.
+// Nav subline: always just the domain (owner 8/4).
 //
-// The mark itself is now the deployment's own name (SPORT.wordmark), so the
-// subline carries what the mark no longer says: on a tournament-branded
-// deployment that's the platform lineage, on podiumMetrics itself it's the
-// studio0x domain. Previously the mark was always "podiumMetrics" and the
-// tournament was demoted to this 8px line.
-const NAV_SUBLINE = BRAND_IS_PLATFORM ? "studio0x.io" : "podiumMetrics · studio0x.io";
+// The mark itself is the deployment's own name (SPORT.wordmark). The subline
+// briefly carried "podiumMetrics · studio0x.io" to keep the platform visible,
+// but two product names stacked in the header read as indecision — the sportOS
+// family footer already states the lineage ("Leagues Cup 2026 — powered by
+// podiumMetrics, part of sportOS by studio0x"), which is the right place for it.
+const NAV_SUBLINE = "studio0x.io";
 
 export default function AppNav() {
   const { data: session, status } = useSession();
