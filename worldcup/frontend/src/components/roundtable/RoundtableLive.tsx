@@ -141,7 +141,11 @@ export default function RoundtableLive() {
       if (!payload?.onAir) {
         setSpeaking(null);
         setNextSpeaker(null);
-        setStatus("off air — the bed stays up until the next kickoff");
+        setStatus(
+          payload?.nextKickoff
+            ? `NEXT BROADCAST · ${payload.nextKickoff.matchup} · ${kickoffLabel(payload.nextKickoff.utcDate)}`
+            : "off air — the bed stays up until the next kickoff",
+        );
         await new Promise((r) => setTimeout(r, POLL_MS));
         continue;
       }
