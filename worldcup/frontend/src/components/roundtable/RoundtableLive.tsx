@@ -161,6 +161,11 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
   /** The most recent concrete audio failure, surfaced verbatim. Every failure in
    *  this chain is otherwise silent and indistinguishable from the others. */
   const [audioIssue, setAudioIssue] = useState<string | null>(null);
+  /** Live engine state, shown on demand. Exists so "no audio" can be narrowed to
+   *  a cause from the device it is happening on, instead of guessed at. */
+  const [diagnostics, setDiagnostics] = useState<Record<string, string> | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [toneResult, setToneResult] = useState<string | null>(null);
 
   const audio = useRef<BroadcastAudio | null>(null);
   const running = useRef(false);
@@ -441,11 +446,16 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
       // actually unlocks WebKit never ran under user activation at all, so the
       // context reported itself "running" and emitted nothing. Everything
       // asynchronous has to come after this line.
+      // This now also starts the crowd bed synchronously — sound leaves the
+      // speaker in the same call stack as the tap.
       engine.unlock();
 
+      // Only does anything when a remote bed URL is configured; the synthesised
+      // bed is already running by this point.
       await engine.startBed();
       // Ask the context directly rather than trusting that the tap worked.
       setNeedsUnlock(!engine.running);
+      setDiagnostics(engine.diagnostics());
       running.current = true;
       setLive(true);
       setStatus("tuning in…");
@@ -472,7 +482,28 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
     engine.unlock();
     setAudioIssue(null);
     // The context reports its real state a tick after resume() settles.
-    window.setTimeout(() => setNeedsUnlock(!engine.running), 300);
+    window.setTimeout(() => {
+      setNeedsUnlock(!engine.running);
+      setDiagnostics(engine.diagnostics());
+    }, 300);
+  }, []);
+
+  /** Play the diagnostic beep. Not async at the top level — the tap has to reach
+   *  the engine without an await in front of it, same rule as the unlock. */
+  const testTone = useCallback(() => {
+    const engine = audio.current;
+    if (!engine) return;
+    engine.unlock(); // free: re-asserts the gesture on a device that dropped it
+    setToneResult("playing…");
+    void engine.playTestTone().then((ok) => {
+      setToneResult(
+        ok
+          ? "Tone sent. Heard it? → the audio path works and the fault is in the TTS chain. Silent? → the context or the phone's silent switch."
+          : "Tone could not be started — see the state below.",
+      );
+      setDiagnostics(engine.diagnostics());
+      setNeedsUnlock(!engine.running);
+    });
   }, []);
 
   // ── iOS suspends the context whenever the app is backgrounded ─────────────
@@ -712,6 +743,57 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
             <button onClick={goOffAir} className="s0x-btn s0x-btn-secondary shrink-0 !px-3 !py-1">
               stop
             </button>
+          </div>
+
+          {/* ── audio diagnostics ──────────────────────────────────────── */}
+          {/* Deliberately on the surface rather than in the console: the device
+              that fails is a phone, and nobody is attaching a debugger to it
+              mid-match. The test tone is the single most useful control here —
+              it splits "the browser is blocking sound" from "the voices never
+              rendered", which look identical from the outside. */}
+          <div className="border-t border-s0x-border px-4 py-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={testTone}
+                className="s0x-mono text-[10px] text-s0x-teal underline underline-offset-2"
+              >
+                🔈 test sound
+              </button>
+              <button
+                onClick={() => {
+                  const engine = audio.current;
+                  if (engine) setDiagnostics(engine.diagnostics());
+                  setShowDiagnostics((v) => !v);
+                }}
+                className="s0x-mono text-[10px] text-s0x-muted underline underline-offset-2"
+              >
+                {showDiagnostics ? "hide" : "audio status"}
+              </button>
+            </div>
+
+            {toneResult && (
+              <p className="mt-1.5 text-[10px] leading-relaxed text-s0x-muted">{toneResult}</p>
+            )}
+
+            {showDiagnostics && diagnostics && (
+              <dl className="s0x-mono mt-2 space-y-0.5 text-[10px]">
+                {Object.entries(diagnostics).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="w-20 shrink-0 text-s0x-muted">{k}</dt>
+                    <dd className="min-w-0 text-s0x-text">{v}</dd>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <dt className="w-20 shrink-0 text-s0x-muted">audio mode</dt>
+                  <dd className="min-w-0 text-s0x-text">
+                    {data?.episode?.audioMode ?? "—"}
+                    {data?.episode?.audioMode === "stream"
+                      ? " (not stored — rendering failed, often an ElevenLabs 429)"
+                      : ""}
+                  </dd>
+                </div>
+              </dl>
+            )}
           </div>
         </>
       )}

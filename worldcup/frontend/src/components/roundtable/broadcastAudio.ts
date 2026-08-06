@@ -290,7 +290,82 @@ export class BroadcastAudio {
       this.onIssue(`Audio unlock failed: ${e instanceof Error ? e.message : String(e)}`);
     }
 
+    // The crowd bed starts HERE, in the tap, not in an async continuation.
+    // Beyond satisfying iOS, this is what makes the button feel like it did
+    // something: sound arrives on the press rather than a beat later.
+    //
+    // Only the synthesised bed can do this. A remote bed needs a fetch, which
+    // cannot happen inside a gesture at all — that deployment depends on the
+    // silent unlock buffer above, which is exactly what it is for.
+    if (!STADIUM_BED_URL) {
+      try {
+        this.startBedSync();
+      } catch (e) {
+        this.onIssue(`Stadium bed failed to start: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
     if (SILENT_KEEPALIVE) this.startKeepalive();
+  }
+
+  /**
+   * An unmistakable beep through the same graph as everything else.
+   *
+   * This is a DIAGNOSTIC, and it exists because "no audio" has now been reported
+   * twice without it being possible to tell which half is broken. The crowd bed
+   * is synthesised locally; the pundits come from ElevenLabs over the network.
+   * If the beep is audible then the context, the session and the output device
+   * are all fine and the fault is in the TTS chain. If it is not, the fault is
+   * the context or the phone's silent switch. One tap answers a question that
+   * two rounds of guessing did not.
+   */
+  async playTestTone(): Promise<boolean> {
+    if (this.disposed) return false;
+    if (!(await this.ensureRunning())) {
+      this.onIssue("Test tone blocked — the audio context is not running.");
+      return false;
+    }
+    try {
+      const t0 = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      const g = this.ctx.createGain();
+      // Ramped rather than switched: a hard gate on a sine is a click at both
+      // ends, which is a worse test signal than the tone itself.
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.03);
+      g.gain.setValueAtTime(0.35, t0 + 0.45);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+      osc.connect(g);
+      // Straight to master, bypassing the mixer gains: a test that can be
+      // silenced by the crowd slider tests the wrong thing.
+      g.connect(this.master);
+      osc.start(t0);
+      osc.stop(t0 + 0.65);
+      return true;
+    } catch (e) {
+      this.onIssue(`Test tone failed: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
+    }
+  }
+
+  /** Everything a human needs to tell these failure modes apart. */
+  diagnostics(): Record<string, string> {
+    return {
+      context: this.disposed ? "disposed" : this.ctx.state,
+      sampleRate: `${Math.round(this.ctx.sampleRate)} Hz`,
+      crowdBed: this.bedSource ? "running" : "not started",
+      bedLevel: this.bedLevel.toFixed(2),
+      keepalive: !SILENT_KEEPALIVE
+        ? "disabled"
+        : this.keepalive
+          ? this.keepalive.paused
+            ? "created, PAUSED (iOS may mute Web Audio via the silent switch)"
+            : "playing"
+          : "not created",
+      bedSource: STADIUM_BED_URL ? "remote" : "synthesised",
+    };
   }
 
   /** Silent looping element — see SILENT_KEEPALIVE above for why it exists. */
@@ -357,22 +432,48 @@ export class BroadcastAudio {
 
   // ── ambience ───────────────────────────────────────────────────────────────
 
+  /**
+   * Start the synthesised bed RIGHT NOW, synchronously.
+   *
+   * This is the version that runs inside the tap. The previous code yielded to
+   * a `setTimeout` before generating the buffer so the "tuning in…" paint could
+   * land first — which meant the bed's `start()` happened in a later task, out
+   * of the gesture's call stack. That is precisely the gap iOS punishes, and it
+   * bought a paint nobody was waiting for. Generating ~1M samples costs tens of
+   * milliseconds; staying inside the gesture is worth every one of them.
+   *
+   * Returns whether a source was actually started.
+   */
+  startBedSync(): boolean {
+    if (this.disposed || this.bedSource) return false;
+    this.attachBed(makeCrowdBuffer(this.ctx), true);
+    return true;
+  }
+
   async startBed(): Promise<void> {
     if (this.disposed || this.bedSource) return;
 
-    // Yield once so the "tuning in…" paint lands before a million samples of
-    // noise are generated on the main thread. The unlock has already run by
-    // this point, so nothing here is racing the gesture.
-    await new Promise<void>((r) => setTimeout(r, 0));
-    if (this.disposed) return;
-
-    const fetched = STADIUM_BED_URL ? await fetchBuffer(this.ctx, STADIUM_BED_URL) : null;
-    if (STADIUM_BED_URL && !fetched) {
-      this.onIssue(`Stadium bed at ${STADIUM_BED_URL} could not be loaded — using the synthesised crowd.`);
+    // Only the REMOTE bed can reach here — the synthesised one is started
+    // synchronously by unlock(). A fetch cannot happen inside a gesture, so a
+    // deployment that sets NEXT_PUBLIC_STADIUM_BED_URL relies on the silent
+    // unlock buffer having already opened the context.
+    if (!STADIUM_BED_URL) {
+      this.startBedSync();
+      return;
     }
-    const buffer = fetched ?? makeCrowdBuffer(this.ctx);
-    if (this.disposed) return;
 
+    const fetched = await fetchBuffer(this.ctx, STADIUM_BED_URL);
+    if (this.disposed) return;
+    if (!fetched) {
+      this.onIssue(`Stadium bed at ${STADIUM_BED_URL} could not be loaded — using the synthesised crowd.`);
+      this.startBedSync();
+      return;
+    }
+    this.attachBed(fetched, false);
+  }
+
+  /** Wire a buffer up as the looping bed and fade it in. */
+  private attachBed(buffer: AudioBuffer, synthesised: boolean): void {
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     src.loop = true;
@@ -383,7 +484,7 @@ export class BroadcastAudio {
     // Band-limit to the range a distant crowd actually occupies: no sub rumble,
     // no hiss. Only applied to the synthesised bed — real audio is left alone.
     let node: AudioNode = src;
-    if (!STADIUM_BED_URL) {
+    if (synthesised) {
       const hp = this.ctx.createBiquadFilter();
       hp.type = "highpass";
       hp.frequency.value = 140;

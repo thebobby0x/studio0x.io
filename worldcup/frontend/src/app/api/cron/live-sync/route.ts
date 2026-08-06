@@ -86,9 +86,15 @@ const QUOTA_RESERVE = 300;
 // segment, this call joins it instead of paying for a second one.
 
 /** Skip the trigger unless this much of maxDuration remains. Generation is a
- *  Claude call plus a parallel ElevenLabs render; starting one with less runway
- *  than this risks a timeout that wastes the whole spend. */
-const GENERATE_RESERVE_MS = 30_000;
+ *  Claude call plus the ElevenLabs render; starting one with less runway than
+ *  this risks a timeout that wastes the whole spend.
+ *
+ *  Raised from 30s on 8/5: the render is no longer parallel. ElevenLabs was
+ *  returning 429 to a 15-way fan-out, so lines now render through a throttle
+ *  (lib/roundtable360/render.ts) and a full episode takes tens of seconds rather
+ *  than a few. In practice the loop breaks on its FIRST poll when something
+ *  happens, so ~85s is normally left and this bound rarely binds. */
+const GENERATE_RESERVE_MS = 45_000;
 
 /** Hard ceiling on the invocation, mirroring `maxDuration` above in ms. */
 const INVOCATION_BUDGET_MS = 90_000;

@@ -44,6 +44,80 @@ const INTRA_GROUP_GAP_MS = 260;
 /** Cap per line, as a billing bound on a public generation trigger. */
 const MAX_LINE_CHARS = 900;
 
+// ── ElevenLabs request throttle ──────────────────────────────────────────────
+//
+// WHY THIS EXISTS (LC26, 8/5): the render path fanned out hard — groups rendered
+// in parallel AND the lines inside each group rendered in parallel — so a
+// 15-line episode fired ~15 simultaneous ElevenLabs requests. Every plan tier
+// has a concurrency cap well below that, so the account started returning 429,
+// and `renderLine`'s model fallback made it worse by answering a rate limit with
+// two MORE requests. A single episode could cost ~45 rejected calls and produce
+// no audio at all.
+//
+// Concurrency is therefore 1 by default, with a stagger between requests. That
+// is slower — a 15-line episode serialises to roughly 20-35s instead of a few
+// seconds — and the tradeoff is deliberate: audio that arrives late is a show,
+// audio that 429s is silence. Both knobs are env-tunable, so raising them on a
+// higher ElevenLabs tier needs no deploy.
+const MAX_CONCURRENCY = Math.max(1, Number(process.env.ELEVENLABS_MAX_CONCURRENCY ?? 1));
+const STAGGER_MS = Math.max(0, Number(process.env.ELEVENLABS_STAGGER_MS ?? 500));
+
+/** Longest we will honour a 429's retry-after before giving up on the line. */
+const MAX_BACKOFF_MS = 8_000;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Counting semaphore. On release the slot is handed DIRECTLY to the next waiter
+ * rather than being decremented and re-acquired — otherwise a burst of waiters
+ * can all observe a free slot and pile back in past the limit.
+ */
+class Semaphore {
+  private active = 0;
+  private queue: Array<() => void> = [];
+  constructor(private readonly limit: number) {}
+
+  async acquire(): Promise<void> {
+    if (this.active < this.limit) {
+      this.active++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.queue.push(resolve));
+    // The releaser transferred its slot; `active` deliberately unchanged.
+  }
+
+  release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+      return;
+    }
+    this.active--;
+  }
+}
+
+/**
+ * Process-wide, NOT per-episode. Two episodes generating in one instance (a
+ * client poll racing the live-sync trigger) must share the same budget, or the
+ * limit is per-caller and means nothing.
+ *
+ * It cannot span serverless instances — nothing in-process can — so this bounds
+ * the common case rather than guaranteeing a global cap. The generation cooldown
+ * and in-flight lock are what keep the number of concurrent instances near one.
+ */
+const ttsGate = new Semaphore(MAX_CONCURRENCY);
+
+/** Parse `retry-after` (seconds, or an HTTP date). Null when absent/unusable. */
+function retryAfterMs(res: Response): number | null {
+  const raw = res.headers.get("retry-after");
+  if (!raw) return null;
+  const secs = Number(raw);
+  if (Number.isFinite(secs)) return Math.min(MAX_BACKOFF_MS, Math.max(0, secs * 1000));
+  const when = Date.parse(raw);
+  if (Number.isFinite(when)) return Math.min(MAX_BACKOFF_MS, Math.max(0, when - Date.now()));
+  return null;
+}
+
 export interface RenderableLine {
   speaker: Speaker360;
   text: string;
@@ -227,27 +301,64 @@ export async function renderLine(line: RenderableLine): Promise<Buffer | RenderF
     },
   ];
 
-  let lastReason = "unknown";
-  for (const attempt of attempts) {
-    try {
-      const res = await fetch(`${ELEVENLABS}/${voiceId}?output_format=mp3_44100_128`, {
-        method: "POST",
-        headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
-        body: JSON.stringify(attempt.body),
-      });
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > 0) return buf;
-        lastReason = `${attempt.label}: empty body`;
-      } else {
-        lastReason = `${attempt.label}: HTTP ${res.status}`;
-        console.warn(`[roundtable360/render] ${lastReason} for ${line.speaker}`);
+  // One slot at a time across the whole process. Everything below — including
+  // the model fallbacks and any backoff — happens inside it, because a line that
+  // is mid-retry is still consuming the account's concurrency.
+  await ttsGate.acquire();
+  try {
+    let lastReason = "unknown";
+
+    for (const attempt of attempts) {
+      // A 429 is answered ONCE with a wait, then the same attempt is retried.
+      // Falling through to the next model on a rate limit is what turned one
+      // throttled line into three rejected requests: the limit is per ACCOUNT,
+      // so a different model_id is the same queue.
+      for (let tries = 0; tries < 2; tries++) {
+        try {
+          const res = await fetch(`${ELEVENLABS}/${voiceId}?output_format=mp3_44100_128`, {
+            method: "POST",
+            headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
+            body: JSON.stringify(attempt.body),
+          });
+
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (buf.length > 0) return buf;
+            lastReason = `${attempt.label}: empty body`;
+            break; // an empty 200 is not a rate limit — move to the next model
+          }
+
+          if (res.status === 429) {
+            const wait = retryAfterMs(res) ?? 1_500;
+            lastReason =
+              `${attempt.label}: HTTP 429 (ElevenLabs concurrency/rate limit). ` +
+              `Lower ELEVENLABS_MAX_CONCURRENCY or raise the plan tier.`;
+            console.warn(`[roundtable360/render] rate limited, waiting ${wait}ms for ${line.speaker}`);
+            if (tries === 0) {
+              await sleep(wait);
+              continue; // retry this same attempt once
+            }
+            // Still limited after backing off. Trying the other models now would
+            // just spend two more rejections, so stop this line entirely.
+            return { speaker: line.speaker, reason: lastReason };
+          }
+
+          lastReason = `${attempt.label}: HTTP ${res.status}`;
+          console.warn(`[roundtable360/render] ${lastReason} for ${line.speaker}`);
+          break; // a real error for this model — try the next one
+        } catch (e) {
+          lastReason = `${attempt.label}: ${e instanceof Error ? e.message : String(e)}`;
+          break;
+        }
       }
-    } catch (e) {
-      lastReason = `${attempt.label}: ${e instanceof Error ? e.message : String(e)}`;
     }
+    return { speaker: line.speaker, reason: lastReason };
+  } finally {
+    // The gap belongs INSIDE the slot: releasing first and sleeping after would
+    // let the next line start immediately and the stagger would do nothing.
+    if (STAGGER_MS > 0) await sleep(STAGGER_MS);
+    ttsGate.release();
   }
-  return { speaker: line.speaker, reason: lastReason };
 }
 
 function isFailure(v: Buffer | RenderFailure): v is RenderFailure {
@@ -273,10 +384,12 @@ export interface GroupRenderResult {
 /**
  * Render and store every group of an episode.
  *
- * Lines within a group render in PARALLEL (the group is one conversational
- * burst — there is no reason to serialise it), and the groups themselves render
- * in parallel too, so a 15-line episode costs about as much wall-clock as its
- * slowest single line.
+ * Lines and groups are all dispatched at once, but the fan-out is now NOMINAL:
+ * every request passes through the process-wide `ttsGate`, so the real
+ * concurrency is ELEVENLABS_MAX_CONCURRENCY (1 by default) and a 15-line episode
+ * takes tens of seconds rather than as long as its slowest line. That is the
+ * price of not being rate-limited into silence — see the throttle block above.
+ * Raising the env var restores the old behaviour on a plan that can take it.
  *
  * Blob failure is expected, not exceptional: the store is at capacity from WC26
  * audio, and CLAUDE.md's hard rule forbids deleting any of it to make room. A
