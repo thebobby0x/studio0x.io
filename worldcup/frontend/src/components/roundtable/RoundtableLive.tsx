@@ -155,6 +155,12 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
   /** The moment that forced the segment currently on air. Drives the BREAKING
    *  chip; cleared when the segment it interrupted for finishes. */
   const [breaking, setBreaking] = useState<BreakingCue | null>(null);
+  /** The audio context is not running — the browser is holding sound back and
+   *  only a tap can release it. Drives the tap-to-enable banner. */
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+  /** The most recent concrete audio failure, surfaced verbatim. Every failure in
+   *  this chain is otherwise silent and indistinguishable from the others. */
+  const [audioIssue, setAudioIssue] = useState<string | null>(null);
 
   const audio = useRef<BroadcastAudio | null>(null);
   const running = useRef(false);
@@ -423,22 +429,76 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
     if (live || starting) return;
     setStarting(true);
     try {
-      const engine = new BroadcastAudio({ bed: bedLevel });
+      const engine = new BroadcastAudio({ bed: bedLevel, onIssue: setAudioIssue });
       audio.current = engine;
-      await engine.resume();
+
+      // THE UNLOCK, AND IT HAPPENS BEFORE ANY `await`.
+      //
+      // This is the whole iOS fix. `goLive` is async, and every `await` inside
+      // it hands control back to the event loop — after which WebKit no longer
+      // considers the code to be running inside the user's tap. The previous
+      // order (`await engine.resume()` first) meant the silent-buffer start that
+      // actually unlocks WebKit never ran under user activation at all, so the
+      // context reported itself "running" and emitted nothing. Everything
+      // asynchronous has to come after this line.
+      engine.unlock();
+
       await engine.startBed();
+      // Ask the context directly rather than trusting that the tap worked.
+      setNeedsUnlock(!engine.running);
       running.current = true;
       setLive(true);
       setStatus("tuning in…");
       void broadcast();
-    } catch {
+    } catch (e) {
       setStatus("audio could not start in this browser");
+      setAudioIssue(e instanceof Error ? e.message : String(e));
       audio.current?.dispose();
       audio.current = null;
     } finally {
       setStarting(false);
     }
   }, [live, starting, bedLevel, broadcast]);
+
+  /**
+   * Re-unlock from a tap on the banner.
+   *
+   * Deliberately NOT async and deliberately doing the work first: the same
+   * activation rule that broke `goLive` applies to every later recovery tap.
+   */
+  const tapToEnable = useCallback(() => {
+    const engine = audio.current;
+    if (!engine) return;
+    engine.unlock();
+    setAudioIssue(null);
+    // The context reports its real state a tick after resume() settles.
+    window.setTimeout(() => setNeedsUnlock(!engine.running), 300);
+  }, []);
+
+  // ── iOS suspends the context whenever the app is backgrounded ─────────────
+  // A phone locking the screen, a call arriving, or a tab switch all suspend the
+  // AudioContext, and coming back does NOT resume it. Across ninety minutes on a
+  // phone this is a certainty, not an edge case, so the show watches for it and
+  // asks for one tap rather than going quietly dead.
+  useEffect(() => {
+    if (!live) return;
+
+    const check = async () => {
+      const engine = audio.current;
+      if (!engine) return;
+      setNeedsUnlock(!(await engine.ensureRunning()));
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const t = setInterval(check, 5_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(t);
+    };
+  }, [live]);
 
   const goOffAir = useCallback(() => {
     running.current = false;
@@ -454,6 +514,8 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
     setSpeaking(null);
     setNextSpeaker(null);
     setBreaking(null);
+    setNeedsUnlock(false);
+    setAudioIssue(null);
     setStatus("");
   }, []);
 
@@ -495,6 +557,37 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
           </span>
         )}
       </div>
+
+      {/* ── tap to enable audio ──────────────────────────────────────────── */}
+      {/* iOS Safari blocks sound until a gesture, and re-blocks it every time the
+          app is backgrounded. This is a full-width tap target rather than a
+          small button because it is the difference between a working broadcast
+          and a silent one, and because it is most often needed on a phone. */}
+      {live && needsUnlock && (
+        <button
+          onClick={tapToEnable}
+          className="flex w-full items-center gap-2 border-b border-s0x-ink bg-s0x-ink/25 px-4 py-3 text-left"
+        >
+          <span className="shrink-0 text-base">🔊</span>
+          <span className="min-w-0">
+            <span className="s0x-mono block text-[11px] font-bold text-s0x-text">
+              Tap to enable audio
+            </span>
+            <span className="block text-[10px] leading-relaxed text-s0x-muted">
+              Your browser is holding sound back. On iPhone, also check the ring/silent
+              switch on the side of the phone.
+            </span>
+          </span>
+        </button>
+      )}
+
+      {/* The concrete reason, when there is one. Kept separate from the tap
+          target so a diagnostic can never be mistaken for the fix. */}
+      {live && audioIssue && !needsUnlock && (
+        <p className="s0x-mono border-b border-s0x-border px-4 py-2 text-[10px] leading-relaxed text-s0x-accent">
+          ⚠ {audioIssue}
+        </p>
+      )}
 
       {/* ── breaking-news banner ─────────────────────────────────────────── */}
       {/* The panel cut in for something. Naming the moment is what separates

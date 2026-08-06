@@ -105,20 +105,92 @@ function makeCrowdBuffer(ctx: AudioContext): AudioBuffer {
   return buffer;
 }
 
+/**
+ * Decode, tolerating Safari's legacy callback signature.
+ *
+ * `decodeAudioData` returned void and took callbacks for most of WebKit's life;
+ * the promise form is newer. On a browser serving the old signature the promise
+ * form resolves to `undefined` and every line silently produces no sound — the
+ * exact symptom this file is being changed to fix, so it is not worth assuming
+ * which form we get.
+ */
+function decode(ctx: AudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
+  return new Promise<AudioBuffer>((resolve, reject) => {
+    const maybe = ctx.decodeAudioData(bytes, resolve, reject) as unknown as
+      | Promise<AudioBuffer>
+      | undefined;
+    if (maybe && typeof maybe.then === "function") maybe.then(resolve, reject);
+  });
+}
+
 async function fetchBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    return await ctx.decodeAudioData(await res.arrayBuffer());
+    return await decode(ctx, await res.arrayBuffer());
   } catch {
     return null;
   }
+}
+
+// ── iOS silent-switch keepalive ──────────────────────────────────────────────
+//
+// On iOS, Web Audio plays into the AMBIENT audio session, which the hardware
+// ring/silent switch mutes. A phone with the switch flipped renders this whole
+// feature silent while every visible sign says it is playing — no error, no
+// rejected promise, nothing to catch. HTMLMediaElement playback uses the
+// PLAYBACK session instead, which the switch does not mute, and starting one
+// moves the page's session for Web Audio along with it.
+//
+// So a looping silent track is started at unlock time and left running. It
+// costs one tiny element and no bandwidth, and it is the difference between
+// "BK hears the match" and "BK hears nothing and everything looks fine".
+//
+// UNVERIFIED on BK's actual device — I have no iOS Safari here to test on. If
+// audio still does not come through with the ringer off, this is the first
+// thing to suspect, and `SILENT_KEEPALIVE = false` disables it cleanly.
+const SILENT_KEEPALIVE = true;
+
+/** A valid ~0.4s silent mono WAV, built byte by byte rather than pasted as a
+ *  base64 blob so it can be read and checked rather than trusted. */
+function silentWavUrl(): string {
+  const rate = 8000;
+  const samples = rate * 0.4;
+  const bytes = new Uint8Array(44 + samples); // 8-bit PCM: 1 byte/sample
+  const view = new DataView(bytes.buffer);
+  const ascii = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  ascii(0, "RIFF");
+  view.setUint32(4, 36 + samples, true); // file size - 8
+  ascii(8, "WAVEfmt ");
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate, true); // byte rate = rate * channels * bytesPerSample
+  view.setUint16(32, 1, true); // block align
+  view.setUint16(34, 8, true); // bits per sample
+  ascii(36, "data");
+  view.setUint32(40, samples, true);
+  // 8-bit PCM is UNSIGNED — silence is 128, not 0. A buffer of zeroes here is
+  // full-scale DC offset, which is a click on every loop rather than silence.
+  bytes.fill(128, 44);
+  return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
 }
 
 export interface BroadcastLevels {
   bed: number;
   voice: number;
   stinger: number;
+}
+
+export interface BroadcastOptions extends Partial<BroadcastLevels> {
+  /** Called with a human-readable reason whenever audio fails or is blocked.
+   *  Exists because every failure mode here is otherwise SILENT — a blocked
+   *  context, a muted session and a decode failure all look identical from the
+   *  outside, which is how a dead audio chain reaches production looking fine. */
+  onIssue?: (message: string) => void;
 }
 
 export class BroadcastAudio {
@@ -136,8 +208,12 @@ export class BroadcastAudio {
   /** Cancellers for in-flight silence() waits, so dispose() never leaves the
    *  broadcast loop parked in a pause that will never end. */
   private pending = new Set<() => void>();
+  private onIssue: (message: string) => void;
+  /** The silent looping element that keeps iOS in the playback audio session. */
+  private keepalive: HTMLAudioElement | null = null;
+  private keepaliveUrl: string | null = null;
 
-  constructor(levels: Partial<BroadcastLevels> = {}) {
+  constructor(levels: BroadcastOptions = {}) {
     // Constructed inside the user's click handler — the autoplay gate. Every
     // browser blocks audio until then, which is also why the show has exactly
     // one entry point.
@@ -146,6 +222,7 @@ export class BroadcastAudio {
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctor();
 
+    this.onIssue = levels.onIssue ?? (() => {});
     this.bedLevel = levels.bed ?? 0.15;
     this.voiceLevel = levels.voice ?? 1;
 
@@ -170,6 +247,109 @@ export class BroadcastAudio {
     return this.ctx.state;
   }
 
+  /** True when the context is actually running and audio can be heard. */
+  get running(): boolean {
+    return !this.disposed && this.ctx.state === "running";
+  }
+
+  /**
+   * The iOS unlock ritual. MUST be called synchronously from inside a real user
+   * gesture handler — not after an `await`, which is the mistake that makes an
+   * unlock look correct and do nothing.
+   *
+   * Three steps, and iOS needs all three:
+   *
+   *  1. `resume()`. Necessary and, on its own, NOT sufficient — WebKit will
+   *     report a context as "running" while still refusing to emit sound.
+   *  2. Play a one-sample silent buffer. This is what actually flips WebKit's
+   *     internal "this page may make noise" bit. A context that has never had a
+   *     source started inside a gesture stays mute however healthy it looks,
+   *     which is exactly the symptom BK is seeing: full UI, no audio.
+   *  3. Start the silent keepalive element, moving iOS off the ambient audio
+   *     session so the ring/silent switch stops muting everything.
+   *
+   * Safe to call repeatedly — the recovery banner calls it again on tap, and so
+   * does the app-foregrounded path.
+   */
+  unlock(): void {
+    if (this.disposed) return;
+
+    // Fired without awaiting: the gesture's user-activation must not be spent
+    // waiting on a promise before the silent buffer starts.
+    void this.ctx.resume().catch((e) => {
+      this.onIssue(`Audio context could not resume: ${e instanceof Error ? e.message : String(e)}`);
+    });
+
+    try {
+      const buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(this.ctx.destination);
+      src.start(0);
+    } catch (e) {
+      this.onIssue(`Audio unlock failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    if (SILENT_KEEPALIVE) this.startKeepalive();
+  }
+
+  /** Silent looping element — see SILENT_KEEPALIVE above for why it exists. */
+  private startKeepalive(): void {
+    if (this.keepalive) {
+      // Already created; a repeat unlock just needs it playing again.
+      this.keepalive.play().catch(() => {
+        /* a rejection here is not fatal — Web Audio may still be audible */
+      });
+      return;
+    }
+    try {
+      const el = document.createElement("audio");
+      this.keepaliveUrl = silentWavUrl();
+      el.src = this.keepaliveUrl;
+      el.loop = true;
+      el.volume = 0.01; // not 0: some builds treat a muted element as no session
+      // Without playsinline iOS can try to take the track fullscreen.
+      el.setAttribute("playsinline", "");
+      this.keepalive = el;
+      el.play().catch((e) => {
+        this.onIssue(
+          `Silent keepalive was blocked (${e instanceof Error ? e.name : "unknown"}) — ` +
+            `if your phone's ring/silent switch is on, audio may stay muted.`,
+        );
+      });
+    } catch {
+      /* keepalive is an enhancement; never let it break the show */
+    }
+  }
+
+  /**
+   * Bring the context back if it can be brought back, and report honestly
+   * whether it worked.
+   *
+   * iOS suspends the AudioContext whenever the app is backgrounded, a call
+   * arrives, or the screen locks — all of which WILL happen across ninety
+   * minutes on a phone. `resume()` only succeeds here if the page still holds
+   * user activation; when it does not, the caller needs to know so it can put
+   * the tap-to-resume banner up instead of pretending to play.
+   */
+  async ensureRunning(): Promise<boolean> {
+    if (this.disposed) return false;
+    if (this.ctx.state === "running") return true;
+    try {
+      // Also covers WebKit's "interrupted" state, which is what an incoming call
+      // or an alarm leaves behind and which no other browser has. resume() is
+      // the recovery for it too.
+      await this.ctx.resume();
+    } catch {
+      /* fall through to the state check — the reason is not actionable */
+    }
+    // Re-read via the getter rather than touching `this.ctx.state` again here:
+    // the early return above narrowed it to the non-running states and that
+    // narrowing survives the await, so an inline comparison is a compile error.
+    // Crossing a function boundary is what re-widens it.
+    return this.running;
+  }
+
   /** Browsers suspend the context when a tab is backgrounded. */
   async resume(): Promise<void> {
     if (this.ctx.state === "suspended") await this.ctx.resume();
@@ -180,9 +360,17 @@ export class BroadcastAudio {
   async startBed(): Promise<void> {
     if (this.disposed || this.bedSource) return;
 
-    const buffer =
-      (STADIUM_BED_URL ? await fetchBuffer(this.ctx, STADIUM_BED_URL) : null) ??
-      makeCrowdBuffer(this.ctx);
+    // Yield once so the "tuning in…" paint lands before a million samples of
+    // noise are generated on the main thread. The unlock has already run by
+    // this point, so nothing here is racing the gesture.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    if (this.disposed) return;
+
+    const fetched = STADIUM_BED_URL ? await fetchBuffer(this.ctx, STADIUM_BED_URL) : null;
+    if (STADIUM_BED_URL && !fetched) {
+      this.onIssue(`Stadium bed at ${STADIUM_BED_URL} could not be loaded — using the synthesised crowd.`);
+    }
+    const buffer = fetched ?? makeCrowdBuffer(this.ctx);
     if (this.disposed) return;
 
     const src = this.ctx.createBufferSource();
@@ -277,14 +465,27 @@ export class BroadcastAudio {
     let buffer: AudioBuffer;
     try {
       const res = await fetch(url, { signal });
-      if (!res.ok) return false;
-      buffer = await this.ctx.decodeAudioData(await res.arrayBuffer());
-    } catch {
+      if (!res.ok) {
+        this.onIssue(`Commentary audio request failed: HTTP ${res.status}`);
+        return false;
+      }
+      buffer = await decode(this.ctx, await res.arrayBuffer());
+    } catch (e) {
+      // An abort is the show being stopped, not a fault — reporting it would
+      // put a scary message on screen every time someone presses stop.
+      if (!signal?.aborted) {
+        this.onIssue(`Commentary audio could not be decoded: ${e instanceof Error ? e.message : String(e)}`);
+      }
       return false;
     }
     if (this.disposed || signal?.aborted) return false;
 
-    await this.resume();
+    // A suspended context accepts start() and plays nothing. Catching it here is
+    // what turns "the transcript scrolls in silence" into an actionable prompt.
+    if (!(await this.ensureRunning())) {
+      this.onIssue("Audio is blocked by the browser — tap to enable sound.");
+      return false;
+    }
     return new Promise<boolean>((resolve) => {
       const src = this.ctx.createBufferSource();
       src.buffer = buffer;
@@ -459,6 +660,16 @@ export class BroadcastAudio {
     for (const cancel of this.pending) cancel();
     this.pending.clear();
     this.stopLine();
+    if (this.keepalive) {
+      this.keepalive.pause();
+      this.keepalive.removeAttribute("src");
+      this.keepalive = null;
+    }
+    if (this.keepaliveUrl) {
+      // The blob is ours; not revoking it leaks it for the life of the tab.
+      URL.revokeObjectURL(this.keepaliveUrl);
+      this.keepaliveUrl = null;
+    }
     if (this.bedSource) {
       try {
         this.bedSource.stop();
