@@ -19,6 +19,7 @@ import { SPORT } from "@/lib/sportConfig";
 import { tournamentBrief, EVENT_NAME } from "@/lib/promptContext";
 import {
   buildLive360Context,
+  buildFinalWhistleContext,
   renderMatchBoard,
   renderMomentFeed,
   renderCallbackBlock,
@@ -34,6 +35,8 @@ import {
   type Speaker360,
 } from "./personas";
 import { renderEpisodeGroups, apiKeyProblem, type RenderedGroup } from "./render";
+import { cueIsCovered } from "./breaking";
+import { getBreakingCue } from "./breakingQuery";
 
 /** Bump when the brief changes — episodes are a log, so this only labels rows. */
 export const PROMPT_REV_360 = "v1";
@@ -42,6 +45,18 @@ export const PROMPT_REV_360 = "v1";
  *  episode. 25s ≈ the client's 30s poll minus jitter, so a single listener still
  *  gets a fresh segment every poll while ten listeners still cost one call. */
 export const MIN_REGEN_MS = 25_000;
+
+/**
+ * The cooldown a BREAKING moment gets instead of MIN_REGEN_MS.
+ *
+ * A goal must not wait out a cooldown tuned for idle chatter — that delay is the
+ * whole reason this show felt scripted rather than live. But the floor cannot be
+ * zero either: goal-then-VAR-then-restart can land three qualifying moments
+ * inside ten seconds, and each one would otherwise buy its own Claude call and
+ * its own full ElevenLabs render. 8s is short enough to feel immediate and long
+ * enough that a burst of related events shares one segment.
+ */
+export const BREAKING_REGEN_MS = 8_000;
 
 const MODEL = process.env.ROUNDTABLE_360_MODEL ?? "claude-haiku-4-5-20251001";
 
@@ -323,14 +338,42 @@ export interface GenerateResult {
  * dead air is the one thing this feature exists to prevent.
  */
 export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateResult> {
-  const ctx = await buildLive360Context(fixtureIds);
+  let ctx = await buildLive360Context(fixtureIds);
   const previous = await latestEpisode();
 
+  // ── the event-driven override ────────────────────────────────────────────
+  // A breaking moment the segment on air has not covered collapses the cooldown
+  // to BREAKING_REGEN_MS. Everything else — idle chatter between incidents —
+  // keeps the full MIN_REGEN_MS, so the spend curve is unchanged for the 95% of
+  // a match where nothing is happening.
+  //
+  // The cue is looked up BEFORE the empty-board check, because the single most
+  // important cue of a match arrives exactly when the board empties.
+  const cueFixtures = ctx.matches.length > 0 ? ctx.matches.map((m) => m.fixture) : fixtureIds;
+  const cue = await getBreakingCue(cueFixtures);
+  const breaking = cue != null && !cueIsCovered(cue, previous);
+
   if (ctx.matches.length === 0) {
-    return { episode: previous, reused: true, reason: "no matches in play" };
+    // Nothing is in play. Normally that is the end of it — but a full-time
+    // whistle that has not been called yet is the one thing worth reopening the
+    // mic for, and the match it belongs to has by definition just left the
+    // board. Any other cue with an empty board is stale and is ignored.
+    if (breaking && cue!.type === "END") {
+      ctx = await buildFinalWhistleContext(cue!.fixture);
+    }
+    if (ctx.matches.length === 0) {
+      return { episode: previous, reused: true, reason: "no matches in play" };
+    }
   }
-  if (previous && Date.now() - new Date(previous.generatedAt).getTime() < MIN_REGEN_MS) {
-    return { episode: previous, reused: true, reason: "within regeneration cooldown" };
+
+  const cooldownMs = breaking ? BREAKING_REGEN_MS : MIN_REGEN_MS;
+
+  if (previous && Date.now() - new Date(previous.generatedAt).getTime() < cooldownMs) {
+    return {
+      episode: previous,
+      reused: true,
+      reason: breaking ? "breaking, but within the breaking-news floor" : "within regeneration cooldown",
+    };
   }
   if (inFlight) {
     const shared = await inFlight;

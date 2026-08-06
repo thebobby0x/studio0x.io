@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { syncLiveMatches, getQuotaSnapshot, type LiveSyncResult } from "@/lib/matchStatsIngest";
+import { SPORT } from "@/lib/sportConfig";
+import { generateEpisode } from "@/lib/roundtable360/generate";
 
 export const dynamic = "force-dynamic";
 // Headroom over LOOP_BUDGET_MS so the final in-flight poll can finish and the
@@ -64,6 +66,33 @@ const DEFAULT_INTERVAL_MS = 20_000;
  *  schedule route and the per-match live route are never starved by this loop. */
 const QUOTA_RESERVE = 300;
 
+// ── Event-driven commentary ─────────────────────────────────────────────────
+//
+// When a poll observes a goal, a red card, or a period boundary, this route
+// STOPS POLLING and spends the rest of its invocation writing the segment about
+// it. That trade is deliberate: the cron fires again in under a minute, so the
+// cost is a few seconds of stats latency, and the gain is that the audio is
+// already generated and rendered before any listener asks for it. Waiting for a
+// browser to poll and THEN generate is what put the booth ~90s behind the crowd.
+//
+// It is done inline rather than fire-and-forget because this project has no
+// `waitUntil` (no @vercel/functions dependency): work left running after the
+// response is written can be killed when the instance freezes, which would fail
+// silently and intermittently — the worst possible failure mode for the one
+// feature whose entire job is to not be late.
+//
+// Generation has its own MIN_REGEN/BREAKING_REGEN cooldowns and an in-flight
+// lock, so this cannot stampede: if a listener's poll already started the same
+// segment, this call joins it instead of paying for a second one.
+
+/** Skip the trigger unless this much of maxDuration remains. Generation is a
+ *  Claude call plus a parallel ElevenLabs render; starting one with less runway
+ *  than this risks a timeout that wastes the whole spend. */
+const GENERATE_RESERVE_MS = 30_000;
+
+/** Hard ceiling on the invocation, mirroring `maxDuration` above in ms. */
+const INVOCATION_BUDGET_MS = 90_000;
+
 function resolveIntervalMs(override?: string | null): number {
   const raw = override ?? process.env.LIVE_SYNC_INTERVAL_MS;
   const n = Number(raw);
@@ -89,12 +118,22 @@ export async function GET(req: Request) {
 
   for (;;) {
     const pollStartedMs = Date.now() - startedAt;
-    const result = await syncLiveMatches(120).catch((e) => ({
+    const result: LiveSyncResult = await syncLiveMatches(120).catch((e) => ({
       ok: false as const, skipped: String(e), inWindow: false, liveMatches: 0,
       statsOk: 0, eventsOk: 0, apiCalls: 0,
       details: [] as Array<{ fixture: number; stats: string; events: string }>,
+      // A failed poll observed nothing, so it broke nothing — never let an error
+      // path trigger a Claude call.
+      momentsPublished: 0, breaking: false, breakingDetail: [] as string[],
     }));
     polls.push({ ...result, pollStartedMs });
+
+    // Something happened. Stop polling and go write about it — the next cron
+    // firing is under a minute away and will pick the stats back up.
+    if (result.breaking) {
+      stoppedBecause = `breaking moment observed (${result.breakingDetail.join("; ")})`;
+      break;
+    }
 
     // Nothing to poll — looping would just re-run the same two cheap DB queries.
     if (!result.inWindow) { stoppedBecause = result.skipped ?? "outside match window"; break; }
@@ -120,6 +159,40 @@ export async function GET(req: Request) {
   const last = polls[polls.length - 1];
   const totalApiCalls = polls.reduce((s, p) => s + p.apiCalls, 0);
 
+  // ── fire the booth ────────────────────────────────────────────────────────
+  const breaking = polls.some((p) => p.breaking);
+  let commentary: { triggered: boolean; reason: string; episodeId?: string; reused?: boolean } = {
+    triggered: false,
+    reason: breaking ? "not attempted" : "no breaking moment this invocation",
+  };
+
+  if (breaking && SPORT.roundtable) {
+    const remaining = INVOCATION_BUDGET_MS - (Date.now() - startedAt);
+    if (remaining < GENERATE_RESERVE_MS) {
+      // Not a failure: the moment is on the event bus, so the next listener poll
+      // (or the next cron firing) still picks it up on the normal path. Only the
+      // head start is lost.
+      commentary = { triggered: false, reason: `only ${Math.round(remaining / 1000)}s of budget left — left to the client poll` };
+    } else {
+      try {
+        const { episode, reused, reason } = await generateEpisode();
+        commentary = {
+          triggered: true,
+          reason: reason ?? "generated",
+          episodeId: episode?.id,
+          reused,
+        };
+      } catch (e) {
+        // A dead booth must never take the stats cron down with it — those are
+        // independent jobs that happen to share an invocation.
+        console.error("[live-sync] breaking commentary generation failed", e);
+        commentary = { triggered: false, reason: "generation threw — see logs" };
+      }
+    }
+  } else if (breaking && !SPORT.roundtable) {
+    commentary = { triggered: false, reason: "roundtable not enabled for this deployment" };
+  }
+
   return NextResponse.json({
     ok: polls.some((p) => p.ok),
     intervalMs,
@@ -127,6 +200,10 @@ export async function GET(req: Request) {
     stoppedBecause,
     totalApiCalls,
     elapsedMs: Date.now() - startedAt,
+    momentsPublished: polls.reduce((s, p) => s + p.momentsPublished, 0),
+    breaking,
+    breakingDetail: polls.flatMap((p) => p.breakingDetail),
+    commentary,
     // Effective cadence achieved this invocation, for sanity-checking the env var.
     effectiveIntervalMs: polls.length > 1 ? Math.round((Date.now() - startedAt) / polls.length) : null,
     liveMatches: last?.liveMatches ?? 0,

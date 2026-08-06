@@ -1153,6 +1153,71 @@ will point at that commit rather than a bar-related one.
 
 ---
 
+## EVENT-DRIVEN LIVE COMMENTARY (2026-08-05, worldcup lane)
+
+The Roundtable used to run on a metronome: a segment was written whenever a
+client polled and `MIN_REGEN_MS` (25s) had lapsed. A goal therefore waited out
+the segment on air (~60-90s of dialogue) plus a poll plus generation. It now
+runs on EVENTS.
+
+**The event bus finally has publishers.** `MatchMoment` existed and nothing wrote
+to it. `/api/cron/live-sync` now publishes through
+`src/lib/eventBus/publishFootball.ts`: match events (from the rows it already
+writes to MatchEventLog — **zero extra api-football calls**, gotcha #25) plus
+**lifecycle moments** (START/PERIOD_END/END). Lifecycle is the new capability —
+kick-off, half-time and full-time are `Match.status` flips with no feed event, so
+the booth was structurally incapable of reacting to them.
+
+**Breaking = a type allowlist, NOT a significance threshold**
+(`lib/roundtable360/breaking.ts`). With the LC26 rivalry amplifier, half-time
+scores 24 and a yellow card 26 — any threshold that lets HT interrupt also lets
+every yellow interrupt. Significance still decides WHICH moment leads. VAR is
+published and reaches the prompt but does not seize the mic (it arrives in
+bursts); revisit with live data.
+
+**Three cooperating triggers**, each with its own guard:
+1. `live-sync` breaks its poll loop early on a breaking moment and spends the
+   remaining invocation budget generating + rendering, so audio is ready before
+   any listener asks. Inline, not fire-and-forget: there is no `waitUntil` here
+   (no `@vercel/functions`), and post-response work dies on instance freeze.
+2. `generateEpisode` collapses the cooldown to `BREAKING_REGEN_MS` (8s) for an
+   uncovered cue. Not zero — goal→VAR→restart would otherwise buy three full
+   Claude+ElevenLabs renders in ten seconds.
+3. The player polls `/api/roundtable/cue` every 10s (two indexed queries, no
+   model call — it *cannot* trigger generation however often it is hit) and cuts
+   in **at a group boundary, never mid-burst**: a group is one stitched audio
+   object and clipping it reads as a bug, not urgency.
+
+**`cueIsCovered` is asked by two callers with different episodes on purpose:**
+the generator passes the LATEST episode ("has this been written about?"), the
+player passes the episode it is AIRING ("has the listener heard it?"). Those
+diverge for the ~20s a segment spends written-but-unplayed.
+
+**The full-whistle exception.** `getLiveMatches` is LIVE/HT only, so a match
+leaves the board the instant it goes FT and generation bailed with "no matches in
+play" — the full-time moment would be published, ranked, and never spoken.
+`buildFinalWhistleContext(fixture)` is the narrow reopening, reached ONLY via an
+uncovered END cue, so it yields exactly one segment per match and the station
+then goes quiet. Deliberately not a general "finished matches linger 15 minutes"
+rule, which would keep the show generating after every match. The client
+correspondingly plays an unplayed episode even when `onAir` is false.
+
+**Audio.** `BroadcastAudio.swellBed()` is the crowd's own reaction — bed gain to
+3.2× the listener's mixer setting, held 1.2s, decaying 5s — queued at the
+stinger duck's own restore time so the two never race on one AudioParam. It is
+proportional to the mixer setting, so turning the crowd down stays down. Red
+cards get no swell for the same reason they get no horn.
+
+**Still synthesised, still swappable:** the bed and stingers are generated in the
+browser (`NEXT_PUBLIC_STADIUM_BED_URL` / `NEXT_PUBLIC_STINGER_URL` override
+them). No Blob bytes were added — the store is at capacity and its WC26 audio may
+not be deleted.
+
+**No schema change** — `MatchMoment` was already in the schema, so nothing needed
+`db push`.
+
+---
+
 ## STORE SESSION NOTES (appended by the store session — store lane only)
 
 *Per the append-only protocol: this section is the store's; other tenant sessions please don't edit it, and I won't edit yours.*

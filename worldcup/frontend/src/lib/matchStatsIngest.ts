@@ -15,6 +15,13 @@
 
 import { prisma } from "@/lib/prisma";
 import { AF_LEAGUE, isConfigured } from "@/lib/sportConfig";
+import {
+  publishLifecycle,
+  publishMatchEvents,
+  type PublishMatchContext,
+  type PublishableEvent,
+} from "@/lib/eventBus/publishFootball";
+import { isBreakingType } from "@/lib/roundtable360/breaking";
 
 const AF_BASE = "https://v3.football.api-sports.io";
 
@@ -211,12 +218,28 @@ export async function ingestFixtureStatistics(
  * so events go here rather than into a third, near-duplicate table. `assist` was
  * added for goal providers.
  */
-export async function ingestFixtureEvents(fixture: number): Promise<{ fixture: number; written: number; ok: boolean; reason?: string }> {
+export async function ingestFixtureEvents(
+  fixture: number,
+): Promise<{ fixture: number; written: number; fresh: PublishableEvent[]; ok: boolean; reason?: string }> {
   const json = (await afFetch(`/fixtures/events?fixture=${fixture}`)) as { response?: AFEvent[] } | null;
   const events = json?.response;
-  if (!events) return { fixture, written: 0, ok: false, reason: "events unavailable" };
+  if (!events) return { fixture, written: 0, fresh: [], ok: false, reason: "events unavailable" };
+
+  // Which of these have we seen before? An upsert cannot tell you whether it
+  // created or updated, and "is this event NEW" is the entire trigger for
+  // automatic commentary — so the known keys are read up front. One indexed
+  // query per fixture per poll, against a table we are about to write anyway.
+  const known = new Set(
+    (
+      await prisma.matchEventLog.findMany({
+        where: { fixture },
+        select: { eventKey: true },
+      })
+    ).map((r) => r.eventKey),
+  );
 
   let written = 0;
+  const fresh: PublishableEvent[] = [];
   for (const e of events) {
     const minute = (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0);
     const type = (e.type ?? "").trim();
@@ -226,6 +249,7 @@ export async function ingestFixtureEvents(fixture: number): Promise<{ fixture: n
     // Stable dedup key — identical to the existing contract so re-polling a live
     // match upserts in place instead of duplicating every event each minute.
     const eventKey = `${type}|${detail}|${minute}|${player ?? ""}`;
+    const isNew = !known.has(eventKey);
     try {
       await prisma.matchEventLog.upsert({
         where: { fixture_eventKey: { fixture, eventKey } },
@@ -235,11 +259,17 @@ export async function ingestFixtureEvents(fixture: number): Promise<{ fixture: n
         update: { minute, detail, ...(assist ? { assist } : {}) },
       });
       written++;
+      // Only report it as fresh once the write actually succeeded — otherwise a
+      // failed insert would trigger commentary about an event we did not store,
+      // and the next poll would report it as fresh all over again.
+      if (isNew) {
+        fresh.push({ eventKey, type, detail, minute, team: e.team?.name ?? "", player, assist });
+      }
     } catch {
       /* one bad event must not abort the fixture */
     }
   }
-  return { fixture, written, ok: true };
+  return { fixture, written, fresh, ok: true };
 }
 
 export interface LiveSyncResult {
@@ -251,6 +281,17 @@ export interface LiveSyncResult {
   eventsOk: number;
   apiCalls: number;
   details: Array<{ fixture: number; stats: string; events: string }>;
+  /** Moments published to the event bus this poll (new events + lifecycle). */
+  momentsPublished: number;
+  /**
+   * True when at least one of those moments is worth interrupting the broadcast
+   * for (a goal, a red card, kick-off, half-time, full-time). The cron reads
+   * this and spends its remaining budget writing the segment immediately —
+   * that is what turns the Roundtable from clock-driven into event-driven.
+   */
+  breaking: boolean;
+  /** Human summary of what broke, for the response body and the logs. */
+  breakingDetail: string[];
 }
 
 /**
@@ -268,6 +309,7 @@ export interface LiveSyncResult {
 export async function syncLiveMatches(windowMinutes = 120): Promise<LiveSyncResult> {
   const result: LiveSyncResult = {
     ok: false, inWindow: false, liveMatches: 0, statsOk: 0, eventsOk: 0, apiCalls: 0, details: [],
+    momentsPublished: 0, breaking: false, breakingDetail: [],
   };
 
   if (!isConfigured()) { result.skipped = "deployment has no league id"; return result; }
@@ -276,29 +318,66 @@ export async function syncLiveMatches(windowMinutes = 120): Promise<LiveSyncResu
   const now = new Date();
   const windowMs = windowMinutes * 60_000;
 
-  // Guard 1: is any fixture plausibly underway right now?
-  const nearby = await prisma.match.count({
+  // Everything in the kickoff window, whatever its status. Two jobs at once:
+  // the cheap "is anything underway?" guard, and the rows the LIFECYCLE pass
+  // needs — kick-off, half-time and full-time are Match.status flips with no
+  // feed event behind them, so they can only be seen here.
+  const nearby = await prisma.match.findMany({
     where: {
       leagueId: { in: [AF_LEAGUE, 0] },
       date: { gte: new Date(now.getTime() - windowMs), lte: new Date(now.getTime() + windowMs) },
     },
+    select: {
+      id: true, fixture: true, status: true, elapsed: true,
+      homeScore: true, awayScore: true, round: true,
+      homeTeam: { select: { afTeamId: true, country: true } },
+      awayTeam: { select: { afTeamId: true, country: true } },
+    },
   });
-  result.inWindow = nearby > 0;
+  result.inWindow = nearby.length > 0;
   if (!result.inWindow) {
     result.ok = true;
     result.skipped = `no kickoff within ±${windowMinutes}m — skipped to save api-football calls`;
     return result;
   }
 
-  // Guard 2: in-play only.
-  const live = await prisma.match.findMany({
-    where: { leagueId: { in: [AF_LEAGUE, 0] }, status: { in: [...IN_PLAY_STATUSES] } },
-    select: {
-      id: true, fixture: true,
-      homeTeam: { select: { afTeamId: true } },
-      awayTeam: { select: { afTeamId: true } },
-    },
+  const contextFor = (m: (typeof nearby)[number]): PublishMatchContext => ({
+    fixture: m.fixture,
+    matchId: m.id,
+    status: m.status,
+    elapsed: m.elapsed,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
+    homeCountry: m.homeTeam.country ?? "",
+    awayCountry: m.awayTeam.country ?? "",
+    round: m.round ?? "",
   });
+
+  // ── LIFECYCLE pass ────────────────────────────────────────────────────────
+  // DB-only, zero api-football calls. Idempotent by momentKey, so each boundary
+  // publishes exactly once per fixture no matter how many times we poll.
+  for (const m of nearby) {
+    const published = await publishLifecycle(contextFor(m));
+    if (!published) continue;
+    const { moment, created } = published;
+    result.momentsPublished++;
+
+    // Plausibility guard for the one case where a genuinely first observation is
+    // still stale news: shipping this code (or a cold deployment) mid-match
+    // records kick-off for the first time at, say, 70'. Announcing "we are under
+    // way!" an hour into the game would be a visible falsehood, so START only
+    // breaks in while the match really has just started. Half-time and full-time
+    // need no equivalent guard — those statuses only hold at the boundary.
+    const plausible = moment.type !== "START" || m.elapsed <= 10;
+
+    if (created && isBreakingType(moment.type) && plausible) {
+      result.breaking = true;
+      result.breakingDetail.push(`${moment.type} · fixture ${m.fixture}`);
+    }
+  }
+
+  // Guard 2: in-play only — the api-football calls are spent here and nowhere else.
+  const live = nearby.filter((m) => (IN_PLAY_STATUSES as readonly string[]).includes(m.status));
   result.liveMatches = live.length;
   if (live.length === 0) { result.ok = true; result.skipped = "no matches in play"; return result; }
 
@@ -310,10 +389,28 @@ export async function syncLiveMatches(windowMinutes = 120): Promise<LiveSyncResu
     result.apiCalls += 2;
     if (stats.ok) result.statsOk++;
     if (events.ok) result.eventsOk++;
+
+    // Publish ONLY the newly-observed events. Re-publishing a match's whole
+    // history every poll would be idempotent but wasteful, and it would make
+    // "what just happened" unanswerable.
+    if (events.fresh.length > 0) {
+      const published = await publishMatchEvents(contextFor(m), events.fresh);
+      result.momentsPublished += published.length;
+      for (const moment of published) {
+        if (!isBreakingType(moment.type)) continue;
+        result.breaking = true;
+        result.breakingDetail.push(
+          `${moment.type} · fixture ${m.fixture} · ${moment.minute}'${moment.entity ? ` · ${moment.entity}` : ""}`,
+        );
+      }
+    }
+
     result.details.push({
       fixture: m.fixture,
       stats: stats.ok ? "ok" : (stats.reason ?? "failed"),
-      events: events.ok ? `${events.written} event(s)` : (events.reason ?? "failed"),
+      events: events.ok
+        ? `${events.written} event(s), ${events.fresh.length} new`
+        : (events.reason ?? "failed"),
     });
   }
 

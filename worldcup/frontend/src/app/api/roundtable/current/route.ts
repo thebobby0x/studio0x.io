@@ -39,9 +39,11 @@ export async function GET(req: Request) {
   try {
     const ctx = await buildLive360Context();
 
-    const episode = wantsGenerate && ctx.matches.length > 0
-      ? (await generateEpisode()).episode
-      : await latestEpisode();
+    // No "only if something is live" guard here any more: generateEpisode makes
+    // that call itself, and it is the only place that can tell the difference
+    // between an empty board and an empty board with an uncalled final whistle.
+    // Duplicating the check here is what would silence the full-time segment.
+    const episode = wantsGenerate ? (await generateEpisode()).episode : await latestEpisode();
 
     const matchSummaries: MatchSummary[] = ctx.matches.map((m) => ({
       fixture: m.fixture,

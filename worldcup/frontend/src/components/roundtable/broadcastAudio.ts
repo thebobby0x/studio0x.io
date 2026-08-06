@@ -47,6 +47,15 @@ export function stingerFor(momentType: string | null | undefined): StingerKind |
 const BED_SECONDS = 12;
 const BED_CROSSFADE = 0.4; // seam-free loop: tail is folded back over the head
 
+// ── Goal swell ───────────────────────────────────────────────────────────────
+// The crowd's own reaction, layered under the produced stinger. Multiplier is
+// relative to the listener's mixer setting and clamped to 1.0 at the top, so the
+// swell is proportional at any crowd level rather than a fixed shout.
+const SWELL_PEAK_MULT = 3.2;
+const SWELL_RISE_S = 0.35; // fast — a crowd erupts, it does not fade in
+const SWELL_HOLD_S = 1.2;
+const SWELL_DECAY_S = 5; // the long settle back to the bed
+
 /** Filtered noise that reads as a distant crowd rather than hiss, written so the
  *  buffer's end already blends into its start — a plain noise loop clicks. */
 function makeCrowdBuffer(ctx: AudioContext): AudioBuffer {
@@ -219,6 +228,42 @@ export class BroadcastAudio {
     return this.bedLevel;
   }
 
+  /**
+   * The crowd reacting — a hard swell on the bed that decays back to the mixer
+   * setting.
+   *
+   * Distinct from the stinger, and the two are complementary rather than
+   * redundant. A stinger is a produced broadcast cue that DUCKS everything under
+   * a horn; this is the stadium itself getting louder because a goal just went
+   * in, and it lands after the horn as the roar that does not stop dead. Without
+   * it the ambience is the same at 0-0 as it is ten seconds after a winner,
+   * which is the tell that the bed is a loop rather than a crowd.
+   *
+   * Scheduled entirely on the audio clock in absolute time, so it can be queued
+   * to begin exactly where a duck restores rather than fighting it: two ramps
+   * racing on one AudioParam is how you get a bed that never comes back up.
+   *
+   * @param startTime absolute ctx time to begin at; defaults to now.
+   * @param from      level to start the rise from; defaults to the current bed.
+   */
+  swellBed(startTime?: number, from?: number): void {
+    if (this.disposed) return;
+    const t0 = startTime ?? this.ctx.currentTime;
+    const g = this.bedGain.gain;
+
+    // Never exceed 1.0 — and stay proportional to the listener's mixer setting,
+    // so someone who turned the crowd down does not get it shouted back at them.
+    const peak = Math.min(1, this.bedLevel * SWELL_PEAK_MULT);
+
+    g.cancelScheduledValues(t0);
+    g.setValueAtTime(from ?? this.bedLevel, t0);
+    g.linearRampToValueAtTime(peak, t0 + SWELL_RISE_S);
+    g.setValueAtTime(peak, t0 + SWELL_RISE_S + SWELL_HOLD_S);
+    // Linear, not exponential: a crowd settles gradually rather than falling off
+    // a cliff, and exponentialRamp cannot target a level of 0 anyway.
+    g.linearRampToValueAtTime(this.bedLevel, t0 + SWELL_RISE_S + SWELL_HOLD_S + SWELL_DECAY_S);
+  }
+
   // ── commentary ─────────────────────────────────────────────────────────────
 
   /**
@@ -309,7 +354,18 @@ export class BroadcastAudio {
     const custom = STINGER_URL ? await fetchBuffer(this.ctx, STINGER_URL) : null;
     const length = custom?.duration ?? (kind === "RED_CARD" ? 1.4 : 2.0);
 
-    this.duck(length);
+    const restoresAt = this.duck(length);
+
+    // A goal is the crowd's moment, not just the booth's: as the horn's duck
+    // lifts, hand straight over to the swell so the roar carries on instead of
+    // snapping back to idle murmur. Queued at the duck's own restore time so the
+    // two never schedule competing ramps on the same AudioParam.
+    //
+    // Red cards are excluded for the same reason they get no horn: a sending-off
+    // is not a celebration.
+    if (kind !== "RED_CARD") {
+      this.swellBed(restoresAt, this.bedLevel * 0.3);
+    }
 
     if (custom) {
       const src = this.ctx.createBufferSource();
@@ -322,8 +378,10 @@ export class BroadcastAudio {
     await new Promise<void>((r) => setTimeout(r, length * 1000));
   }
 
-  /** Duck the bed and the commentary under a stinger, then restore. */
-  private duck(seconds: number): void {
+  /** Duck the bed and the commentary under a stinger, then restore.
+   *  Returns the absolute ctx time the duck lifts, so a caller can queue what
+   *  happens next against the same clock instead of guessing. */
+  private duck(seconds: number): number {
     const now = this.ctx.currentTime;
     const back = now + seconds;
 
@@ -338,6 +396,7 @@ export class BroadcastAudio {
     this.voiceGain.gain.linearRampToValueAtTime(this.voiceLevel * 0.25, now + 0.12);
     this.voiceGain.gain.setValueAtTime(this.voiceLevel * 0.25, back);
     this.voiceGain.gain.linearRampToValueAtTime(this.voiceLevel, back + 0.5);
+    return back;
   }
 
   /** A crowd roar (swept noise) under a two-note horn. Red cards get the roar

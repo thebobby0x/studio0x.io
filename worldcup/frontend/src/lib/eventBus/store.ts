@@ -15,8 +15,11 @@ import { SPORT } from "@/lib/sportConfig";
 import { scoreMoment, type SignificanceContext } from "./significance";
 import type { MatchMoment, MatchMomentInput, MomentQuery, MomentStore } from "./types";
 
-/** Stable dedup key — matches MatchEventLog's contract so re-observation upserts. */
-function momentKey(i: Pick<MatchMomentInput, "type" | "period" | "minute" | "payload">): string {
+/** Stable dedup key — matches MatchEventLog's contract so re-observation upserts.
+ *  Exported because callers need to ask "does this moment already exist?"
+ *  BEFORE publishing it, and a caller that rebuilt the key itself would be one
+ *  edit away from silently disagreeing with the key actually stored. */
+export function momentKey(i: Pick<MatchMomentInput, "type" | "period" | "minute" | "payload">): string {
   const detail = (i.payload?.detail as string | undefined) ?? "";
   return `${i.type}|${i.period ?? ""}|${i.minute}|${detail}`;
 }

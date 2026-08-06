@@ -18,6 +18,7 @@ import FatigueFactor from "@/components/stats/FatigueFactor";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
+import RoundtableLive from "@/components/roundtable/RoundtableLive";
 import MatchPulse from "@/components/match/MatchPulse";
 import MatchMarkets from "@/components/match/MatchMarkets";
 import ShareButton from "@/components/ui/ShareButton";
@@ -25,7 +26,7 @@ import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
-import { BRAND_NAME } from "@/lib/sportConfig";
+import { BRAND_NAME, SPORT } from "@/lib/sportConfig";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -288,6 +289,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {venueInfo && venueFromDB?.venue && (
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
         )}
+
+        {/* The Roundtable, on air. LIVE ONLY — the panel talks about matches in
+            play, so on a finished fixture it would be a card offering to tune
+            into someone else's game. The show itself stays the global
+            whip-around; passing this fixture only narrows what is allowed to
+            INTERRUPT it, so a goal elsewhere does not cut across the segment
+            you are listening to about this match. */}
+        {isLive && SPORT.roundtable && <RoundtableLive fixtures={[m.id]} />}
 
         {/* AI Commentary — shown for live and finished matches */}
         {(isLive || isDone) && <CommentaryPanel fixtureId={m.id} />}

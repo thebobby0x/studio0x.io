@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic2, Radio, Volume2, Loader2 } from "lucide-react";
 import { BroadcastAudio, stingerFor } from "./broadcastAudio";
 import { PERSONAS_360, type Speaker360 } from "@/lib/roundtable360/personas";
+import { cueIsCovered, type BreakingCue } from "@/lib/roundtable360/breaking";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AI Live 360 Roundtable — the player.
@@ -91,6 +92,17 @@ interface CurrentPayload {
 /** Ticker/scoreboard refresh. Matches the live-sync cadence. */
 const POLL_MS = 30_000;
 
+/**
+ * Breaking-news check, while on air only.
+ *
+ * Three times the scoreboard's rate, and affordable because `/api/roundtable/cue`
+ * is two indexed queries with no model call behind it — it is physically unable
+ * to trigger a generation however often it is hit. The number is the worst-case
+ * delay between a goal being recorded and this player knowing about it, so it is
+ * the largest single term in "how late does the booth sound".
+ */
+const CUE_POLL_MS = 10_000;
+
 /** Fallback if the server does not send one. */
 const DEFAULT_PAUSE_MS = 5_000;
 
@@ -117,7 +129,20 @@ function kickoffLabel(iso: string): string {
   });
 }
 
-export default function RoundtableLive() {
+export interface RoundtableLiveProps {
+  /**
+   * Restrict the breaking-news cue to these fixtures.
+   *
+   * The SHOW itself stays global — it is a whip-around, and generating a
+   * separate episode per match page would multiply the Claude and ElevenLabs
+   * spend by the number of live matches for no editorial gain. What this narrows
+   * is when the player CUTS IN: on a match page, a goal in some other game
+   * should not interrupt the segment you are listening to about this one.
+   */
+  fixtures?: number[];
+}
+
+export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
   const [data, setData] = useState<CurrentPayload | null>(null);
   const [live, setLive] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -127,6 +152,9 @@ export default function RoundtableLive() {
   const [status, setStatus] = useState<string>("");
   /** True once consecutive bursts have produced no speech at all. */
   const [audioDown, setAudioDown] = useState(false);
+  /** The moment that forced the segment currently on air. Drives the BREAKING
+   *  chip; cleared when the segment it interrupted for finishes. */
+  const [breaking, setBreaking] = useState<BreakingCue | null>(null);
 
   const audio = useRef<BroadcastAudio | null>(null);
   const running = useRef(false);
@@ -135,6 +163,18 @@ export default function RoundtableLive() {
   const mutedRuns = useRef(0);
   /** Episodes whose stinger has already fired — a goal is announced once. */
   const stung = useRef(new Set<string>());
+  /** The episode actually being PLAYED right now — not necessarily the newest
+   *  one on the server. This is what a cue is judged against. */
+  const airing = useRef<{ leadMomentKey: string | null; generatedAt: string } | null>(null);
+  /** A cue the listener has not heard yet, waiting for the current burst to end.
+   *  Set by the cue poll, consumed by the broadcast loop. */
+  const pendingCue = useRef<BreakingCue | null>(null);
+  /** Cues already acted on, so one goal cuts in once and not on every poll. */
+  const handledCues = useRef(new Set<string>());
+  /** Wall-clock of the last stinger, so a cut-in roar and the following
+   *  segment's lead roar do not both fire for the same goal. */
+  const lastStingerAt = useRef(0);
+  const fixtureParam = fixtures?.length ? `?fixtures=${fixtures.join(",")}` : "";
 
   // ── scoreboard poll (runs whether or not audio is on) ──────────────────────
   const refresh = useCallback(async (generate: boolean): Promise<CurrentPayload | null> => {
@@ -155,6 +195,43 @@ export default function RoundtableLive() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  // ── breaking-news cue poll (only while on air) ────────────────────────────
+  // Off air there is nothing to interrupt, so this does not run at all — the
+  // card on a dashboard nobody has tuned into costs exactly the 30s scoreboard
+  // poll it always did.
+  useEffect(() => {
+    if (!live) return;
+
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/roundtable/cue${fixtureParam}`);
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { cue: BreakingCue | null };
+        const cue = json.cue;
+        if (!cue || cancelled) return;
+
+        // Judged against the episode being PLAYED, not the newest one written.
+        // A segment can be generated seconds after a goal and still be twenty
+        // seconds from the listener's ears; until they have heard it, the goal
+        // is news to them.
+        if (handledCues.current.has(cue.key)) return;
+        if (cueIsCovered(cue, airing.current)) return;
+
+        pendingCue.current = cue;
+      } catch {
+        // A failed cue check is a missed head start, never a broken show.
+      }
+    };
+
+    void check();
+    const t = setInterval(check, CUE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [live, fixtureParam]);
+
   // ── the broadcast loop ────────────────────────────────────────────────────
   const broadcast = useCallback(async () => {
     const engine = audio.current;
@@ -173,7 +250,17 @@ export default function RoundtableLive() {
       pending = null;
       if (!running.current) return;
 
-      if (!payload?.onAir) {
+      // A segment written but not yet heard outranks the off-air state. The
+      // full-time wrap is generated at the exact instant the last match leaves
+      // the board, so `onAir` is already false by the time it exists — bailing
+      // on `onAir` alone would throw away the one segment a viewer is most
+      // likely to be waiting for.
+      const unplayed =
+        payload?.episode != null &&
+        payload.episode.lines.length > 0 &&
+        !played.has(payload.episode.id);
+
+      if (!payload?.onAir && !unplayed) {
         setSpeaking(null);
         setNextSpeaker(null);
         setStatus(
@@ -197,11 +284,24 @@ export default function RoundtableLive() {
       played.add(ep.id);
       if (played.size > 40) played = new Set([ep.id]); // bound the memo
 
+      // What is on air now. The cue poll reads this to decide whether something
+      // has happened that this listener has not yet heard about.
+      airing.current = { leadMomentKey: ep.leadMomentKey, generatedAt: ep.generatedAt };
+
       // Stinger first: the segment leads with a goal / red card / lead change,
       // so the roar lands before Lorraine opens her mouth.
+      //
+      // Unless the cut-in already fired one. A cue and an episode lead can be
+      // the SAME goal recorded under two different keys — the cue comes from the
+      // event bus (`GOAL|1H|23|Normal Goal Messi`), the lead from MatchEventLog
+      // (`Goal|Normal Goal|23|Messi`) — so they cannot be deduped by key. Time is
+      // the reliable discriminator: two roars a few seconds apart are the same
+      // goal being announced twice.
       const kind = stingerFor(ep.leadMomentType);
-      if (kind && ep.leadMomentKey && !stung.current.has(ep.leadMomentKey)) {
+      const justStung = Date.now() - lastStingerAt.current < 15_000;
+      if (kind && ep.leadMomentKey && !stung.current.has(ep.leadMomentKey) && !justStung) {
         stung.current.add(ep.leadMomentKey);
+        lastStingerAt.current = Date.now();
         await engine.playStinger(kind);
       }
       if (!running.current) return;
@@ -267,6 +367,17 @@ export default function RoundtableLive() {
           else if (mutedRuns.current >= 2) setAudioDown(true);
         }
 
+        // ── the cut-in ────────────────────────────────────────────────────
+        // Something has happened that this listener has not heard. Abandon the
+        // rest of the segment and go get the one that covers it.
+        //
+        // AT A GROUP BOUNDARY, NEVER MID-BURST. A group is one stitched audio
+        // object — a conversational exchange — and cutting it off would clip a
+        // pundit mid-sentence, which reads as a bug rather than as urgency. Real
+        // broadcast does the same thing: the presenter finishes their line, then
+        // "…we're going to interrupt you there".
+        if (pendingCue.current) break;
+
         // The natural pause — crowd only. The last thing said stays on screen
         // rather than flipping to a spinner: this is a beat in the show, not a
         // loading state. Skipped after the final burst so the next segment
@@ -276,6 +387,35 @@ export default function RoundtableLive() {
         }
       }
       setSpeaking(null);
+
+      // ── consume the cue ──────────────────────────────────────────────────
+      // Reached either by the break above or by the segment ending naturally
+      // while a cue was waiting. Either way the roar goes up here and the loop
+      // then asks for the segment about it: the server's breaking-news floor
+      // (BREAKING_REGEN_MS) is what makes that request actually generate rather
+      // than hand back the same episode.
+      const cue = pendingCue.current;
+      if (cue && running.current) {
+        pendingCue.current = null;
+        handledCues.current.add(cue.key);
+        if (handledCues.current.size > 60) handledCues.current = new Set([cue.key]);
+        setBreaking(cue);
+
+        const cueKind = stingerFor(cue.type);
+        if (cueKind) {
+          lastStingerAt.current = Date.now();
+          await engine.playStinger(cueKind);
+        } else {
+          // Kick-off, half-time and full-time get no horn — there is nothing to
+          // celebrate — but the crowd still lifts. The swell alone is the cue.
+          engine.swellBed();
+        }
+        // Cancel any prefetched-but-unplayed segment decision; the next loop
+        // iteration re-asks and gets the breaking one.
+        pending = null;
+      } else if (!cue) {
+        setBreaking(null);
+      }
     }
   }, [refresh]);
 
@@ -305,9 +445,15 @@ export default function RoundtableLive() {
     abort.current?.abort();
     audio.current?.dispose();
     audio.current = null;
+    // Nothing is on air, so nothing can be interrupted. Clearing these matters:
+    // a stale `airing` would make the next GO LIVE judge fresh cues against a
+    // segment from the last time this tab was listening.
+    airing.current = null;
+    pendingCue.current = null;
     setLive(false);
     setSpeaking(null);
     setNextSpeaker(null);
+    setBreaking(null);
     setStatus("");
   }, []);
 
@@ -345,10 +491,28 @@ export default function RoundtableLive() {
         {onAir && live && (
           <span className="s0x-live ml-auto shrink-0">
             <span className="s0x-live-dot" />
-            on air
+            {speaking ? "🎙 live commentary" : "on air"}
           </span>
         )}
       </div>
+
+      {/* ── breaking-news banner ─────────────────────────────────────────── */}
+      {/* The panel cut in for something. Naming the moment is what separates
+          "the audio changed" from "a goal just went in" for anyone listening
+          with the sound low or reading rather than listening. */}
+      {live && breaking && (
+        <div className="flex items-center gap-2 border-b border-s0x-border bg-s0x-ink/15 px-4 py-2">
+          <span className="s0x-mono shrink-0 rounded bg-s0x-ink px-1.5 py-0.5 text-[9px] font-bold text-s0x-onink">
+            BREAKING
+          </span>
+          <span className="s0x-data min-w-0 truncate text-[11px] text-s0x-text">
+            {breaking.clockLabel ? `${breaking.clockLabel} · ` : ""}
+            {breaking.detail}
+            {breaking.team ? ` — ${breaking.team}` : ""}
+            {breaking.entity ? ` · ${breaking.entity}` : ""}
+          </span>
+        </div>
+      )}
 
       {/* ── configuration warnings ───────────────────────────────────────── */}
       {/* A missing voice id or a full Blob store degrades the show quietly at

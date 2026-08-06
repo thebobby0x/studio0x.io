@@ -98,7 +98,49 @@ export async function getLiveMatches(): Promise<LiveMatchState[]> {
     orderBy: { date: "asc" },
   });
 
-  return rows.map((m) => ({
+  return rows.map(toMatchState);
+}
+
+/**
+ * The final-whistle context: one just-finished match, treated as if it were
+ * still on the board.
+ *
+ * WHY THIS EXISTS. `getLiveMatches` is LIVE/HT only, so the instant a match goes
+ * FT it vanishes from the board and `generateEpisode` bails with "no matches in
+ * play". The full-time moment would be published to the bus, ranked, and then
+ * never spoken — the booth would fall silent at exactly the moment a viewer most
+ * expects a reaction. This is the narrow exception that lets the panel call the
+ * final whistle.
+ *
+ * Deliberately NOT a general "recently finished matches stay on the board for 15
+ * minutes" rule: that would keep the station on air — and generating — after
+ * every match, multiplying spend for a payoff nobody asked for. The caller
+ * reaches for this only when there is an uncovered END cue, so it produces
+ * exactly one segment per match and then the show goes quiet.
+ */
+export async function buildFinalWhistleContext(fixture: number): Promise<Live360Context> {
+  const row = await prisma.match.findFirst({
+    where: { fixture, date: { gte: new Date(Date.now() - STALE_LIVE_MS) } },
+    include: { homeTeam: true, awayTeam: true },
+  });
+  if (!row) return { matches: [], moments: [], lead: null, nextKickoff: await getNextKickoff() };
+
+  const matches = [toMatchState(row)];
+  const [events, lifecycle] = await Promise.all([
+    getRankedMoments(matches),
+    getLifecycleMoments(matches),
+  ]);
+  const moments = [...events, ...lifecycle].sort(
+    (a, b) => b.significance - a.significance || b.minute - a.minute,
+  );
+  return { matches, moments, lead: moments[0] ?? null, nextKickoff: await getNextKickoff() };
+}
+
+/** Match row → the board shape. Shared so the live board and the final-whistle
+ *  context can never describe the same match differently. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toMatchState(m: any): LiveMatchState {
+  return {
     fixture: m.fixture,
     matchId: m.id,
     home: m.homeTeam.name,
@@ -114,7 +156,7 @@ export async function getLiveMatches(): Promise<LiveMatchState[]> {
     venue: m.venue,
     city: m.city,
     round: m.round,
-  }));
+  };
 }
 
 /**
@@ -180,6 +222,59 @@ export async function getRankedMoments(
   return ranked;
 }
 
+/**
+ * Lifecycle moments (kick-off, half-time, full-time) for the matches on the
+ * board.
+ *
+ * These live ONLY on the event bus. They are Match.status flips, not feed
+ * events, so MatchEventLog has no row for them and `getRankedMoments` above
+ * cannot see them — which is exactly why the booth used to sail through a final
+ * whistle without mentioning it. Published by `/api/cron/live-sync`.
+ *
+ * Read separately rather than moving the whole feed onto MatchMoment: the
+ * MatchEventLog path is the proven one and carries WC26's history, so it stays
+ * the source for match events. If the bus has nothing (a deployment that has not
+ * pushed the table, or a poll that has not run yet) this returns nothing and the
+ * show degrades to exactly its previous behaviour.
+ */
+export async function getLifecycleMoments(
+  matches: LiveMatchState[],
+  windowMs = RECENT_WINDOW_MS,
+): Promise<RankedMoment[]> {
+  if (matches.length === 0) return [];
+  try {
+    const rows = await prisma.matchMoment.findMany({
+      where: {
+        tournamentId: SPORT.id,
+        fixture: { in: matches.map((m) => m.fixture) },
+        type: { in: ["START", "PERIOD_END", "END"] },
+        firstSeenAt: { gte: new Date(Date.now() - windowMs) },
+      },
+      orderBy: { firstSeenAt: "desc" },
+      take: 12,
+    });
+
+    return rows.map((r) => {
+      const payload = (r.payload as Record<string, unknown> | null) ?? {};
+      return {
+        fixture: r.fixture,
+        momentKey: r.momentKey,
+        type: r.type as MomentType,
+        minute: r.minute,
+        team: "", // a boundary belongs to the match, not to one side
+        player: null,
+        assist: null,
+        detail: (payload.description as string | undefined) ?? "period boundary",
+        significance: r.significance,
+        significanceReason: r.significanceReason ?? "",
+        firstSeenAt: r.firstSeenAt.toISOString(),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** The next scheduled kickoff — powers the "NEXT BROADCAST" off-air state. */
 export async function getNextKickoff(): Promise<Live360Context["nextKickoff"]> {
   const m = await prisma.match.findFirst({
@@ -202,7 +297,16 @@ export async function buildLive360Context(fixtureIds?: number[]): Promise<Live36
     const wanted = new Set(fixtureIds);
     matches = matches.filter((m) => wanted.has(m.fixture));
   }
-  const moments = await getRankedMoments(matches);
+  // Match events (MatchEventLog) and period boundaries (event bus) are two
+  // sources because they are two different kinds of fact; the panel sees ONE
+  // ranked feed, sorted by the same significance scorer.
+  const [events, lifecycle] = await Promise.all([
+    getRankedMoments(matches),
+    getLifecycleMoments(matches),
+  ]);
+  const moments = [...events, ...lifecycle].sort(
+    (a, b) => b.significance - a.significance || b.minute - a.minute,
+  );
   const nextKickoff = matches.length === 0 ? await getNextKickoff() : null;
   return { matches, moments, lead: moments[0] ?? null, nextKickoff };
 }
@@ -237,7 +341,10 @@ export function renderMomentFeed(moments: RankedMoment[], matches: LiveMatchStat
     .map((mo) => {
       const who = mo.player ? ` — ${mo.player}` : "";
       const assist = mo.assist ? ` (assist ${mo.assist})` : "";
-      return `· [importance ${mo.significance}] ${label.get(mo.fixture) ?? mo.fixture}: ${mo.detail} for ${mo.team} at ${mo.minute}'${who}${assist}`;
+      // Period boundaries belong to the match, not to one side, so they carry no
+      // team and must not render as "full-time for  at 90'".
+      const side = mo.team ? ` for ${mo.team}` : "";
+      return `· [importance ${mo.significance}] ${label.get(mo.fixture) ?? mo.fixture}: ${mo.detail}${side} at ${mo.minute}'${who}${assist}`;
     })
     .join("\n");
 }
