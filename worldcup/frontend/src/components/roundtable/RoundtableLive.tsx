@@ -690,7 +690,24 @@ export default function RoundtableLive({ fixtures }: RoundtableLiveProps = {}) {
                   <span className="text-[10px] text-s0x-muted">
                     {PERSONAS_360[speaking.line.speaker].role}
                   </span>
-                  <Volume2 size={12} className="ml-auto shrink-0 text-s0x-teal" />
+                  {/* This icon used to be DECORATION — a speaker glyph marking
+                      "this person is talking", with no handler on it. It looks
+                      exactly like an unmute control, so on a silent broadcast
+                      it is the first thing anyone taps, and it did nothing.
+                      (BK tapped it, reasonably, and reported no audio.)
+
+                      It is now the control it always looked like: re-assert the
+                      unlock and play the test tone. Tapping it is the single
+                      most likely gesture on a silent player, so it should be
+                      the one that both fixes and diagnoses the problem. */}
+                  <button
+                    onClick={testTone}
+                    title="Test sound / enable audio"
+                    aria-label="Test sound and enable audio"
+                    className="-m-2 ml-auto shrink-0 p-2 text-s0x-teal"
+                  >
+                    <Volume2 size={14} />
+                  </button>
                 </div>
                 <p className="mt-1.5 text-sm leading-relaxed text-s0x-text">{speaking.line.text}</p>
               </>
