@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { put, head } from "@vercel/blob";
 import { createHash } from "crypto";
+import { EVENT_NAME, tournamentBrief } from "@/lib/promptContext";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -71,7 +72,10 @@ export async function POST(req: Request) {
     max_tokens: 1024,
     messages: [{
       role: "user",
-      content: `You are a senior editor at studio0x, a premium AI sports analytics platform covering the 2026 World Cup.
+      content: `You are a senior editor at studio0x, a premium AI sports analytics platform covering the ${EVENT_NAME}.
+
+${tournamentBrief()}
+
 
 A reader just clicked "Go Deeper" on this story:
 
@@ -86,7 +90,7 @@ Write a deep-dive editorial expanding on this story. Structure it with these thr
 3-4 sentences expanding the context behind the story. Ground every claim in the facts stated in the HEADLINE and SUMMARY above — you may interpret and analyse them, but do NOT invent specifics that are not given: no made-up formations, player names, match minutes, statistics, or xG figures. If the summary lacks a detail, discuss the situation in general terms instead of fabricating it.
 
 **Historical Context**
-2-3 sentences placing this in the broader history of these teams or the World Cup. Speak in general, well-known terms (e.g. a nation's pedigree or past deep runs) — do NOT cite specific historical scorelines, years, match incidents, or statistics unless they appear in the summary above, and never invent a historical anecdote.
+2-3 sentences placing this in the broader history of these teams or the ${EVENT_NAME}. Speak in general, well-known terms (e.g. a nation's pedigree or past deep runs) — do NOT cite specific historical scorelines, years, match incidents, or statistics unless they appear in the summary above, and never invent a historical anecdote.
 
 **What to Watch Next**
 2-3 sentences on the direct consequences — what a result like this typically means for a side's path, situations to monitor, or tactical questions it raises. Only reference specific upcoming fixtures or standings if they are stated above.

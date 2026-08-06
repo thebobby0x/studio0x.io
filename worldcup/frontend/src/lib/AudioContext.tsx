@@ -34,6 +34,17 @@ interface AudioContextType {
   isMuted: boolean;
   loopMode: LoopMode;
   isShuffling: boolean;
+  /**
+   * Why the current track isn't playing, in words a listener can act on.
+   *
+   * Every failure path here used to end in `.catch(() => {})` or
+   * `.catch(() => setIsPlaying(false))`, and the <audio> element's own `error`
+   * event was never listened for at all. A dead Blob URL, a 403, or a codec the
+   * browser refuses produced exactly the same result as a successful pause:
+   * nothing happened, silently, forever. null = no fault.
+   */
+  error: string | null;
+  clearError: () => void;
   play: (track: Track, playlist?: Track[], index?: number) => void;
   pause: () => void;
   resume: () => void;
@@ -61,6 +72,8 @@ const defaultCtx: AudioContextType = {
   isMuted: false,
   loopMode: "none",
   isShuffling: false,
+  error: null,
+  clearError: noop,
   play: noop,
   pause: noop,
   resume: noop,
@@ -90,6 +103,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [loopMode, setLoopMode] = useState<LoopMode>("none");
   const [isShuffling, setIsShuffling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Stable refs for values needed inside event handlers
   const playlistRef = useRef<Track[]>([]);
@@ -124,8 +138,26 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     currentIndexRef.current = idx;
     setCurrent(track);
 
+    setError(null);
+    if (!track.audioUrl) {
+      // A row with no audioUrl is a catalogued track whose file never imported.
+      setIsPlaying(false);
+      setError("This anthem hasn't been imported yet.");
+      return;
+    }
+
     audio.src = track.audioUrl;
-    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    audio.play().then(() => setIsPlaying(true)).catch((e: unknown) => {
+      setIsPlaying(false);
+      // NotAllowedError is the browser's autoplay policy, not a broken file —
+      // it needs a different instruction than "the track is unavailable".
+      const name = e instanceof Error ? e.name : "";
+      setError(
+        name === "NotAllowedError"
+          ? "Tap play again to start audio."
+          : "This track could not be played.",
+      );
+    });
   }, []);
 
   // Resolve the next track honoring shuffle / loop
@@ -175,14 +207,31 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
 
+    // The element's own failure channel. play() resolving does NOT mean the
+    // media loaded — a 404 or 403 Blob URL surfaces here, not in the promise.
+    const onError = () => {
+      setIsPlaying(false);
+      const code = audio.error?.code;
+      console.error("[AudioProvider] media error", { code, src: audio.currentSrc });
+      setError(
+        code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+          ? "This anthem's audio file is missing or unreadable."
+          : code === MediaError.MEDIA_ERR_NETWORK
+            ? "Lost connection while loading this anthem."
+            : "This track could not be played.",
+      );
+    };
+
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("error", onError);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("error", onError);
       audio.pause();
       audioRef.current = null;
     };
@@ -243,7 +292,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resume = useCallback(() => {
-    audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+    audioRef.current?.play()
+      .then(() => { setIsPlaying(true); setError(null); })
+      .catch(() => setError("This track could not be played."));
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -253,7 +304,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play().then(() => setIsPlaying(true)).catch(() => {});
+      audio.play()
+        .then(() => { setIsPlaying(true); setError(null); })
+        .catch(() => setError("This track could not be played."));
     }
   }, [isPlaying]);
 
@@ -288,6 +341,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const toggleMute = useCallback(() => setIsMuted((m) => !m), []);
 
+  const clearError = useCallback(() => setError(null), []);
+
   const cycleLoop = useCallback(() => {
     setLoopMode((m) => {
       const nextMode = m === "none" ? "all" : m === "all" ? "one" : "none";
@@ -317,6 +372,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         isMuted,
         loopMode,
         isShuffling,
+        error,
+        clearError,
         play,
         pause,
         resume,

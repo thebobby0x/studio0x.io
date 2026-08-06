@@ -8,14 +8,21 @@ export const maxDuration = 60;
 // Heat vs. Outcomes backfill (backlog §16) — chunked: each call stamps up to
 // `count` played fixtures with kickoff-hour weather (Open-Meteo hourly, real
 // archived readings) + FT outcome facts (events feed). The admin button loops
-// until `remaining` hits 0, same pattern as the anthem reimport.
+// on `nextOffset` until it comes back null, same pattern as the anthem reimport.
+//
+// Run "Resolve Venues" first — it caches each venue's coordinates in the Venue
+// table. Without that this route geocodes inline and is far slower.
 async function handler(req: Request) {
   if (!(await isAdminAuthed(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
   const count = Math.min(Math.max(parseInt(searchParams.get("count") ?? "8", 10) || 8, 1), 20);
-  const result = await backfillMatchWeather(count);
+  // `offset` steps past matches that cannot be stamped (unresolvable venue, no
+  // upstream reading). Without it the caller re-processed the same head of the
+  // queue on every chunk and never reached the rest of the fixture list.
+  const offset = Math.max(0, parseInt(searchParams.get("offset") ?? "0", 10) || 0);
+  const result = await backfillMatchWeather(count, offset);
   return NextResponse.json(result, { status: result.ok ? 200 : 502 });
 }
 

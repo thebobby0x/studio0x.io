@@ -2,6 +2,7 @@
 
 import type { GoalEvent } from "@/app/api/matches/[id]/goals/route";
 import InfoTip from "@/components/ui/InfoTip";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 // Counter-attack window: goal scored within this many minutes of the previous goal
 const COUNTER_WINDOW_MIN = 4;
@@ -120,12 +121,14 @@ export default function TransitionDangerRating({ goals, homeTeamName, awayTeamNa
                 <span className={`font-black ${t.labelColor}`}>{t.label}</span>
               </div>
             </div>
-            <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all"
-                style={{ width: `${(t.tdr / maxTDR) * 100}%` }}
-              />
-            </div>
+            <SegmentedBar
+              value={t.tdr}
+              maxValue={maxTDR}
+              segments={14}
+              height={9}
+              color="cyan"
+              ariaLabel={`Transition Danger Rating ${t.tdr}`}
+            />
             <div className="text-[9px] text-slate-700 font-mono">TDR {t.tdr}</div>
           </div>
         ))}

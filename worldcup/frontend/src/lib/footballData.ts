@@ -2,9 +2,11 @@
 // Requires API_FOOTBALL_KEY env var — falls back to null (caller uses simulation).
 // Free tier: 100 req/day. Per-date in-memory cache keeps us well within limits.
 
+import { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig";
+
 const BASE    = "https://v3.football.api-sports.io";
-const LEAGUE  = 1;    // World Cup
-const SEASON  = 2026;
+const LEAGUE  = AF_LEAGUE; // deployment config (worldcup 1 / leaguescup 772)
+const SEASON  = AF_SEASON;
 const LIVE_TTL_MS   = 120_000;  // 2 min for today's matches
 const PAST_TTL_MS   = 3_600_000; // 1 hr for finished dates
 

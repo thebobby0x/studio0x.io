@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import InfoTip from "@/components/ui/InfoTip";
 import type { PlayerMatchStats } from "@/app/api/matches/[id]/players/route";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 interface TeamPressingStats {
   name: string;
@@ -89,12 +90,14 @@ export default function PressingIntensityIndex({ matchId, homeTeamName, awayTeam
                 <span className={`font-black ${t.labelColor}`}>{t.label}</span>
               </div>
             </div>
-            <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-red-500 transition-all"
-                style={{ width: `${(t.pii / maxPII) * 100}%` }}
-              />
-            </div>
+            <SegmentedBar
+              value={t.pii}
+              maxValue={maxPII}
+              segments={14}
+              height={9}
+              color="red"
+              ariaLabel={`Pressing Intensity Index ${t.pii}`}
+            />
             <div className="flex justify-between text-[9px] text-slate-700 font-mono tabular-nums">
               <span>PII {t.pii}</span>
             </div>

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getVenueInfo } from "@/lib/venues";
+import { resolveVenueGeo } from "@/lib/venueGeo";
 import { CLIMATE_CONTROLLED, heatBand } from "@/lib/heat";
 
 // ── Heat vs. Outcomes (backlog §16) ──────────────────────────────────────────
@@ -23,8 +23,27 @@ export interface HeatBackfillResult {
   skippedNoVenue: number;
   skippedNoData: number;
   remaining: number;
+  /**
+   * Where the next chunk must start.
+   *
+   * A skipped match writes no row, so it is still at the head of the work list on
+   * the next call. Without an offset the caller re-processed the same
+   * unresolvable matches on every iteration, `remaining` never reached 0, and the
+   * admin loop burned its 25 guard iterations before reporting failure. null =
+   * the list is exhausted.
+   */
+  nextOffset: number | null;
+  /** Venue names that could not be geocoded — the actionable part of a skip. */
+  unresolvedVenues: string[];
+  /** True when the call returned early on its time budget rather than finishing. */
+  budgetExhausted: boolean;
   errors: string[];
 }
+
+// Wall-clock budget per invocation. The route's maxDuration is 60s; returning a
+// partial, honest result at 45s beats a 504, which surfaces to the admin button
+// as an opaque "chunk failed" and loses the counts entirely.
+const TIME_BUDGET_MS = 45_000;
 
 interface HourlyWeather {
   tempC: number;
@@ -68,6 +87,8 @@ async function fetchKickoffWeather(
 interface HourlyAir {
   aqi: number;
   pm25: number;
+  /** Kickoff-hour UV index. Null when the service had no reading. */
+  uvIndex: number | null;
 }
 
 // Kickoff-hour air quality (US AQI + PM2.5) — the wildfire-smoke signal.
@@ -81,7 +102,7 @@ async function fetchKickoffAir(
   const day = kickoff.toISOString().slice(0, 10);
   const url =
     `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}` +
-    `&hourly=us_aqi,pm2_5&start_date=${day}&end_date=${day}&timezone=UTC`;
+    `&hourly=us_aqi,pm2_5,uv_index&start_date=${day}&end_date=${day}&timezone=UTC`;
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 6000);
@@ -94,8 +115,10 @@ async function fetchKickoffAir(
     if (i < 0) return null;
     const aqi = json.hourly.us_aqi?.[i];
     const pm25 = json.hourly.pm2_5?.[i];
+    // UV is optional: a missing reading must not discard the AQI we did get.
+    const uvIndex = json.hourly.uv_index?.[i] ?? null;
     if (aqi == null || pm25 == null) return null;
-    return { aqi, pm25 };
+    return { aqi, pm25, uvIndex };
   } catch {
     return null;
   }
@@ -134,10 +157,12 @@ async function fetchOutcomeFacts(fixture: number): Promise<OutcomeFacts | null> 
   }
 }
 
-export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResult> {
+export async function backfillMatchWeather(count = 8, offset = 0): Promise<HeatBackfillResult> {
+  const startedAt = Date.now();
   const result: HeatBackfillResult = {
     ok: false, processed: 0, created: 0, outcomesAdded: 0,
-    skippedNoVenue: 0, skippedNoData: 0, remaining: 0, errors: [],
+    skippedNoVenue: 0, skippedNoData: 0, remaining: 0,
+    nextOffset: null, unresolvedVenues: [], budgetExhausted: false, errors: [],
   };
 
   const existing = await prisma.matchWeather.findMany({
@@ -150,7 +175,7 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
   const played = await prisma.match.findMany({
     where: { date: { lte: new Date() }, fixture: { gt: 0 } },
     orderBy: { date: "asc" },
-    select: { fixture: true, date: true, status: true, venue: true },
+    select: { fixture: true, date: true, status: true, venue: true, city: true, venueId: true },
   });
   const todo = played.filter((m) => {
     const row = byFixture.get(m.fixture);
@@ -158,21 +183,52 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
     return m.status === "FT" && row.totalGoals === null;
   });
 
-  const chunk = todo.slice(0, count);
-  result.remaining = todo.length - chunk.length;
+  const start = Math.max(0, Math.min(offset, todo.length));
+  const chunk = todo.slice(start, start + count);
+  result.remaining = Math.max(0, todo.length - start - chunk.length);
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // One geo resolution per distinct venue per invocation. Several fixtures share
+  // a ground, and resolveVenueGeo's cold path costs up to three sequential
+  // network calls (api-football /venues, Nominatim, Open-Meteo geocoding) at 8s
+  // each — doing that per MATCH is what pushed this route past its 60s limit.
+  const geoCache = new Map<string, Awaited<ReturnType<typeof resolveVenueGeo>>>();
+  const geoFor = async (venue: string, city: string, venueId: number | null) => {
+    if (!geoCache.has(venue)) geoCache.set(venue, await resolveVenueGeo(venue, city, venueId));
+    return geoCache.get(venue) ?? null;
+  };
+
+  // Matches skipped in THIS chunk stay in `todo` next time, so the caller has to
+  // step past them; ones that produced a row drop out and must not be stepped
+  // over. Counting the skips is what makes the offset self-correcting.
+  let skippedInChunk = 0;
+
   for (const m of chunk) {
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      result.budgetExhausted = true;
+      result.remaining += chunk.length - result.processed;
+      break;
+    }
     result.processed++;
     try {
       const row = byFixture.get(m.fixture);
 
       if (!row) {
-        const info = getVenueInfo(m.venue);
-        if (!info) { result.skippedNoVenue++; continue; }
+        // resolveVenueGeo falls back from the curated stadium table to the
+        // venue's city coordinates, so a competition outside WC26's 16 stadiums
+        // still gets weather instead of skippedNoVenue on every match.
+        const info = await geoFor(m.venue, m.city, m.venueId);
+        if (!info) {
+          result.skippedNoVenue++;
+          skippedInChunk++;
+          if (m.venue && !result.unresolvedVenues.includes(m.venue)) {
+            result.unresolvedVenues.push(m.venue);
+          }
+          continue;
+        }
         const wx = await fetchKickoffWeather(info.lat, info.lng, m.date);
-        if (!wx) { result.skippedNoData++; continue; }
+        if (!wx) { result.skippedNoData++; skippedInChunk++; continue; }
         const [facts, air] = await Promise.all([
           m.status === "FT" ? fetchOutcomeFacts(m.fixture) : Promise.resolve(null),
           fetchKickoffAir(info.lat, info.lng, m.date),
@@ -197,12 +253,12 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
         // Row exists but outcomes were missing when it was created (match was
         // live at the time) — fill them in now that it's FT. Piggyback the
         // air-quality fill for rows stamped before the AQ columns existed.
-        const info = getVenueInfo(m.venue);
+        const info = row.aqi === null ? await geoFor(m.venue, m.city, m.venueId) : null;
         const [facts, air] = await Promise.all([
           fetchOutcomeFacts(m.fixture),
-          row.aqi === null && info ? fetchKickoffAir(info.lat, info.lng, m.date) : Promise.resolve(null),
+          info ? fetchKickoffAir(info.lat, info.lng, m.date) : Promise.resolve(null),
         ]);
-        if (!facts && !air) { result.skippedNoData++; continue; }
+        if (!facts && !air) { result.skippedNoData++; skippedInChunk++; continue; }
         await prisma.matchWeather.update({
           where: { fixture: m.fixture },
           data: { ...(air ?? {}), ...(facts ?? {}) },
@@ -210,10 +266,15 @@ export async function backfillMatchWeather(count = 8): Promise<HeatBackfillResul
         if (facts) result.outcomesAdded++;
       }
     } catch (e) {
+      // A throwing fixture also leaves no row behind — step past it too, or the
+      // caller loops on it forever.
+      skippedInChunk++;
       result.errors.push(`fixture ${m.fixture}: ${String(e)}`);
     }
   }
 
+  // Advance only past the matches that will still be in the work list next time.
+  result.nextOffset = result.remaining > 0 ? start + skippedInChunk : null;
   result.ok = true;
   return result;
 }

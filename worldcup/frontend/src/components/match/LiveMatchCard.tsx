@@ -2,25 +2,39 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Activity, Clock, MapPin, Wifi, Users } from "lucide-react";
+import { Activity, Clock, MapPin, Wifi, Users, Goal, Square, ArrowLeftRight, CircleSlash } from "lucide-react";
 import type { LiveData, LiveMetrics } from "@/lib/types";
-import type { GoalEvent, MissedPen, VarEvent } from "@/app/api/matches/[id]/goals/route";
+import type { GoalEvent, MissedPen, VarEvent, CardEvent } from "@/app/api/matches/[id]/goals/route";
 import type { TeamLiveStats } from "@/lib/liveStats";
 import { getVenueInfo, venueCity } from "@/lib/venues";
 import VenueWeather from "@/components/ui/VenueWeather";
 import MatchDNA from "@/components/stats/MatchDNA";
 import FlagImg from "@/components/ui/FlagImg";
+import { SegmentedVersusBar } from "@/components/ui/SegmentedBar";
 import ShareButton from "@/components/ui/ShareButton";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
+// Row order IS the reading order of the HUD panel: attacking output first,
+// discipline last. Labels are short because they sit in a mono, tracked-out
+// centre column between two values — "Shots On Target" wrapped there.
+// Possession is excluded: it gets the oversized headline treatment above.
 const METRIC_LABELS: Record<string, string> = {
-  possession:   "Possession %",
-  shots_on:     "Shots On Target",
-  shots_off:    "Shots Off Target",
+  shots_on:     "Shots On",
+  shots_off:    "Shots Off",
   corners:      "Corners",
+  saves:        "Saves",
   fouls:        "Fouls",
-  yellow_cards: "Yellow Cards",
-  red_cards:    "Red Cards",
+  offsides:     "Offsides",
+  yellow_cards: "Yellow",
+  red_cards:    "Red",
 };
+
+/** Metric lookup by string key. null = the feed did not report this stat, which
+ *  is DIFFERENT from a reported zero and must not render as one. */
+function metricVal(m: LiveMetrics[string] | undefined, key: string): number | null {
+  const v = (m as Record<string, number | undefined> | undefined)?.[key];
+  return typeof v === "number" ? v : null;
+}
 
 // Rehydrate the flattened metrics record into the TeamLiveStats shape that
 // MatchDNA's Live Pressure block reads. Missing keys stay null (unreported).
@@ -43,14 +57,15 @@ function toTeamLiveStats(m: LiveMetrics[string] | undefined): TeamLiveStats {
   };
 }
 
-function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTeam }: {
+function GoalDisplay({ goals, missedPens = [], varEvents = [], cards = [], homeTeam, awayTeam }: {
   goals: GoalEvent[];
   missedPens?: MissedPen[];
   varEvents?: VarEvent[];
+  cards?: CardEvent[];
   homeTeam: string;
   awayTeam: string;
 }) {
-  if (goals.length === 0 && missedPens.length === 0 && varEvents.length === 0) return null;
+  if (goals.length === 0 && missedPens.length === 0 && varEvents.length === 0 && cards.length === 0) return null;
 
   // Honest VAR-delay note: the gap between a VAR decision and a penalty being
   // struck, in MATCH MINUTES (api-football has no wall-clock review duration).
@@ -78,21 +93,26 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
   const homeGoals = goals.filter((g) => !g.isOwnGoal ? g.team === homeTeam : g.team !== homeTeam);
   const awayGoals = goals.filter((g) => !g.isOwnGoal ? g.team === awayTeam : g.team !== awayTeam);
 
-  function formatGoal(g: GoalEvent): string {
-    const minute = `${g.minute}'`;
-    // Reconstructed goals have no confirmed scorer — never show a name.
-    if (g.pending) return `⚽ ~${minute} · scorer TBC`;
-    if (g.isOwnGoal) {
-      return `OG ⚽ ${minute} (${g.scorer})`;
-    }
-    const suffix = g.isPenalty ? " (pen)" : "";
-    return `${g.scorer}${suffix} ⚽ ${minute}`;
+  /** Scorer line for a moment card. Reconstructed goals have no confirmed
+   *  scorer — a name is never invented, the card says so instead. */
+  function goalName(g: GoalEvent): string {
+    if (g.pending) return "Scorer TBC";
+    return g.isOwnGoal ? `${g.scorer} (OG)` : g.scorer;
+  }
+
+  function goalNote(g: GoalEvent): string | null {
+    if (g.pending) return "unconfirmed";
+    if (g.isPenalty) return "penalty";
+    if (g.isOwnGoal) return "own goal";
+    return null;
   }
 
   // Missed penalties are KEY MOMENTS, not goals — shown muted with an ✗ so a
   // saved/skied PK never reads as a score (Mbappé, FRA-MAR QF).
   const homePens = missedPens.filter((p) => p.team === homeTeam);
   const awayPens = missedPens.filter((p) => p.team === awayTeam);
+  const homeCards = cards.filter((c) => c.team === homeTeam);
+  const awayCards = cards.filter((c) => c.team === awayTeam);
 
   return (
     <div className="px-4 pb-3 space-y-1.5">
@@ -111,42 +131,166 @@ function GoalDisplay({ goals, missedPens = [], varEvents = [], homeTeam, awayTea
           ))}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-400">
-      <div className="flex flex-col items-end gap-0.5">
-        {homeGoals.map((g, i) => (
-          <span key={i}>{formatGoal(g)}</span>
-        ))}
-        {homePens.map((p, i) => (
-          <span key={`mp${i}`} className="text-slate-600">✗ pen missed · {p.player} {p.minute}&apos;</span>
-        ))}
-      </div>
-      <div className="flex flex-col items-start gap-0.5">
-        {awayGoals.map((g, i) => (
-          <span key={i}>{formatGoal(g)}</span>
-        ))}
-        {awayPens.map((p, i) => (
-          <span key={`mp${i}`} className="text-slate-600">✗ pen missed · {p.player} {p.minute}&apos;</span>
-        ))}
-      </div>
+      {/* Moment cards — one per event, neon left edge, mono minute, Archivo
+          name. Home column mirrors right-to-left so the two sides read inward
+          toward the scoreline. */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+        <div className="flex flex-col gap-1.5">
+          {homeGoals.map((g, i) => (
+            <MomentCard key={`hg${i}`} kind="goal" minute={g.minute} approx={g.pending}
+              name={goalName(g)} note={goalNote(g)} align="right" />
+          ))}
+          {homePens.map((p, i) => (
+            <MomentCard key={`hp${i}`} kind="miss" minute={p.minute}
+              name={p.player} note="penalty missed" align="right" />
+          ))}
+          {homeCards.map((c, i) => (
+            <MomentCard key={`hc${i}`} kind="card" minute={c.minute}
+              name={c.player} note={c.detail.toLowerCase()} align="right" />
+          ))}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {awayGoals.map((g, i) => (
+            <MomentCard key={`ag${i}`} kind="goal" minute={g.minute} approx={g.pending}
+              name={goalName(g)} note={goalNote(g)} align="left" />
+          ))}
+          {awayPens.map((p, i) => (
+            <MomentCard key={`ap${i}`} kind="miss" minute={p.minute}
+              name={p.player} note="penalty missed" align="left" />
+          ))}
+          {awayCards.map((c, i) => (
+            <MomentCard key={`ac${i}`} kind="card" minute={c.minute}
+              name={c.player} note={c.detail.toLowerCase()} align="left" />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function StatBar({ label, homeVal, awayVal }: { label: string; homeVal: number; awayVal: number }) {
-  const total = homeVal + awayVal || 1;
-  const homeW = Math.round((homeVal / total) * 100);
+/**
+ * A single match moment as a Gaming-UI card.
+ *
+ * Accent encodes the event TYPE, not the team: Rosa for goals and cards (the
+ * decisive, "hot" events), Riptide for substitutions and everything procedural.
+ * A missed penalty is deliberately muted — it is a key moment, but it must
+ * never read like a goal (the Mbappé FRA-MAR near-miss that prompted the rule).
+ */
+function MomentCard({ kind, minute, name, note, align, approx }: {
+  kind: "goal" | "card" | "sub" | "miss";
+  minute: number;
+  name: string;
+  note?: string | null;
+  align: "left" | "right";
+  approx?: boolean;
+}) {
+  const Icon = kind === "goal" ? Goal : kind === "card" ? Square : kind === "sub" ? ArrowLeftRight : CircleSlash;
+  const teal = kind === "sub";
+  const muted = kind === "miss";
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex justify-between text-xs text-slate-400">
-        <span className="font-semibold text-white">{homeVal}</span>
-        <span className="text-slate-400">{label}</span>
-        <span className="font-semibold text-white">{awayVal}</span>
+    <div
+      className={`s0x-moment ${teal ? "s0x-moment-teal" : ""} ${muted ? "opacity-60" : ""} ${
+        align === "right" ? "s0x-moment-mirror flex-row-reverse text-right" : ""
+      }`}
+    >
+      <Icon
+        size={13}
+        className={`s0x-moment-icon shrink-0 ${teal ? "text-s0x-teal" : muted ? "text-s0x-muted" : "text-s0x-accent"}`}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="s0x-display text-[12px] font-bold text-s0x-text leading-tight truncate">{name}</div>
+        {note && <div className="s0x-mono text-[8px] text-s0x-muted mt-0.5">{note}</div>}
       </div>
-      <div className="flex h-1.5 w-full rounded-full overflow-hidden bg-brand-border">
-        <div className="bg-brand-green transition-all duration-700" style={{ width: `${homeW}%` }} />
-        <div className="bg-amber-500 transition-all duration-700" style={{ width: `${100 - homeW}%` }} />
+      <span className="s0x-data text-[11px] font-bold tabular-nums text-s0x-muted shrink-0">
+        {approx ? "~" : ""}{minute}&apos;
+      </span>
+    </div>
+  );
+}
+
+/**
+ * One live stat as a HUD row: left value | label | right value, with the
+ * proportional Riptide/Rosa split underneath.
+ *
+ * `unit` renders a suffix (possession is a percentage, everything else a count).
+ * When BOTH sides report zero the bar is drawn as an even, dimmed split rather
+ * than an arbitrary 50/50 fill — 0–0 corners is not "honours even", it's "no
+ * data yet", and the old version made those look identical.
+ */
+function StatRow({ label, homeVal, awayVal, unit = "" }: {
+  label: string;
+  homeVal: number;
+  awayVal: number;
+  unit?: string;
+}) {
+  const total = homeVal + awayVal;
+  const homeW = total > 0 ? Math.round((homeVal / total) * 100) : 50;
+  const leading = homeVal === awayVal ? null : homeVal > awayVal ? "home" : "away";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="s0x-data text-sm font-bold tabular-nums" style={leading === "home" ? { color: "var(--seg-cyan)" } : undefined}>
+          {homeVal}{unit}
+        </span>
+        <span className="s0x-mono text-[9px] text-s0x-muted text-center flex-1">{label}</span>
+        <span className="s0x-data text-sm font-bold tabular-nums" style={leading === "away" ? { color: "var(--seg-red)" } : undefined}>
+          {awayVal}{unit}
+        </span>
       </div>
+      <SegmentedVersusBar
+        home={homeVal}
+        away={awayVal}
+        segments={16}
+        height={9}
+        ariaLabel={`${label}: ${homeVal}${unit} to ${awayVal}${unit}`}
+      />
+    </div>
+  );
+}
+
+/**
+ * Possession — the headline split, given its own oversized treatment: big
+ * mono percentages flanking a thick Riptide-vs-Rosa bar.
+ *
+ * Possession is already a percentage per side and the two SHOULD sum to 100,
+ * but the feed occasionally reports one side only. Normalising against the
+ * actual total keeps the bar honest instead of overflowing its track.
+ */
+function PossessionBar({ homeCode, awayCode, home, away }: {
+  homeCode: string;
+  awayCode: string;
+  home: number;
+  away: number;
+}) {
+  const total = home + away;
+  const homeW = total > 0 ? (home / total) * 100 : 50;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end justify-between gap-3">
+        <div className="text-left">
+          <div className="s0x-data text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--seg-cyan)", textShadow: "0 0 10px rgb(var(--seg-cyan-glow) / .8)" }}>
+            {Math.round(home)}<span className="text-base">%</span>
+          </div>
+          <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{homeCode}</div>
+        </div>
+        <div className="s0x-mono text-[9px] text-s0x-muted pb-1">Possession</div>
+        <div className="text-right">
+          <div className="s0x-data text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--seg-red)", textShadow: "0 0 10px rgb(var(--seg-red-glow) / .8)" }}>
+            {Math.round(away)}<span className="text-base">%</span>
+          </div>
+          <div className="s0x-mono text-[9px] text-s0x-muted mt-1">{awayCode}</div>
+        </div>
+      </div>
+      <SegmentedVersusBar
+        home={home}
+        away={away}
+        homeLabel={`${Math.round(homeW)}%`}
+        awayLabel={`${Math.round(100 - homeW)}%`}
+        segments={28}
+        height={18}
+        circuit
+        ariaLabel={`Possession: ${Math.round(home)}% ${homeCode}, ${Math.round(away)}% ${awayCode}`}
+      />
     </div>
   );
 }
@@ -156,7 +300,11 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
   const [goals, setGoals] = useState<GoalEvent[] | null>(null);
   const [missedPens, setMissedPens] = useState<MissedPen[]>([]);
   const [varEvents, setVarEvents] = useState<VarEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [cards, setCards] = useState<CardEvent[]>([]);
+  // "missing" = the route says this match does not exist (404) — permanent, so
+  // stop polling. "transient" = anything else; keep polling, because a 5s loop
+  // will very likely fix itself.
+  const [fault, setFault] = useState<"missing" | "transient" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -164,7 +312,19 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         fetch(`/api/matches/${matchId}/live`),
         fetch(`/api/matches/${matchId}/goals`),
       ]);
-      if (!liveRes.ok) throw new Error("API error");
+      if (!liveRes.ok) {
+        // Log the real status and body — the old code threw a bare
+        // `new Error("API error")` and rendered `String(e)`, which is how the
+        // dashboard came to display the literal string "Error: Error: API
+        // error" with nothing in it to debug from.
+        const body = await liveRes.text().catch(() => "");
+        console.error(
+          `[LiveMatchCard] /api/matches/${matchId}/live → ${liveRes.status}`,
+          body.slice(0, 300),
+        );
+        setFault(liveRes.status === 404 ? "missing" : "transient");
+        return;
+      }
       const [liveData, goalsData] = await Promise.all([
         liveRes.json(),
         goalsRes.ok ? goalsRes.json() : Promise.resolve({ goals: [] }),
@@ -173,28 +333,57 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
       setGoals(goalsData.goals ?? []);
       setMissedPens(goalsData.missedPens ?? []);
       setVarEvents(goalsData.varEvents ?? []);
+      setCards(goalsData.cards ?? []);
+      // Recovered. The old code never cleared the error, so a single blip in a
+      // 5s poll left the tile broken until a full page reload.
+      setFault(null);
     } catch (e) {
-      setError(String(e));
+      console.error(`[LiveMatchCard] fetch failed for ${matchId}`, e);
+      setFault("transient");
     }
   }, [matchId]);
 
   useEffect(() => {
     load();
+    // A match the API doesn't have will never appear by polling — stop asking.
+    if (fault === "missing") return;
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, fault]);
 
-  if (error) return <div className="rounded-xl bg-brand-card border border-red-800/40 p-6 text-red-400">Error: {error}</div>;
+  // A live tile that can't reach its data is a degraded state, not a crash: it
+  // renders calm, on-palette copy and (when transient) keeps retrying behind it.
+  // Raw error strings never reach the dashboard.
+  if (fault && !data) {
+    return (
+      <div className="s0x-card s0x-hud-grid p-6 text-center">
+        <span className="s0x-scanline" aria-hidden="true" />
+        <Activity size={18} className="mx-auto mb-2 text-s0x-muted" />
+        <p className="s0x-mono text-[11px] text-s0x-muted">
+          {fault === "missing" ? "Match data unavailable" : "Live data temporarily unavailable"}
+        </p>
+        <p className="text-[11px] text-s0x-muted/70 mt-1">
+          {fault === "missing"
+            ? "This fixture isn't in the database yet — run Sync Fixtures."
+            : "Reconnecting…"}
+        </p>
+      </div>
+    );
+  }
   if (!data) return <div className="rounded-xl bg-brand-card border border-brand-border p-6 animate-pulse h-64" />;
 
   const { match, metrics, dataSources } = data;
   const homeCode = match.homeTeam.code;
   const awayCode = match.awayTeam.code;
+  // Club crest (club deployments) — FlagImg falls back to a flag on nation ones.
+  const homeCrest = { logoUrl: match.homeTeam.logoUrl, afId: match.homeTeam.afTeamId };
+  const awayCrest = { logoUrl: match.awayTeam.logoUrl, afId: match.awayTeam.afTeamId };
   const hm = metrics[homeCode] ?? {};
   const am = metrics[awayCode] ?? {};
   const isLive = match.status === "LIVE" || match.status === "HT";
   const isDone = match.status === "FT";
   const showGoals = (isLive || isDone) && goals && goals.length > 0;
+  const hasMoments = showGoals || missedPens.length > 0 || varEvents.length > 0 || cards.length > 0;
   // Real team stats only — never feed simulated numbers into metric panels
   const statsReal = dataSources?.stats === "api-football" && Object.keys(hm).length > 0;
   const dnaStats = statsReal ? { home: toTeamLiveStats(hm), away: toTeamLiveStats(am) } : null;
@@ -205,10 +394,12 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
 
   if (hero && isLive) {
     return (
-      <div className="rounded-2xl overflow-hidden border border-red-900/50" style={{
-        background: "linear-gradient(135deg, #0f1a0f 0%, #0d0d0d 40%, #1a0d0d 100%)",
-        boxShadow: "0 0 60px rgba(239,68,68,0.12), 0 0 120px rgba(34,197,94,0.06)",
+      <div className="s0x-hud-grid s0x-hud-scan rounded-s0x overflow-hidden border border-s0x-ink/50" style={{
+        // Noir 900/800 body with a Rosa 700 (live) + Riptide (data) halo.
+        background: "linear-gradient(135deg, #1D191C 0%, #0F0C0E 45%, #161014 100%)",
+        boxShadow: "0 0 60px rgba(202,53,139,0.16), 0 0 120px rgba(93,203,209,0.06)",
       }}>
+        <span className="s0x-scanline" aria-hidden="true" />
         {/* LIVE banner */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
@@ -227,7 +418,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
               <VenueWeather lat={venueInfo.lat} lng={venueInfo.lng} timezone={venueInfo.timezone} />
             )}
             <ShareButton
-              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · podiumMetrics · studio0x.io`}
+              text={`LIVE: ${match.homeTeam.name} ${match.homeScore}–${match.awayScore} ${match.awayTeam.name} (${match.status === "HT" ? "HT" : `${match.elapsed}'`}) · ${BRAND_NAME} · studio0x.io`}
               url={`/schedule/${match.fixture}`}
               title={`${match.homeTeam.name} vs ${match.awayTeam.name}`}
             />
@@ -238,15 +429,19 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         <div className="px-4 py-6">
           <div className="grid grid-cols-3 items-center gap-2">
             <Link href={`/team/${homeCode}`} className="text-center group">
-              <div className="flex justify-center mb-3"><FlagImg tla={homeCode} size={72} className="shadow-lg" /></div>
+              <div className="flex justify-center mb-3"><FlagImg tla={homeCode} {...homeCrest} size={72} className="shadow-lg" /></div>
               <div className="font-black text-lg sm:text-xl text-white group-hover:text-brand-gold transition-colors leading-tight">{match.homeTeam.name}</div>
               <div className="text-xs text-slate-600 uppercase tracking-wider mt-0.5">{homeCode}</div>
             </Link>
 
             <div className="text-center">
-              <div className="text-7xl sm:text-8xl font-black tabular-nums tracking-tighter leading-none text-white" style={{ textShadow: "0 0 40px rgba(255,255,255,0.15)" }}>
+              {/* whitespace-nowrap + tabular-nums: at text-7xl in a 3-column grid
+                  on a phone this column is narrower than "0 – 0" renders, so the
+                  scoreline wrapped and the two goal totals stacked vertically
+                  with the dash between them. It must always read as one line. */}
+              <div className="s0x-data text-6xl sm:text-8xl font-bold leading-none text-s0x-text whitespace-nowrap tabular-nums" style={{ textShadow: "0 0 12px rgb(248 189 216 / .55), 0 0 46px rgb(202 53 139 / .45)" }}>
                 {match.homeScore}
-                <span className="text-slate-700 mx-1">–</span>
+                <span className="text-slate-700 mx-0.5 sm:mx-1">–</span>
                 {match.awayScore}
               </div>
               <div className="mt-3 flex items-center justify-center gap-1.5">
@@ -267,7 +462,7 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
             </div>
 
             <Link href={`/team/${awayCode}`} className="text-center group">
-              <div className="flex justify-center mb-3"><FlagImg tla={awayCode} size={72} className="shadow-lg" /></div>
+              <div className="flex justify-center mb-3"><FlagImg tla={awayCode} {...awayCrest} size={72} className="shadow-lg" /></div>
               <div className="font-black text-lg sm:text-xl text-white group-hover:text-brand-gold transition-colors leading-tight">{match.awayTeam.name}</div>
               <div className="text-xs text-slate-600 uppercase tracking-wider mt-0.5">{awayCode}</div>
             </Link>
@@ -275,11 +470,12 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         </div>
 
         {/* Goal scorers */}
-        {(showGoals || missedPens.length > 0 || varEvents.length > 0) && goals && (
+        {hasMoments && goals && (
           <GoalDisplay
             goals={goals}
             missedPens={missedPens}
             varEvents={varEvents}
+            cards={cards}
             homeTeam={match.homeTeam.name}
             awayTeam={match.awayTeam.name}
           />
@@ -301,22 +497,51 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
           </div>
         )}
 
-        {/* Stats bars if available */}
+        {/* Live Stats — HUD panel: circuit corners, scan-line wash, possession
+            headline, then the proportional Riptide-vs-Rosa stat rows. */}
         {dataSources?.stats !== "sim" && Object.keys(hm).length > 0 && (
-          <div className="px-6 pb-5 pt-2 border-t border-white/5 space-y-3">
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-3">
-              <Activity size={11} />
-              <span>Live Stats</span>
-              <div className="flex items-center gap-1 ml-auto">
-                <span className="w-2 h-2 rounded-sm bg-brand-green" /><span className="mr-2 text-slate-400">{homeCode}</span>
-                <span className="w-2 h-2 rounded-sm bg-amber-500" /><span className="text-slate-400">{awayCode}</span>
+          <div className="px-4 pb-5 pt-2">
+            <div className="s0x-circuit s0x-hud-grid s0x-hud-scan rounded-s0x border border-s0x-border bg-s0x-surface/60 p-4 sm:p-5 space-y-4">
+              <span className="s0x-scanline" aria-hidden="true" />
+
+              <div className="relative flex items-center gap-2">
+                <Activity size={11} className="text-s0x-teal" />
+                <span className="s0x-eyebrow">Live Stats</span>
+                <div className="s0x-mono ml-auto flex items-center gap-1.5 text-[9px]">
+                  <span className="w-2 h-2 rounded-sm bg-s0x-teal" />
+                  <span className="text-s0x-muted mr-2">{homeCode}</span>
+                  <span className="w-2 h-2 rounded-sm bg-s0x-accent-ink" />
+                  <span className="text-s0x-muted">{awayCode}</span>
+                </div>
+              </div>
+
+              {(hm.possession != null || am.possession != null) && (
+                <div className="relative">
+                  <PossessionBar
+                    homeCode={homeCode}
+                    awayCode={awayCode}
+                    home={Number(hm.possession ?? 0)}
+                    away={Number(am.possession ?? 0)}
+                  />
+                </div>
+              )}
+
+              <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+                {Object.entries(METRIC_LABELS)
+                  // Only rows the feed actually reported. Rendering a hardcoded
+                  // list meant unreported stats (saves and offsides are often
+                  // absent pre-FT) drew as a confident, wrong 0–0.
+                  .filter(([key]) => metricVal(hm, key) != null || metricVal(am, key) != null)
+                  .map(([key, label]) => (
+                    <StatRow
+                      key={key}
+                      label={label}
+                      homeVal={metricVal(hm, key) ?? 0}
+                      awayVal={metricVal(am, key) ?? 0}
+                    />
+                  ))}
               </div>
             </div>
-            {Object.entries(METRIC_LABELS).map(([key, label]) => {
-              const hv = hm[key as keyof typeof hm] ?? 0;
-              const av = am[key as keyof typeof am] ?? 0;
-              return <StatBar key={key} label={label} homeVal={Number(hv)} awayVal={Number(av)} />;
-            })}
           </div>
         )}
       </div>
@@ -370,14 +595,14 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         <div className="grid grid-cols-3 items-center gap-2">
           {/* Home team */}
           <Link href={`/team/${homeCode}`} className="text-center group block">
-            <div className="flex justify-center mb-2"><FlagImg tla={homeCode} size={56} className="shadow-md" /></div>
+            <div className="flex justify-center mb-2"><FlagImg tla={homeCode} {...homeCrest} size={56} className="shadow-md" /></div>
             <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.homeTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{homeCode}</div>
           </Link>
 
           {/* Score */}
           <div className="text-center">
-            <div className="text-5xl sm:text-6xl font-black text-white tabular-nums tracking-tighter leading-none">
+            <div className="text-5xl sm:text-6xl font-black text-white tabular-nums tracking-tighter leading-none whitespace-nowrap">
               {match.homeScore}<span className="text-brand-border mx-1 sm:mx-2">–</span>{match.awayScore}
             </div>
             <div suppressHydrationWarning className="flex items-center justify-center gap-1 mt-2 text-xs text-slate-500">
@@ -388,19 +613,20 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
 
           {/* Away team */}
           <Link href={`/team/${awayCode}`} className="text-center group block">
-            <div className="flex justify-center mb-2"><FlagImg tla={awayCode} size={56} className="shadow-md" /></div>
+            <div className="flex justify-center mb-2"><FlagImg tla={awayCode} {...awayCrest} size={56} className="shadow-md" /></div>
             <div className="font-bold text-base sm:text-lg text-white group-hover:text-brand-gold transition-colors leading-tight">{match.awayTeam.name}</div>
             <div className="text-xs text-slate-500 uppercase tracking-wider">{awayCode}</div>
           </Link>
         </div>
       </div>
 
-      {/* Goal scorers */}
-      {(showGoals || missedPens.length > 0 || varEvents.length > 0) && goals && (
+      {/* Match moments — goals, missed pens, cards, VAR */}
+      {hasMoments && goals && (
         <GoalDisplay
           goals={goals}
           missedPens={missedPens}
           varEvents={varEvents}
+          cards={cards}
           homeTeam={match.homeTeam.name}
           awayTeam={match.awayTeam.name}
         />
@@ -422,22 +648,45 @@ export default function LiveMatchCard({ matchId, hero }: { matchId: string; hero
         </div>
       )}
 
-      {/* Stats bars */}
+      {/* Live Stats — same HUD panel as the hero, at card scale. */}
       {dataSources?.stats !== "sim" && Object.keys(hm).length > 0 && (
-        <div className="px-6 pb-6 space-y-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
-            <Activity size={12} />
-            <span>Live Stats</span>
-            <div className="flex items-center gap-1 ml-auto">
-              <span className="w-2 h-2 rounded-sm bg-brand-green" /><span className="mr-2 text-slate-400">{match.homeTeam.name}</span>
-              <span className="w-2 h-2 rounded-sm bg-amber-500" /><span className="text-slate-400">{match.awayTeam.name}</span>
+        <div className="px-4 pb-5">
+          <div className="s0x-circuit s0x-hud-grid rounded-s0x border border-s0x-border bg-s0x-surface/60 p-4 space-y-4">
+            <div className="relative flex items-center gap-2">
+              <Activity size={11} className="text-s0x-teal" />
+              <span className="s0x-eyebrow">Live Stats</span>
+              <div className="s0x-mono ml-auto flex items-center gap-1.5 text-[9px]">
+                <span className="w-2 h-2 rounded-sm bg-s0x-teal" />
+                <span className="text-s0x-muted mr-2">{homeCode}</span>
+                <span className="w-2 h-2 rounded-sm bg-s0x-accent-ink" />
+                <span className="text-s0x-muted">{awayCode}</span>
+              </div>
+            </div>
+
+            {(hm.possession != null || am.possession != null) && (
+              <div className="relative">
+                <PossessionBar
+                  homeCode={homeCode}
+                  awayCode={awayCode}
+                  home={Number(hm.possession ?? 0)}
+                  away={Number(am.possession ?? 0)}
+                />
+              </div>
+            )}
+
+            <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+              {Object.entries(METRIC_LABELS)
+                .filter(([key]) => metricVal(hm, key) != null || metricVal(am, key) != null)
+                .map(([key, label]) => (
+                  <StatRow
+                    key={key}
+                    label={label}
+                    homeVal={metricVal(hm, key) ?? 0}
+                    awayVal={metricVal(am, key) ?? 0}
+                  />
+                ))}
             </div>
           </div>
-          {Object.entries(METRIC_LABELS).map(([key, label]) => {
-            const hv = hm[key as keyof typeof hm] ?? 0;
-            const av = am[key as keyof typeof am] ?? 0;
-            return <StatBar key={key} label={label} homeVal={Number(hv)} awayVal={Number(av)} />;
-          })}
         </div>
       )}
     </div>

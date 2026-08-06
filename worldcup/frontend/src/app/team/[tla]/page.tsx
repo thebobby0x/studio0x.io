@@ -6,6 +6,7 @@ import AppNav from "@/components/ui/AppNav";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { prisma } from "@/lib/prisma";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -658,7 +659,7 @@ export default async function TeamPage({ params }: { params: Promise<{ tla: stri
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Data via api-football.com
+        studio0x.io · {BRAND_NAME} · Data via api-football.com
       </footer>
     </div>
   );

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { storyScope } from "@/lib/storyScope";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
   let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
   try {
     stories = await prisma.newsStory.findMany({
-      where,
+      where: { ...where, ...storyScope() },
       orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
       take: limit,
     });
@@ -57,11 +59,13 @@ export async function GET(req: Request) {
         ].join("\n")
       )
       .join("\n\n---\n\n");
-    const header = `# podiumMetrics — Tournament Story Archive\n\n*${stories.length} stories · exported ${new Date().toISOString().slice(0, 10)} · podiumMetrics by studio0x*\n\n---\n\n`;
+    const header = `# ${BRAND_NAME} — Tournament Story Archive\n\n*${stories.length} stories · exported ${new Date().toISOString().slice(0, 10)} · ${BRAND_NAME} by studio0x*\n\n---\n\n`;
     return new NextResponse(header + md, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="podiummetrics-stories.md"',
+        // Filename follows the deployment brand, so an LC26 export doesn't land
+        // in the user's downloads as "podiummetrics-stories.md".
+        "Content-Disposition": `attachment; filename="${BRAND_NAME.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-stories.md"`,
       },
     });
   }

@@ -7,6 +7,15 @@ import ScheduleView from "./ScheduleView";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { prisma } from "@/lib/prisma";
+import { SPORT, BRAND_NAME } from "@/lib/sportConfig";
+
+const HAS_GROUPS = Object.keys(SPORT.teamGroups).length > 0;
+const HAS_BRACKET = SPORT.calendar.rounds.length > 0;
+const SCHEDULE_SUBTITLE = HAS_GROUPS && HAS_BRACKET
+  ? "Full group stage & knockout bracket"
+  : HAS_BRACKET
+    ? "Full league phase & knockout bracket"
+    : "Every fixture in the league phase";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -33,8 +42,8 @@ async function fetchSchedule(): Promise<ScheduleMatch[]> {
       stageLabel: "Group Stage",
       group: m.homeTeam.groupStage ?? "",
       matchday: 1,
-      homeTeam: { name: m.homeTeam.name, tla: m.homeTeam.code },
-      awayTeam: { name: m.awayTeam.name, tla: m.awayTeam.code },
+      homeTeam: { name: m.homeTeam.name, tla: m.homeTeam.code, afId: m.homeTeam.afTeamId },
+      awayTeam: { name: m.awayTeam.name, tla: m.awayTeam.code, afId: m.awayTeam.afTeamId },
       homeScore: m.homeScore ?? null,
       awayScore: m.awayScore ?? null,
       penHome: null,
@@ -60,10 +69,13 @@ export default async function SchedulePage() {
         {/* Page header */}
         <div className="mb-8">
           <h1 className="text-3xl font-black text-white tracking-tight">
-            podiumMetrics <span className="text-brand-gold">Schedule</span>
+            {BRAND_NAME} <span className="text-brand-gold">Schedule</span>
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Live scores · Countdowns · Full group stage & knockout bracket
+            {/* Copy must describe the format this deployment actually has —
+                LC26 runs a single league phase with no groups and no published
+                bracket, so "Full group stage & knockout bracket" was wrong. */}
+            Live scores · Countdowns · {SCHEDULE_SUBTITLE}
           </p>
         </div>
 
@@ -81,7 +93,7 @@ export default async function SchedulePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Schedule data via api-football.com
+        studio0x.io · {BRAND_NAME} · Schedule data via api-football.com
       </footer>
     </div>
   );

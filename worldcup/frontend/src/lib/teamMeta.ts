@@ -1,3 +1,4 @@
+import { SPORT } from "@/lib/sportConfig";
 // TLA → ISO 3166-1 alpha-2 (or subdivision) code for flagcdn.com
 const ISO2: Record<string, string> = {
   // Americas
@@ -32,8 +33,12 @@ const ISO2: Record<string, string> = {
   FIJ: "fj", NZL: "nz", PNG: "pg", SOL: "sb", VAN: "vu",
 };
 
+/** Nation flag image for a FIFA TLA. Returns null on club deployments — a club
+ *  code is not a country code, and mapping one to flagcdn produced Colombia's
+ *  flag for Columbus Crew. Club badges come from FlagImg's crest path. */
 export function getFlagUrl(tla: string | undefined | null, width = 80): string | null {
   if (!tla) return null;
+  if (!SPORT.feedCodesAreNationTlas) return null;
   const code = ISO2[tla.toUpperCase()];
   if (!code) return null;
   return `https://flagcdn.com/w${width}/${code}.png`;

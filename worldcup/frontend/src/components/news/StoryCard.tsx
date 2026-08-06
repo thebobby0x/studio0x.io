@@ -6,14 +6,16 @@ import FlagImg from "@/components/ui/FlagImg";
 import ShareButton from "@/components/ui/ShareButton";
 import { registerStoryStop, stopAllStories, startAmbient, stopAmbient } from "@/lib/storyAudio";
 
+// Riptide = ordinary editorial categories; Rosa = the studio0x proprietary /
+// featured ones. Both straight off the brand palette.
 export const CATEGORY_COLORS: Record<string, string> = {
-  "MATCH REPORT":     "bg-white/10 text-slate-300",
-  "MATCH PREVIEW":    "bg-white/10 text-slate-300",
-  "ANALYSIS":         "bg-white/10 text-slate-300",
-  "STANDINGS":        "bg-white/10 text-slate-300",
-  "METRIC SPOTLIGHT": "bg-brand-gold/20 text-brand-gold",
-  "GAME RECAP":       "bg-white/10 text-slate-300",
-  "DAILY RECAP":      "bg-brand-gold/20 text-brand-gold",
+  "MATCH REPORT":     "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "MATCH PREVIEW":    "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "ANALYSIS":         "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "STANDINGS":        "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "METRIC SPOTLIGHT": "bg-s0x-ink/20 border border-s0x-ink/45 text-s0x-accent",
+  "GAME RECAP":       "bg-s0x-teal/10 border border-s0x-teal/30 text-s0x-teal",
+  "DAILY RECAP":      "bg-s0x-ink/20 border border-s0x-ink/45 text-s0x-accent",
 };
 
 export interface StoryCardData {
@@ -46,6 +48,24 @@ export function DeepDivePanel({ text }: { text: string }) {
   );
 }
 
+// The TTS route reports WHY it failed — missing key, ElevenLabs rejection, full
+// Blob store — and the player used to throw all of it away and say "Audio
+// unavailable" for every case. CLAUDE.md gotcha #15 exists precisely because a
+// full Blob store produces symptoms identical to a missing API key, so the
+// distinction has to reach the surface.
+function ttsMessage(status: number, error?: string): string {
+  const e = (error ?? "").toLowerCase();
+  if (e.includes("elevenlabs_api_key")) return "Narration isn't configured yet";
+  // "Audio cache failed" is the Vercel BLOB write failing — ElevenLabs already
+  // succeeded by that point and handed back the bytes. Naming the store matters:
+  // read as "ElevenLabs storage full" it sends admins to purge an ElevenLabs
+  // history that frees nothing, because we never store anything there.
+  if (e.includes("quota") || e.includes("cache failed")) return "Audio cache full — admin: free up Blob storage";
+  if (status === 429 || e.includes("429")) return "Narration busy — try again";
+  if (e.includes("elevenlabs")) return "Narration service unavailable";
+  return "Audio unavailable";
+}
+
 export default function StoryCard({ story, showAge = true }: { story: StoryCardData; showAge?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -64,13 +84,13 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   const [deepAudioUrl, setDeepAudioUrl] = useState<string | null>(null);
   const [deepAudioLoading, setDeepAudioLoading] = useState(false);
   const [deepPlaying, setDeepPlaying] = useState(false);
-  const [deepAudioError, setDeepAudioError] = useState(false);
+  const [deepAudioError, setDeepAudioError] = useState<string | null>(null);
   const deepAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Short story audio error state
-  const [audioError, setAudioError] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
-  const catColor = CATEGORY_COLORS[story.category] ?? "bg-slate-700 text-slate-300";
+  const catColor = CATEGORY_COLORS[story.category] ?? "bg-s0x-surface border border-s0x-border text-s0x-muted";
   const age = Math.round((Date.now() - new Date(story.generatedAt).getTime()) / 60_000);
   const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
 
@@ -85,6 +105,38 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
       stopAmbient();
     };
     return registerStoryStop(stop);
+  }, []);
+
+  /**
+   * Load and play a URL. Resolves false when the media cannot be played —
+   * a 404/403 blob fires the element's `error` event and never rejects play(),
+   * so both signals have to be raced or a purged blob just hangs.
+   */
+  const playUrl = useCallback(async (url: string): Promise<boolean> => {
+    const audio = new Audio(url);
+    const loadable = await new Promise<boolean>((resolve) => {
+      const done = (v: boolean) => {
+        audio.removeEventListener("canplay", ok);
+        audio.removeEventListener("error", bad);
+        resolve(v);
+      };
+      const ok = () => done(true);
+      const bad = () => done(false);
+      audio.addEventListener("canplay", ok, { once: true });
+      audio.addEventListener("error", bad, { once: true });
+      audio.load();
+    });
+    if (!loadable) return false;
+    audioRef.current = audio;
+    audio.onended = () => { setPlaying(false); stopAmbient(); };
+    try {
+      await audio.play();
+    } catch {
+      return false; // autoplay policy or decode failure
+    }
+    startAmbient();
+    setPlaying(true);
+    return true;
   }, []);
 
   const handlePlay = useCallback(async () => {
@@ -103,29 +155,41 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setAudioLoading(true);
-    setAudioError(false);
+    setAudioError(null);
     try {
+      // A story row can carry a PERSISTED narration URL (admin batch generation).
+      // Use it directly — that's the whole point of persisting it — but never
+      // trust it blindly: the blob it points at is a regenerable cache that an
+      // admin storage purge can delete out from under the row. If it won't load,
+      // fall through and re-synthesise once rather than showing a dead player.
+      if (audioUrl) {
+        const ok = await playUrl(audioUrl);
+        if (ok) return;
+        console.warn("[StoryCard] persisted audioUrl failed to load, regenerating", audioUrl);
+        setAudioUrl(null);
+      }
       const res = await fetch("/api/ai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: `${story.headline}. ${story.body}`, storyId: story.id }),
       });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) { setAudioError(true); setTimeout(() => setAudioError(false), 4000); return; }
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!data.url) {
+        console.error("[StoryCard] TTS failed", res.status, data.error);
+        setAudioError(ttsMessage(res.status, data.error));
+        setTimeout(() => setAudioError(null), 6000);
+        return;
+      }
       setAudioUrl(data.url);
-      const audio = new Audio(data.url);
-      audioRef.current = audio;
-      audio.onended = () => { setPlaying(false); stopAmbient(); };
-      audio.play();
-      startAmbient();
-      setPlaying(true);
-    } catch {
-      setAudioError(true);
-      setTimeout(() => setAudioError(false), 4000);
+      if (!(await playUrl(data.url))) throw new Error("playback blocked");
+    } catch (e) {
+      console.error("[StoryCard] story audio", e);
+      setAudioError("Audio unavailable");
+      setTimeout(() => setAudioError(null), 6000);
     } finally {
       setAudioLoading(false);
     }
-  }, [audioUrl, playing, story]);
+  }, [audioUrl, playing, story, playUrl]);
 
   const handleDeepPlay = useCallback(async () => {
     if (!deepDive) return;
@@ -144,7 +208,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
     }
     stopAllStories();
     setDeepAudioLoading(true);
-    setDeepAudioError(false);
+    setDeepAudioError(null);
     try {
       // Strip markdown formatting for clean TTS
       const cleanDeep = deepDive.replace(/\*\*/g, "").replace(/\n\n+/g, ". ");
@@ -154,18 +218,24 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: fullText, storyId: `${story.id}-deep` }),
       });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!data.url) { setDeepAudioError(true); setTimeout(() => setDeepAudioError(false), 4000); return; }
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!data.url) {
+        console.error("[StoryCard] deep-dive TTS failed", res.status, data.error);
+        setDeepAudioError(ttsMessage(res.status, data.error));
+        setTimeout(() => setDeepAudioError(null), 6000);
+        return;
+      }
       setDeepAudioUrl(data.url);
       const audio = new Audio(data.url);
       deepAudioRef.current = audio;
       audio.onended = () => { setDeepPlaying(false); stopAmbient(); };
-      audio.play();
+      await audio.play().catch(() => { throw new Error("playback blocked"); });
       startAmbient();
       setDeepPlaying(true);
-    } catch {
-      setDeepAudioError(true);
-      setTimeout(() => setDeepAudioError(false), 4000);
+    } catch (e) {
+      console.error("[StoryCard] deep-dive audio", e);
+      setDeepAudioError("Audio unavailable");
+      setTimeout(() => setDeepAudioError(null), 6000);
     } finally {
       setDeepAudioLoading(false);
     }
@@ -195,29 +265,29 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
   }, [deepDive, story]);
 
   return (
-    <div className="rounded-xl bg-brand-card border border-brand-border p-4 flex flex-col gap-2 transition-all">
+    <div className="s0x-card p-4 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${catColor}`}>
+        <span className={`s0x-mono text-[9px] font-semibold px-2 py-0.5 rounded-full ${catColor}`}>
           {story.category}
         </span>
         <div className="flex items-center gap-1.5">
           {story.teamsInvolved.slice(0, 2).map((tla) => (
             <FlagImg key={tla} tla={tla} size={18} />
           ))}
-          {showAge && <span className="text-[10px] text-slate-600 ml-1">{ageStr}</span>}
+          {showAge && <span className="s0x-data text-[10px] text-s0x-muted ml-1">{ageStr}</span>}
         </div>
       </div>
 
-      <h3 className="font-black text-white text-base leading-snug">{story.headline}</h3>
+      <h3 className="s0x-display font-black text-s0x-text text-base leading-snug">{story.headline}</h3>
 
-      <p className={`text-sm text-slate-400 leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>
+      <p className={`text-sm text-s0x-text/70 leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>
         {story.body}
       </p>
 
       <div className="flex items-center justify-between mt-0.5">
         <button
           onClick={() => setExpanded((e) => !e)}
-          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          className="s0x-mono flex items-center gap-1.5 text-[10px] text-s0x-muted hover:text-s0x-accent transition-colors"
         >
           {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           {expanded ? "Less" : "Read more"}
@@ -232,7 +302,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
           <button
             onClick={handleDeepDive}
             disabled={deepDiveLoading}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-brand-gold/30 text-brand-gold hover:bg-brand-gold/10 disabled:opacity-40"
+            className="s0x-btn s0x-btn-secondary !px-3 !py-1.5 !text-[10px] disabled:opacity-40"
           >
             {deepDiveLoading ? <Loader2 size={12} className="animate-spin" /> : <Telescope size={12} />}
             {deepDiveLoading ? "Analysing…" : deepDiveOpen ? "Close" : "Go Deeper"}
@@ -248,7 +318,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
             }`}
           >
             {audioLoading ? <Loader2 size={12} className="animate-spin" /> : playing ? <Pause size={12} /> : <Play size={12} />}
-            {audioLoading ? "Generating…" : audioError ? "Audio unavailable" : playing ? "Pause" : "Listen"}
+            {audioLoading ? "Generating…" : audioError ? audioError : playing ? "Pause" : "Listen"}
           </button>
         </div>
       </div>
@@ -274,7 +344,7 @@ export default function StoryCard({ story, showAge = true }: { story: StoryCardD
                 }`}
               >
                 {deepAudioLoading ? <Loader2 size={12} className="animate-spin" /> : deepPlaying ? <Pause size={12} /> : <Play size={12} />}
-                {deepAudioLoading ? "Generating…" : deepAudioError ? "Audio unavailable" : deepPlaying ? "Pause" : "Listen to Full Analysis"}
+                {deepAudioLoading ? "Generating…" : deepAudioError ? deepAudioError : deepPlaying ? "Pause" : "Listen to Full Analysis"}
               </button>
             </div>
           </>

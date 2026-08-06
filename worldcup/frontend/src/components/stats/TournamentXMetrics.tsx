@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 // ── Novel cross-metric formulas ────────────────────────────────────────────────
 // Each connects traditionally separate stat categories to derive new insight.
@@ -146,11 +147,12 @@ export default async function TournamentXMetrics({ limit = 10, metric = "cps" as
                   {r.goals > 0 && <span className="text-[9px] text-slate-500">⚽{r.goals}</span>}
                   {r.assists > 0 && <span className="text-[9px] text-slate-500">🎯{r.assists}</span>}
                 </div>
-                <div className="mt-1 h-0.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r ${metric === "ipm" ? "from-amber-500 to-amber-300" : metric === "sei" ? "from-amber-500 to-amber-300" : metric === "dd" ? "from-amber-500 to-amber-300" : metric === "cps" ? "from-emerald-500 to-emerald-300" : "from-rose-500 to-rose-300"}`}
-                    style={{ width: `${pct}%` }}
-                  />
+                <div className="mt-1">
+                  {/* cps was the one "positive" metric in the old palette; it keeps
+                      the cyan read, everything else takes the red accent. */}
+                  <SegmentedBar value={pct} segments={10} height={6}
+                    color={metric === "cps" ? "cyan" : "red"}
+                    ariaLabel={`${r.name} ${metric}`} />
                 </div>
               </div>
               <span className={`font-black tabular-nums text-[11px] w-10 text-right ${m.color}`}>{displayVal}</span>

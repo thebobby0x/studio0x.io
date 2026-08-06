@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { SPORT } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,36 @@ const API_BASE = "https://v3.football.api-sports.io";
 
 const POS_MAP: Record<string, string> = { G: "GK", D: "DEF", M: "MID", A: "FWD" };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NATION COMPETITIONS ONLY.
+//
+// This route is pinned to api-football league 1 (World Cup) and resolves our
+// teams by FIFA nation TLA. On a club deployment that combination CORRUPTS data
+// rather than merely doing nothing: LC26 club codes collide with nation TLAs
+// (COL = Columbus Crew and Colombia, POR = Portland Timbers and Portugal, CHI =
+// Chicago Fire and Chile, GUA, SAL…), so every collision writes a World Cup
+// national squad into a club's roster. See CLAUDE.md, "CLUB DEPLOYMENTS — the
+// team-identity rule": resolve teams by afTeamId, never by code.
+//
+// The admin button is hidden on club deployments; this guard is the backstop for
+// anyone hitting the URL directly.
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runSeed() {
+  if (SPORT.entityKind !== "nation") {
+    return NextResponse.json(
+      {
+        error: "Not applicable to this deployment",
+        detail:
+          `${SPORT.eventName} is a ${SPORT.entityKind} competition. This route seeds NATIONAL squads ` +
+          `from the World Cup league and matches teams by nation TLA, which collides with club codes ` +
+          `(COL, POR, CHI…) and would write national-team players into club rosters. ` +
+          `Use "Seed Team Crests + Country" and the fixture sync instead.`,
+      },
+      { status: 400 },
+    );
+  }
+
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "API_FOOTBALL_KEY not configured" }, { status: 500 });

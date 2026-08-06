@@ -1,6 +1,7 @@
 import { GET } from "@/app/api/tournament/records/route";
 import type { TournamentRecords, TopScorerEntry, TopAssisterEntry } from "@/app/api/tournament/records/route";
 import { getFlag } from "@/lib/flags";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 async function fetchRecords(): Promise<TournamentRecords> {
   try {
@@ -61,11 +62,9 @@ function ScorerRow({
       <span className="text-[9px] text-slate-600 font-mono w-7 text-center shrink-0 hidden sm:inline">
         {entry.tla || entry.team.slice(0, 3).toUpperCase()}
       </span>
-      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden min-w-0">
-        <div
-          className={`h-full bg-gradient-to-r ${barColor} rounded-full`}
-          style={{ width: `${barWidth}%` }}
-        />
+      <div className="flex-1 min-w-0">
+        <SegmentedBar value={barWidth} segments={12} height={8} color="cyan"
+          ariaLabel={`${entry.team}: ${primary}`} />
       </div>
       <span className={`text-sm font-black tabular-nums w-5 text-right shrink-0 ${primaryColor}`}>
         {primary}

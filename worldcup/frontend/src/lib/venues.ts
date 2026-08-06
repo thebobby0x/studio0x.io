@@ -1,3 +1,4 @@
+import { SPORT } from "@/lib/sportConfig";
 export interface VenueInfo {
   city: string;
   country: string;
@@ -258,9 +259,24 @@ const ALIASES: Record<string, string> = {
   "BMO":                         "BMO Field",
 };
 
+// Substring matching against this table is safe ONLY on the deployment the table
+// describes. It is a list of the 16 World Cup 2026 stadiums, and the fuzzy passes
+// below happily match a different competition's ground onto a World Cup one:
+// "BMO Stadium" (LAFC, Los Angeles) hit the "BMO" alias and resolved to BMO
+// Field in TORONTO — so every LAFC home fixture was stamped with Toronto's city
+// AND Toronto's coordinates, which would have produced Canadian weather for a
+// match in California.
+//
+// EXACT matches stay enabled everywhere: several real Leagues Cup grounds are
+// genuinely in this table (BC Place, Estadio Akron, Estadio BBVA), and an exact
+// name or alias hit is correct on any deployment. Only the substring guesses are
+// restricted.
+const FUZZY_VENUE_MATCH = SPORT.id === "worldcup";
+
 function canonicalize(name: string): string {
   if (VENUES[name]) return name;
   if (ALIASES[name]) return ALIASES[name];
+  if (!FUZZY_VENUE_MATCH) return name;
   const lower = name.toLowerCase();
   for (const [alias, canonical] of Object.entries(ALIASES)) {
     if (lower.includes(alias.toLowerCase())) return canonical;

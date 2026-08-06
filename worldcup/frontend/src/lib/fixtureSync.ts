@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
+// league/season from the active deployment config (Stage 3): worldcup → 1/2026
+// (unchanged, behavior-preserving); leaguescup → 772/2026.
+import { AF_LEAGUE, AF_SEASON, SPORT } from "@/lib/sportConfig";
+import { resolveTeams, type FeedTeam } from "@/lib/teamIdentity";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Non-destructive fixture sync — the permanent fix for the stale-DB class of
@@ -14,8 +17,7 @@ import { getVenueInfo } from "@/lib/venues";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AF_BASE = "https://v3.football.api-sports.io";
-const AF_LEAGUE = 1; // World Cup
-const AF_SEASON = 2026;
+// AF_LEAGUE / AF_SEASON now come from @/lib/sportConfig (imported at top).
 
 export const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -25,21 +27,12 @@ export const STATUS_MAP: Record<string, string> = {
   AWD: "FT", WO: "FT", SUSP: "LIVE", INT: "LIVE", LIVE: "LIVE",
 };
 
-// Static group assignments (api-football doesn't include group in fixtures)
-export const TEAM_GROUPS: Record<string, string> = {
-  MEX: "A", RSA: "A", KOR: "A", CZE: "A",
-  CAN: "B", BIH: "B", QAT: "B", SUI: "B",
-  BRA: "C", MAR: "C", HAI: "C", SCO: "C",
-  USA: "D", PAR: "D", AUS: "D", TUR: "D",
-  GER: "E", CUW: "E", CUR: "E", CIV: "E", ECU: "E",
-  NED: "F", JPN: "F", SWE: "F", TUN: "F",
-  BEL: "G", EGY: "G", IRN: "G", NZL: "G",
-  ESP: "H", CPV: "H", KSA: "H", URU: "H",
-  FRA: "I", SEN: "I", IRQ: "I", NOR: "I",
-  ARG: "J", ALG: "J", AUT: "J", JOR: "J",
-  POR: "K", COD: "K", UZB: "K", COL: "K",
-  ENG: "L", CRO: "L", GHA: "L", PAN: "L",
-};
+// Static group assignments come from the deployment config (api-football doesn't
+// include group in fixtures). WC26 keeps its nation map; LC26's is empty because
+// the competition has no groups — applying the WC map to clubs is what put
+// Columbus Crew ("COL" = Colombia) into World Cup Group K.
+export const TEAM_GROUPS: Record<string, string> = SPORT.teamGroups;
+const HAS_GROUPS = Object.keys(TEAM_GROUPS).length > 0;
 
 interface AFFixture {
   fixture: {
@@ -47,7 +40,7 @@ interface AFFixture {
     date: string;
     referee: string | null;
     status: { short: string; elapsed: number | null };
-    venue: { name: string | null; city: string | null };
+    venue: { id: number | null; name: string | null; city: string | null };
   };
   league: { round: string };
   teams: { home: { id: number; name: string }; away: { id: number; name: string } };
@@ -55,7 +48,7 @@ interface AFFixture {
   score?: { penalty?: { home: number | null; away: number | null } };
 }
 
-interface AFTeam { team: { id: number; name: string; code: string | null } }
+interface AFTeam { team: { id: number; name: string; code: string | null; country: string | null; logo: string | null } }
 
 export interface SyncResult {
   ok: boolean;
@@ -94,42 +87,96 @@ export async function syncFixtures(): Promise<SyncResult> {
   }
 
   const teamsJson = teamsRes.ok ? ((await teamsRes.json()) as { response?: AFTeam[] }) : { response: [] };
-  const teamCodeById = new Map<number, string>(
-    (teamsJson.response ?? [])
-      .filter((t) => t.team.code)
-      .map((t) => [t.team.id, t.team.code!.toUpperCase()])
-  );
 
-  // Guard: an empty team map means the /teams call failed or came back hollow.
+  // Resolve feed teams to DB identities. Nation deployments key off the feed's
+  // FIFA TLA (unchanged); club deployments key off the api-football team id,
+  // because 14 of the 36 Leagues Cup clubs have no `team.code` at all and every
+  // fixture involving them was being silently skipped below (36/54 affected).
+  // Seed from /teams, then top up from the fixtures themselves so a club that
+  // /teams omits still resolves.
+  const feedTeams = new Map<number, FeedTeam>();
+  for (const t of teamsJson.response ?? []) {
+    feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country, logo: t.team.logo });
+  }
+  for (const f of afFixtures) {
+    for (const side of [f.teams.home, f.teams.away]) {
+      if (!feedTeams.has(side.id)) feedTeams.set(side.id, { id: side.id, name: side.name });
+    }
+  }
+  const resolved = resolveTeams([...feedTeams.values()]);
+
+  // Guard: an empty resolution means the /teams call failed or came back hollow.
   // Proceeding would resolve EVERY knockout fixture to the TBD sentinel and the
   // diff-writer would downgrade real, already-played pairings back to TBD
   // (owner report 7/15: dashboard full of "TBD 0-2 TBD" for finished semis).
   // The fixtures call has this guard; the teams call never did.
-  if (teamCodeById.size === 0) {
-    result.skipped = "api-football /teams returned no codes — refusing to sync (would downgrade knockout teams to TBD)";
+  if (resolved.size === 0) {
+    result.skipped = "api-football /teams returned no usable teams — refusing to sync (would downgrade knockout teams to TBD)";
     return result;
   }
 
-  // ── 2. Upsert teams by code (stable IDs — anthem links survive) ────────────
-  const teamMeta = new Map<string, string>(); // code → name
-  for (const f of afFixtures) {
-    const h = teamCodeById.get(f.teams.home.id);
-    const a = teamCodeById.get(f.teams.away.id);
-    if (h && !teamMeta.has(h)) teamMeta.set(h, f.teams.home.name);
-    if (a && !teamMeta.has(a)) teamMeta.set(a, f.teams.away.name);
+  // ── 2. Upsert teams (stable IDs — anthem links survive) ────────────────────
+  // Upsert by api-football team id where we have one, so a club whose derived
+  // code changes (rename, collision reshuffle) updates in place instead of
+  // minting a duplicate row.
+  // Pre-pass: free every wanted code that is currently held by a DIFFERENT team.
+  //
+  // Team.code is @unique, and this change reassigns codes. Two ways that bites:
+  //   · a stale row squats a code nothing owns any more;
+  //   · a code moves between two teams that are BOTH still in the competition —
+  //     Atlas was stored as "ATL", and "ATL" now resolves to Atlante FC. Without
+  //     this pass, resolving Atlante would find Atlas by code and overwrite the
+  //     wrong row (or hit a unique violation).
+  // Ownership is decided by NAME: the row entitled to code C is the one named
+  // whatever the resolver says owns C. Everyone else gets parked; parked rows are
+  // either re-coded moments later in this same loop (if they're still in the
+  // competition) or pruned by clear-foreign-data.
+  const nameForCode = new Map([...resolved.values()].map((t) => [t.code, t.name]));
+  const held = await prisma.team.findMany({
+    where: { code: { in: [...nameForCode.keys()] } },
+    select: { id: true, code: true, name: true },
+  });
+  for (const row of held) {
+    if (nameForCode.get(row.code) === row.name) continue; // rightful owner
+    await prisma.team
+      .update({ where: { id: row.id }, data: { code: `X-${row.id.slice(0, 8)}` } })
+      .catch((e) => result.errors.push(`free code ${row.code}: ${String(e)}`));
   }
-  await Promise.all(
-    [...teamMeta.entries()].map(([code, name]) =>
-      prisma.team
-        .upsert({
-          where: { code },
-          create: { code, name, flagEmoji: getFlag(code), groupStage: TEAM_GROUPS[code] ?? "KO" },
-          update: { name, flagEmoji: getFlag(code) },
-        })
-        .then(() => { result.teamsUpserted++; })
-        .catch((e) => result.errors.push(`team ${code}: ${String(e)}`))
-    )
-  );
+
+  for (const [afId, t] of resolved) {
+    try {
+      // Match an existing row by api-football id, then NAME, then code. Name
+      // outranks code because this change REASSIGNS codes: rows seeded by the old
+      // code-keyed path have no afTeamId and carry a code that may now belong to
+      // another club. Name is stable, unique, and comes straight from the feed.
+      const existing =
+        (await prisma.team.findFirst({ where: { afTeamId: afId } })) ??
+        (await prisma.team.findUnique({ where: { name: t.name } })) ??
+        (await prisma.team.findUnique({ where: { code: t.code } }));
+      // groupStage on a deployment WITHOUT groups must be empty, not preserved
+      // and not "KO". Preserving left Columbus Crew and Portland Timbers holding
+      // "K" — World Cup Group K, written by the old code-keyed seed because
+      // their feed codes are Colombia's and Portugal's TLAs. And "KO" ("in the
+      // tournament, not in a group") is only meaningful where groups exist; on
+      // LC26 it leaked into the schedule's `group` field via synthesizeFromDb.
+      const groupStage = HAS_GROUPS ? (t.groupStage || existing?.groupStage || "KO") : "";
+      if (existing) {
+        await prisma.team.update({
+          where: { id: existing.id },
+          // Never blank a known crest with an empty feed value.
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage, ...(t.logoUrl ? { logoUrl: t.logoUrl } : {}) },
+        });
+      } else {
+        await prisma.team.create({
+          // Never blank a known crest with an empty feed value.
+          data: { code: t.code, name: t.name, flagEmoji: t.flagEmoji, country: t.country, afTeamId: afId, groupStage, ...(t.logoUrl ? { logoUrl: t.logoUrl } : {}) },
+        });
+      }
+      result.teamsUpserted++;
+    } catch (e) {
+      result.errors.push(`team ${t.code} (af:${afId}): ${String(e)}`);
+    }
+  }
   // TBD sentinel for undecided knockout slots
   await prisma.team.upsert({
     where: { code: "TBD" },
@@ -137,24 +184,30 @@ export async function syncFixtures(): Promise<SyncResult> {
     update: {},
   });
 
-  const allTeams = await prisma.team.findMany({ select: { id: true, code: true } });
+  const allTeams = await prisma.team.findMany({ select: { id: true, code: true, afTeamId: true } });
   const teamIdByCode = new Map(allTeams.map((t) => [t.code, t.id]));
+  const teamIdByAfId = new Map(allTeams.filter((t) => t.afTeamId != null).map((t) => [t.afTeamId!, t.id]));
 
   // ── 3. Diff-aware match upsert by fixture id ───────────────────────────────
   const existing = await prisma.match.findMany({
-    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true },
+    select: { fixture: true, status: true, homeScore: true, awayScore: true, penHome: true, penAway: true, elapsed: true, date: true, homeTeamId: true, awayTeamId: true, referee: true, leagueId: true, venue: true, city: true, venueId: true },
   });
   const existingByFixture = new Map(existing.map((m) => [m.fixture, m]));
 
   for (const f of afFixtures) {
-    const rawHome = teamCodeById.get(f.teams.home.id) ?? "";
-    const rawAway = teamCodeById.get(f.teams.away.id) ?? "";
     const isKnockout = !f.league.round.toLowerCase().includes("group");
-    const homeCode = rawHome || (isKnockout ? "TBD" : "");
-    const awayCode = rawAway || (isKnockout ? "TBD" : "");
-    const homeTeamId = teamIdByCode.get(homeCode);
-    const awayTeamId = teamIdByCode.get(awayCode);
-    if (!homeTeamId || !awayTeamId) continue; // group fixture with unknown code — skip
+    // Resolve by api-football team id first (always present), falling back to
+    // the TBD sentinel only for genuinely undecided knockout slots.
+    const homeTeamId =
+      teamIdByAfId.get(f.teams.home.id) ??
+      (isKnockout ? teamIdByCode.get("TBD") : undefined);
+    const awayTeamId =
+      teamIdByAfId.get(f.teams.away.id) ??
+      (isKnockout ? teamIdByCode.get("TBD") : undefined);
+    if (!homeTeamId || !awayTeamId) {
+      result.errors.push(`fixture ${f.fixture.id}: unresolved team (${f.teams.home.name} v ${f.teams.away.name})`);
+      continue;
+    }
 
     // Belt-and-braces with the empty-map guard above: a real team is NEVER
     // downgraded to the TBD sentinel on a per-fixture basis either (a single
@@ -174,19 +227,29 @@ export async function syncFixtures(): Promise<SyncResult> {
     const date = new Date(f.fixture.date);
     const referee = f.fixture.referee?.trim() || null;
 
+    // "World Cup Stadium" is a WC26 DB sentinel (see CLAUDE.md) — never stamp it
+    // on another tournament's fixture. Unknown venue stays blank.
+    const venue = f.fixture.venue.name ?? (SPORT.id === "worldcup" ? "World Cup Stadium" : "");
+    // Prefer OUR canonical city name (matches travel-stats/venue maps); the
+    // feed's raw city string is the fallback.
+    const city = getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "";
+    // The feed supplies a venue id far more reliably than a city (40 of 54 LC26
+    // fixtures had no city). Storing the id lets lib/venueGeo resolve the city
+    // and coordinates once per venue, which is what unblocks weather ingest.
+    const venueId = f.fixture.venue.id ?? null;
+
     const cur = existingByFixture.get(f.fixture.id);
     try {
       if (!cur) {
-        const venue = f.fixture.venue.name ?? "World Cup Stadium";
         await prisma.match.create({
           data: {
             fixture: f.fixture.id,
+            leagueId: AF_LEAGUE,
             homeTeamId: effHomeTeamId,
             awayTeamId: effAwayTeamId,
             venue,
-            // Prefer OUR canonical city name (matches travel-stats/venue maps);
-            // api-football's raw city string only as fallback.
-            city: getVenueInfo(venue)?.city ?? f.fixture.venue.city ?? "",
+            city,
+            venueId,
             date,
             status,
             homeScore,
@@ -207,6 +270,15 @@ export async function syncFixtures(): Promise<SyncResult> {
           cur.date.getTime() !== date.getTime() ||
           cur.homeTeamId !== effHomeTeamId || // TBD → real team upgrade (never the reverse)
           cur.awayTeamId !== effAwayTeamId ||
+          cur.leagueId !== AF_LEAGUE || // backfills rows seeded before leagueId existed
+          // Heal venue/city. These were write-once (create only), so rows whose
+          // city the old seed blanked stayed blank forever — 42 of 54 LC26
+          // fixtures had a real venue name and no city, which is why Travel
+          // Pulse could only group 7 host cities. Only ever fill or correct from
+          // a non-empty feed value; never blank a known venue/city.
+          (!!venue && cur.venue !== venue) ||
+          (!!city && cur.city !== city) ||
+          (venueId !== null && cur.venueId !== venueId) ||
           (penHome !== null && cur.penHome !== penHome) ||
           (penAway !== null && cur.penAway !== penAway) ||
           (referee !== null && cur.referee !== referee); // don't null-out a known ref
@@ -214,7 +286,7 @@ export async function syncFixtures(): Promise<SyncResult> {
           await prisma.match.update({
             where: { fixture: f.fixture.id },
             // Only write pens when the feed has them (never null-out a shootout result).
-            data: { status, homeScore, awayScore, elapsed, date, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
+            data: { status, homeScore, awayScore, elapsed, date, leagueId: AF_LEAGUE, homeTeamId: effHomeTeamId, awayTeamId: effAwayTeamId, ...(venue ? { venue } : {}), ...(city ? { city } : {}), ...(venueId !== null ? { venueId } : {}), ...(penHome !== null ? { penHome } : {}), ...(penAway !== null ? { penAway } : {}), ...(referee !== null ? { referee } : {}) },
           });
           result.matchesUpdated++;
         } else {

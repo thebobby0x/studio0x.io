@@ -6,10 +6,12 @@ import ShareButton from "@/components/ui/ShareButton";
 import { KNOCKOUT_START } from "@/lib/tournament";
 import TournamentRecords from "@/components/stats/TournamentRecords";
 import EliminationProximity from "@/components/stats/EliminationProximity";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 import { BarChart2 } from "lucide-react";
 import type { GroupStanding, TeamStanding } from "@/app/api/standings/route";
 import { getTournamentWinnerMarkets } from "@/lib/polymarket";
 import { prisma } from "@/lib/prisma";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // ── Group Intensity™ ──────────────────────────────────────────────────────────
 // LIVE results-based: measures how tight and entertaining the group actually is
@@ -197,12 +199,22 @@ function GroupCard({
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border bg-brand-card flex-wrap">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider shrink-0">
-          {standing.group}
-        </span>
-        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
-          Group {standing.group}
-        </span>
+        {/* A single-letter key is a GROUP; anything else is the whole-competition
+            table (LC26's one league phase), which must not be headed "Group X". */}
+        {standing.group.length === 1 ? (
+          <>
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-gold/10 text-brand-gold text-xs font-black tracking-wider shrink-0">
+              {standing.group}
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
+              Group {standing.group}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 mr-auto">
+            {standing.group}
+          </span>
+        )}
         {/* Group Danger Index™ — pre-tournament Polymarket strength */}
         {gdi && (
           <span className="flex items-center gap-1 text-[10px] font-bold border border-brand-border/50 rounded-full px-2 py-0.5">
@@ -376,12 +388,12 @@ export default async function StandingsPage() {
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-black text-white tracking-tight">
-              podiumMetrics <span className="text-brand-gold">Standings</span>
+              {BRAND_NAME} <span className="text-brand-gold">Standings</span>
             </h1>
             <ShareButton
-              text="podiumMetrics group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io"
+              text={`${BRAND_NAME} group standings — live tables, Group Intensity™ and Elimination Proximity™ · studio0x.io`}
               url="/standings"
-              title="podiumMetrics Standings"
+              title={`${BRAND_NAME} Standings`}
             />
           </div>
           <p className="text-slate-500 mt-1 text-sm">
@@ -472,13 +484,16 @@ export default async function StandingsPage() {
                   <span className="text-base leading-none">{t.flag}</span>
                   <span className="text-xs font-semibold text-slate-200 flex-1 truncate">{t.name}</span>
                   <span className="text-[9px] text-slate-600 font-mono w-7 text-center">G{t.group}</span>
-                  <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-brand-gold to-amber-300 rounded-full"
-                      style={{ width: `${t.score}%` }}
+                  <div className="w-24 shrink-0">
+                    <SegmentedBar
+                      value={t.score}
+                      segments={12}
+                      height={9}
+                      color="cyan"
+                      ariaLabel={`${t.name} power ranking score ${t.score} of 100`}
                     />
                   </div>
-                  <span className="text-xs font-black text-brand-gold tabular-nums w-8 text-right">{t.score}</span>
+                  <span className="s0x-data text-xs font-bold w-8 text-right" style={{ color: "var(--seg-cyan)" }}>{t.score}</span>
                 </div>
               ))}
             </div>
@@ -496,7 +511,7 @@ export default async function StandingsPage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Standings computed from live match data
+        studio0x.io · {BRAND_NAME} · Standings computed from live match data
       </footer>
     </div>
   );

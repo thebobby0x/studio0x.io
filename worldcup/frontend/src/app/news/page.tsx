@@ -3,6 +3,8 @@ import StoryCard, { type StoryCardData } from "@/components/news/StoryCard";
 import AppNav from "@/components/ui/AppNav";
 import { Newspaper } from "lucide-react";
 import { maybeScheduleRefresh } from "@/lib/storyRefresh";
+import { storyScope } from "@/lib/storyScope";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export default async function NewsPage() {
   let stories: Awaited<ReturnType<typeof prisma.newsStory.findMany>> = [];
   try {
     stories = await prisma.newsStory.findMany({
+      where: storyScope(),
       orderBy: [{ date: "desc" }, { generatedAt: "desc" }],
       take: 400,
     });
@@ -63,7 +66,7 @@ export default async function NewsPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-brand-dark/90 via-brand-dark/70 to-brand-dark/40" />
         <div className="relative px-5 py-8">
           <h1 className="text-3xl font-black text-white">
-            podiumMetrics <span className="text-brand-gold">News</span>
+            {BRAND_NAME} <span className="text-brand-gold">News</span>
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             AI match recaps & daily round-ups · every result, archived · <span className="font-mono text-slate-500">studio0x</span>

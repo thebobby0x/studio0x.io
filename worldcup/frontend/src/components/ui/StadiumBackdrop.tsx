@@ -28,19 +28,19 @@ export default function StadiumBackdrop({ variant = "gold" }: { variant?: "gold"
         <defs>
           {/* night-sky wash */}
           <radialGradient id={`${p}-sky`} cx="50%" cy="-10%" r="90%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity={crown ? 0.22 : 0.14} />
-            <stop offset="45%" stopColor="#f59e0b" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+            <stop offset="0%" stopColor="#CA358B" stopOpacity={crown ? 0.22 : 0.14} />
+            <stop offset="45%" stopColor="#CA358B" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#CA358B" stopOpacity="0" />
           </radialGradient>
           {/* floodlight beam */}
           <linearGradient id={`${p}-beam`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#fde68a" stopOpacity={crown ? 0.30 : 0.20} />
-            <stop offset="100%" stopColor="#fde68a" stopOpacity="0" />
+            <stop offset="0%" stopColor="#F8BDD8" stopOpacity={crown ? 0.30 : 0.20} />
+            <stop offset="100%" stopColor="#F8BDD8" stopOpacity="0" />
           </linearGradient>
           {/* pitch glow rising from the bottom edge */}
           <linearGradient id={`${p}-pitch`} x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.10" />
-            <stop offset="60%" stopColor="#10b981" stopOpacity="0" />
+            <stop offset="0%" stopColor="#5DCBD1" stopOpacity="0.10" />
+            <stop offset="60%" stopColor="#5DCBD1" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -51,25 +51,25 @@ export default function StadiumBackdrop({ variant = "gold" }: { variant?: "gold"
         <polygon points="660,-20 760,-20 600,420 440,420" fill={`url(#${p}-beam)`} />
 
         {/* stadium bowl rim — two sweeping tiers */}
-        <path d="M -40 300 Q 400 180 840 300" fill="none" stroke="#182a42" strokeWidth="2.5" />
-        <path d="M -40 330 Q 400 216 840 330" fill="none" stroke="#182a42" strokeWidth="1.5" opacity="0.8" />
+        <path d="M -40 300 Q 400 180 840 300" fill="none" stroke="#312C2F" strokeWidth="2.5" />
+        <path d="M -40 330 Q 400 216 840 330" fill="none" stroke="#312C2F" strokeWidth="1.5" opacity="0.8" />
 
         {/* floodlight masts on the rim */}
         {[120, 280, 520, 680].map((x) => {
           const yTop = 240 - Math.sin((x / 800) * Math.PI) * 46;
           return (
             <g key={x}>
-              <line x1={x} y1={yTop + 60} x2={x} y2={yTop} stroke="#182a42" strokeWidth="2" />
-              <rect x={x - 12} y={yTop - 8} width="24" height="8" rx="2" fill="#f59e0b" opacity={crown ? 0.9 : 0.6} />
+              <line x1={x} y1={yTop + 60} x2={x} y2={yTop} stroke="#312C2F" strokeWidth="2" />
+              <rect x={x - 12} y={yTop - 8} width="24" height="8" rx="2" fill="#CA358B" opacity={crown ? 0.9 : 0.6} />
             </g>
           );
         })}
 
         {/* pitch line-art: halfway line + centre circle breaking the bottom edge */}
         <rect y="300" width="800" height="120" fill={`url(#${p}-pitch)`} />
-        <circle cx="400" cy="470" r="130" fill="none" stroke="#10b981" strokeOpacity="0.25" strokeWidth="2" />
-        <circle cx="400" cy="470" r="6" fill="#10b981" fillOpacity="0.35" />
-        <line x1="0" y1="470" x2="800" y2="470" stroke="#10b981" strokeOpacity="0.2" strokeWidth="2" />
+        <circle cx="400" cy="470" r="130" fill="none" stroke="#5DCBD1" strokeOpacity="0.25" strokeWidth="2" />
+        <circle cx="400" cy="470" r="6" fill="#5DCBD1" fillOpacity="0.35" />
+        <line x1="0" y1="470" x2="800" y2="470" stroke="#5DCBD1" strokeOpacity="0.2" strokeWidth="2" />
 
         {/* crown variant: gold confetti falling through the beams */}
         {crown &&
@@ -78,7 +78,7 @@ export default function StadiumBackdrop({ variant = "gold" }: { variant?: "gold"
             [500, 160, 2], [580, 70, 2.5], [660, 140, 2], [730, 90, 3], [150, 230, 2],
             [640, 220, 2.5], [390, 250, 2],
           ].map(([x, y, r], i) => (
-            <circle key={i} cx={x} cy={y} r={r} fill={i % 3 === 0 ? "#fde68a" : "#f59e0b"} opacity="0.7" />
+            <circle key={i} cx={x} cy={y} r={r} fill={i % 3 === 0 ? "#F8BDD8" : "#CA358B"} opacity="0.7" />
           ))}
       </svg>
     </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { put, head } from "@vercel/blob";
+import { SPORT } from "@/lib/sportConfig";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -31,8 +32,21 @@ function textKey(text: string): string {
 // Roundtable persona voices — the owner's CUSTOM ElevenLabs voices (built
 // 7/18 in their VoiceLab; env overrides remain for future swaps). Personas are
 // mapped SERVER-side; clients send a persona key, never a voice id.
-// "lorraine" (the BRITISH host) keeps the configured default voice.
+//
+// LORRAINE FIX (owner 8/5). She used to be absent from this map, so she fell
+// through to `defaultVoice` — ELEVENLABS_VOICE_ID, whose fallback is "Daniel",
+// a deep MALE news anchor. Lorraine Footy is FEMALE. Her real custom voice was
+// never committed in PR #160 (that PR wired only Ricky/Roberto/Henry); the owner
+// supplied the id on 8/5 and it is now mapped here like the rest of the cast.
+//
+// Two knock-on effects, both intended:
+//   · she is now a "panel persona", so she renders on eleven_v3 with an accent
+//     tag instead of turbo — the same treatment the other three already get;
+//   · her cached audio must be invalidated, or the old male renders serve
+//     forever (blob keys are text-derived). See PERSONA_AUDIO_REV_BY_PERSONA —
+//     scoped to HER alone so the rest of the WC26 archive is not re-billed.
 const PERSONA_VOICES: Record<string, string> = {
+  lorraine: process.env.ELEVENLABS_VOICE_LORRAINE ?? "cLJPCFydIdotiLUDM5NV", // Lorraine Footy — British host, FEMALE
   henry:   process.env.ELEVENLABS_VOICE_HENRY   ?? "3DF5pISMxWFbDQoLOBrj", // Henry Futois — French, ex-PSG
   roberto: process.env.ELEVENLABS_VOICE_ROBERTO ?? "99M1da0B26r8CknfhKDi", // Roberto Madrid — Spanish, ex-Real Madrid GK
   ricky:   process.env.ELEVENLABS_VOICE_RICKY   ?? "3ySUSzjLQQdZWd24NIc5", // Ricky Riquelme — Argentinian, old Boca legend
@@ -57,17 +71,34 @@ const DEFAULT_MODEL = "eleven_turbo_v2_5";
 
 // v3 performance tags — spoken-text-only accent direction per panelist.
 const ACCENT_TAGS: Record<string, string> = {
+  lorraine: "[strong British accent] ",
   henry:   "[strong French accent] ",
   roberto: "[strong Spanish accent] ",
   ricky:   "[strong Argentinian accent] ",
 };
 
-// The full Roundtable cast — the three custom panel voices plus the host.
+// The full Roundtable cast — now four custom panel voices.
 const ROUNDTABLE_PERSONAS = new Set(["lorraine", "henry", "roberto", "ricky"]);
 // Bump to invalidate previously cached persona audio when the voice model,
 // settings, or the respell lexicon change — blob keys are text-derived, so old
 // renders serve forever otherwise.
 const PERSONA_AUDIO_REV = "v5";
+
+// Per-persona cache rev, overriding the global one.
+//
+// Lorraine's voice changed on 8/5 (male default → her real female voice), so
+// HER cached audio is now wrong and must regenerate. Bumping the global
+// PERSONA_AUDIO_REV would have done that — and also invalidated every Ricky,
+// Roberto and Henry line in the WC26 archive, re-billing synthesis and putting
+// a first-play delay on a site that is shown to buyers (CLAUDE.md: "it's a
+// regenerable cache" is not self-approving). Scoping the bump to the one
+// persona whose voice actually changed is the narrowest correct fix.
+const PERSONA_AUDIO_REV_BY_PERSONA: Record<string, string> = {
+  lorraine: "v6", // female voice, 8/5 — invalidates only her old male renders
+};
+function personaRev(persona: string): string {
+  return PERSONA_AUDIO_REV_BY_PERSONA[persona] ?? PERSONA_AUDIO_REV;
+}
 
 // ── Audio-only pronunciation lexicon (owner 7/18, round 2) ───────────────────
 // Even eleven_multilingual_v2 reads SHORT foreign words with English phonetics
@@ -120,7 +151,16 @@ export async function POST(req: Request) {
   // Check Vercel Blob cache — persona + audio rev in the key (all Roundtable
   // voices, host included) so voices never collide and model/settings/respell
   // changes regenerate instead of serving stale takes.
-  const blobKey = `tts/${isRoundtable ? `${PERSONA_AUDIO_REV}-${persona}-` : ""}${textKey(text)}.mp3`;
+  //
+  // DEPLOYMENT-NAMESPACED (8/5). Keys used to be a flat `tts/<hash>.mp3` across
+  // every deployment. If two Vercel projects point at the SAME Blob store, their
+  // caches commingle indistinguishably — and the cleanup tool, which deletes
+  // everything under tts/, then cannot tell one deployment's audio from
+  // another's. Namespacing makes future purges scopable. Existing flat keys are
+  // left alone: they are a regenerable cache, so the worst case of the changed
+  // key is one re-synthesis per line, and blob-cleanup treats un-namespaced
+  // blobs as shared legacy that only an explicit opt-in may delete.
+  const blobKey = `tts/${SPORT.id}/${isRoundtable ? `${personaRev(persona!)}-${persona}-` : ""}${textKey(text)}.mp3`;
   try {
     const existing = await head(blobKey);
     if (existing?.url) return NextResponse.json({ url: existing.url, cached: true });

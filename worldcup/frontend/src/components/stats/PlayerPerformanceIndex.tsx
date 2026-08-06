@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 // PPI = goals×3 + assists×2 + rating×1.5 − redCards×3 − yellowCards×0.5
 // Normalised 0–100 against tournament leader
@@ -71,11 +72,9 @@ export default async function PlayerPerformanceIndex({ limit = 12 }: { limit?: n
                     </>
                   )}
                 </div>
-                <div className="mt-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-brand-gold to-amber-300"
-                    style={{ width: `${pct}%` }}
-                  />
+                <div className="mt-1">
+                  <SegmentedBar value={pct} segments={12} height={7} color="cyan"
+                    ariaLabel={`${s.player.name} performance index`} />
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0 text-[10px]">

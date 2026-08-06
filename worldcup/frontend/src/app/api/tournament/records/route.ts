@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { AF_LEAGUE, AF_SEASON } from "@/lib/sportConfig";
 
 const BASE   = "https://v3.football.api-sports.io";
-const LEAGUE = 1;
-const SEASON = 2026;
+const LEAGUE = AF_LEAGUE; // deployment config (worldcup 1 / leaguescup 772)
+const SEASON = AF_SEASON;
 
 export interface TopScorerEntry {
   name: string;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Crosshair, Zap, Trophy } from "lucide-react";
 import { getFlag } from "@/lib/flags";
 import ShareButton from "@/components/ui/ShareButton";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tournament Player Boards (owner 7/19) — the debate engine. Golden Boot,
@@ -35,7 +36,7 @@ function Board({
 }) {
   if (rows.length === 0) return null;
   const max = rows[0]?.value ?? 1;
-  const shareText = `${shareLabel}: ${rows.slice(0, 3).map((r, i) => `${i + 1}. ${r.player} (${r.tla}) ${r.value}`).join(" · ")} · podiumMetrics by studio0x`;
+  const shareText = `${shareLabel}: ${rows.slice(0, 3).map((r, i) => `${i + 1}. ${r.player} (${r.tla}) ${r.value}`).join(" · ")} · ${BRAND_NAME} by studio0x`;
   return (
     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
       <div className="px-4 py-3 border-b border-brand-border flex items-center gap-2">

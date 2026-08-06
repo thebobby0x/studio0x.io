@@ -178,6 +178,27 @@ as "FIFA World Cup Passport"). News is a SEPARATE module from live-game followin
 **`docs/sportos-modules.md`**. Keep module code/IDs vertical-neutral (owner-agreed);
 module extraction is post-tournament work — don't refactor mid-tournament.
 
+**NO DELETION WITHOUT APPROVAL — HARD RULE (owner directive 2026-08-05):**
+Never delete any files, audio, DB records, or assets without BK explicitly
+reviewing and approving the exact deletion list first. Suggesting a deletion is
+welcome; executing one without sign-off is not.
+- **Why:** the frozen **WC26 site, including all of its generated ElevenLabs
+  narration, is a preserved proof-of-concept** for marketing, investor demos and
+  acquisition conversations. Its value is that it still works end to end. "It's
+  a regenerable cache" is NOT self-approving — regenerating costs money and a
+  first-play delay on a site that is being shown to buyers.
+- **How:** every destructive tool is preview-first. Enumerate what would be
+  deleted (counts + sizes), hand that to BK, and only then execute. Default
+  every purge to the narrowest scope that could be correct; anything wider goes
+  behind an explicit confirm token (e.g. `includeLegacy=CONFIRM_SHARED_OK`).
+- **Cross-deployment hazard:** the Neon DBs are per-deployment, but the Vercel
+  **Blob store may be shared** between `worldcup-2026` and `leaguescup` — that is
+  unverified and only the Vercel dashboard can answer it. TTS blobs are
+  namespaced `tts/<deployment>/…` since 8/5; anything flat predates that and is
+  unattributable. `/api/admin/audio-health` reports whether another deployment's
+  namespace is present (positive proof of sharing). Assume shared until told
+  otherwise.
+
 **CONTENT TRUTH — HARD RULE (owner directive 7/18, verbatim intent):** "actual facts
 and truths, with opinions based on facts and truths, NO false, NO fake, NO invented,
 NO imaginary anything." Applies to EVERY content surface, present and future:
@@ -409,7 +430,7 @@ All seed/admin routes require SUPER_ADMIN session OR a `?secret=wc2026studio0x` 
 | `POST /api/seed` | Full re-seed of match data (kalshi/liveMetric/playerMatchStat/match wiped + rebuilt). Teams/players/anthems are PRESERVED (upserted by code, stable IDs). Use sync-fixtures unless you need a hard reset. |
 | `POST /api/admin/seed-players?mock=true` | Seeds 30+ key players with club/league data (mock mode, no API needed) |
 | `POST /api/admin/seed-players` | Seeds players from api-football live squad data |
-| `POST /api/admin/seed-full-squads` | Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players) |
+| `POST /api/admin/seed-full-squads` | **NATION deployments only.** Seeds all 26-man squads for all 48 WC teams from api-football (~1,248 players). Pinned to league 1 and keyed by nation TLA — on a club deployment the code collisions (COL/POR/CHI/GUA/SAL) would write national squads into club rosters, so the button is hidden and the route 400s (8/4). |
 | `POST /api/ai/stories` | Force-regenerates story cache (also invalidated after 1hr) |
 | `PATCH /api/admin/users` | Updates user role (SUPER_ADMIN only) |
 | `POST /api/admin/view-as` | Sets impersonation cookie |
@@ -601,6 +622,102 @@ Never push directly to main.
     (`classifyRound`) not group membership and keeps LIVE scores; the live route never
     persists clock-simulated state to the DB; LiveRefresh mounts on schedule + match
     pages. If hero/banner diverge again, suspect a NEW writer of stale Match rows.
+
+---
+
+## MULTI-DEPLOYMENT: how a tournament is configured (added 2026-08-04, LC26 launch)
+
+`src/lib/sportConfig.ts` is the ONE toggle. `TOURNAMENT` env selects a config from
+the registry (`worldcup` | `leaguescup` | `f1-2026`); everything tournament-specific
+hangs off it. Vercel projects: `worldcup-2026` (WC26) and `leaguescup` (LC26,
+`leaguescup.vercel.app`, own Neon DB).
+
+**`NEXT_PUBLIC_TOURNAMENT` must match `TOURNAMENT`.** `TOURNAMENT` is server-only —
+Next inlines only `NEXT_PUBLIC_*` into client bundles — so every `"use client"`
+module read it as undefined and silently fell back to WORLDCUP. The server rendered
+LC26 while the browser ran WC26 dates. `next.config.ts` now derives the public var
+from the server one at build time, so setting `TOURNAMENT` is sufficient; the
+explicit var is belt-and-braces. **Never read `process.env.TOURNAMENT` in client code.**
+
+**What lives in the config (never hardcode these again):**
+- `calendar` — start/knockoutStart/end + round windows + totalEvents. `lib/tournament.ts`
+  reads these; it used to hardcode WC26's June–July dates.
+- `teamGroups` — WC26's nation→group map. **Empty for LC26** (single league phase).
+- `odds` — Polymarket slugs. **`tournamentSlug: null` for LC26** — no Leagues Cup
+  market exists, and the surface must render an empty state, never another
+  competition's prices.
+- `feedCodesAreNationTlas` — true only for nation competitions.
+
+**CLUB DEPLOYMENTS — the team-identity rule (`src/lib/teamIdentity.ts`):**
+api-football's `team.code` is a FIFA nation TLA. It is useless-to-harmful for clubs:
+14 of the 36 Leagues Cup clubs have NO code at all (so code-keyed ingestion dropped
+every fixture they appeared in — 36 of 54), and the codes that exist COLLIDE with
+nations: Columbus Crew = "COL" (Colombia), Portland Timbers = "POR" (Portugal),
+Chicago Fire = "CHI" (Chile), Guadalajara = "GUA", Real Salt Lake = "SAL".
+- **Resolve teams by `afTeamId` (api-football team id), never by code.**
+- `Team.code` on a club deployment is a derived slug — a display label, not an
+  official abbreviation. `Team.country` comes from the feed.
+- **Never map a club code to a flag.** `getFlag()`/`getFlagUrl()` return neutral on
+  club deployments; use `FlagImg afId=` (crest) or `countryFlag(country)`.
+- Codes MOVE when the resolver changes (ATL: Atlas → Atlante; SAL: Real Salt Lake →
+  Santos Laguna). Both seed and fixtureSync run a code-freeing pre-pass and match
+  existing rows by **name before code**.
+
+**AI prompts:** never write a tournament name into a prompt. Import
+`EVENT_NAME` / `coveringLine()` / `tournamentBrief()` from `src/lib/promptContext.ts`.
+Hardcoded "2026 World Cup" in five prompts is what put "sudden-death World Cup
+knockout showdown" on a Leagues Cup league-phase fixture.
+
+**Provenance columns:** `Match.leagueId`, `NewsStory.tournamentId`, `MatchMoment.tournamentId`.
+0 / "" means "written before the column existed" — treat as unknown, never as ours.
+`afTeamId` is indexed, NOT `@unique`: Vercel's build runs `prisma db push` WITHOUT
+`--accept-data-loss`, and adding a unique constraint to a populated table fails the deploy.
+
+**CLUB CRESTS:** `Team.logoUrl` (api-football `/teams` → `team.logo`) is a club's
+badge — it has no national flag. Populate with the **"Seed Team Crests + Country"**
+admin button (`/api/admin/seed-teams`); fixture sync also writes it. Pass it to
+`FlagImg logoUrl=` / `afId=`; a bare `tla` renders a neutral monogram on club
+deployments, never a country's flag.
+
+**ANTHEMS ARE PER-DEPLOYMENT:**
+- WC26 → `src/lib/anthemManifest.ts`, 54 tracks enumerated by Drive FILE id.
+- Club deployments → **discovered by walking a Drive FOLDER TREE**
+  (`src/lib/clubAnthemDrive.ts` + `src/lib/driveFolder.ts`), because BK adds Suno
+  tracks continuously and a static manifest would go stale. Filenames follow
+  `{Club Name} — _{Anthem Title}_ v{n}.mp3`; the folder decides MLS / Liga MX /
+  generic. Unmatched filenames are REPORTED, never attached to a guessed club.
+- `PRESET` was `ANTHEM_MANIFEST` unconditionally, so "Reimport ALL Anthems" on
+  LC26 would have imported **54 World Cup national anthems** and pruned to them.
+- **Listing a Drive folder needs `GOOGLE_DRIVE_API_KEY`** (downloading a public
+  file does not). Missing key / unshared folder → discovery fails CLOSED: nothing
+  imported, **nothing pruned**. Never treat an empty listing as "no anthems"
+  (CLAUDE.md gotcha #17: import-then-prune, never wipe-first).
+- `?discover=true` on `/api/admin/batch-anthem` is a safe dry run — the first
+  thing to check when a track is missing. Admin button: "Discover Anthems".
+
+**NEWS PROVENANCE:** read paths MUST use `storyScope()` (`src/lib/storyScope.ts`).
+Generation is idempotent — it SKIPS fixtures that already have a story — so a
+corrected prompt never reaches copy written by a broken one. Scoping the
+idempotency checks too means the app self-heals; the untagged (`""`) rows are
+legacy World Cup copy on any non-WC deployment and are hidden there.
+
+**LIVE STATS CADENCE (`/api/cron/live-sync`):** Vercel's minimum cron granularity
+is 1 minute, so the route POLLS IN A LOOP inside each invocation to go sub-minute.
+Iterations are derived from `LIVE_SYNC_INTERVAL_MS` and a ~55s budget — never
+hardcoded. **Cost scales linearly**: one poll = (matches in play) × 2 calls, so a
+90-min window with 4 matches costs 2,160 calls at 20s and **10,800 at 3s**.
+20000ms is the ceiling for a 7,500/day Pro plan; **3000–5000ms needs an
+enterprise plan (50k+/day)**. The loop hard-stops on api-football's own
+`x-ratelimit-requests-remaining` (reserve 300) — the provider's accounting, not a
+local counter, because a local one can't see the schedule/live routes or other
+instances. That guard is what prevents a repeat of gotcha #25.
+
+**Admin recovery (SUPER_ADMIN, `/admin` → "Tournament Data"):**
+`/api/admin/clear-foreign-data` (feed-verified: asks api-football which fixtures are
+ours, deletes the rest; refuses on an empty feed) · `/api/admin/seed-fixtures` ·
+`/api/admin/regenerate-news` (deletes first — plain generation SKIPS fixtures that
+already have a story, so a fixed prompt never reaches old copy) ·
+`/api/admin/refresh-odds` · "Run Full Reset" runs all four in order.
 
 ---
 
@@ -877,6 +994,227 @@ Before ending any session:
 4. Append to `docs/eod-YYYY-MM-DD.md` with what shipped and what's pending
 
 The stop hook (`~/.claude/stop-hook-git-check.sh`) will warn if there are uncommitted files.
+
+---
+
+## LC26 SKIN — Gaming UI / dark HUD (owner directive 2026-08-04, worldcup lane)
+
+The Leagues Cup 2026 deployment (`leaguescup.studio0x.io`, Vercel
+`prj_3Gr6yOJZe8bGVcoMQwkNoFLeR8Cl`) ships a **Gaming-UI / dark-HUD** skin on the
+**official studio0x brand palette**. This SUPERSEDES the older "COLOR DISCIPLINE"
+block above for this deployment — in particular the "no teal" rule: **Riptide teal
+is now the sanctioned data/stats/live-value color.** No arbitrary colors anywhere.
+
+**Tokens (single source: `src/app/globals.css` `:root`)**
+
+| Token | Value | Role |
+|---|---|---|
+| `--s0x-bg` | `#0F0C0E` Noir 900 | page background |
+| `--s0x-surface` | `#1D191C` Noir 800 | cards, panels |
+| `--s0x-border` | `#312C2F` Noir 700 | borders, dividers |
+| `--s0x-text` | `#FAF5F7` Bone 50 | primary text |
+| `--s0x-muted` | `#9A8F95` | metadata |
+| `--s0x-accent` | `#F8BDD8` Rosa 200 | hover / highlight (the *readable* pink) |
+| `--s0x-accent-ink` | `#CA358B` Rosa 700 | primary CTA fill, LIVE badge, neon glow source |
+| `--s0x-teal` | `#5DCBD1` Riptide | data, stats, live values, anthem/audio |
+
+Fixed anchors that never flip with the theme: `--s0x-on-accent` (Bone 50 — what
+goes ON a Rosa 700 / Riptide fill) and `--s0x-noir`. **Never pair `text-s0x-text`
+with an accent fill** — it breaks lite-mode contrast; use `text-s0x-onink`.
+
+**How the re-skin works.** The six legacy vars (`--bg/--card/--border/--gold/
+--green/--blue`) now resolve THROUGH the s0x tokens, so every `brand-*` utility
+in the ~130 existing components re-skins from `globals.css` alone. On top of
+that, a **dark skin layer** (`html:not([data-theme="light"]) …` rules at the
+bottom of globals.css) repaints the hardcoded stock-Tailwind utilities:
+slate→Noir/Bone ramp, amber/yellow/orange→Rosa, red/rose/pink→Rosa 700,
+green/emerald→Riptide, blue/sky/indigo/purple→Riptide. **When you add a class
+from a stock Tailwind hue, add its remap there too** — otherwise a raw Tailwind
+color leaks onto a user-facing surface.
+
+**Typography** (`next/font/google`, loaded in `layout.tsx`):
+Archivo (display, variable `wdth` axis — `.s0x-display-hero` = wdth 125,
+`.s0x-display` = wdth 105) · Instrument Sans (body, Tailwind's default `sans`) ·
+IBM Plex Mono (labels/data/scores/timers — `.s0x-mono` uppercase +14% tracking,
+`.s0x-data` case-preserving).
+
+**Utilities** (all in globals.css, all CSS-only — no image assets):
+`.s0x-card` (Noir 800 + Noir 700 + 12px radius + Rosa 700 left-edge accent on
+hover) · `.s0x-eyebrow` (Rosa 700 mono section kicker) · `.s0x-hud-grid` /
+`.s0x-hud-scan` / `.s0x-scanline` (grid + scan-line textures, honors
+`prefers-reduced-motion`) · `.s0x-btn` + `-primary`/`-secondary`/`-teal` ·
+`.s0x-live` + `.s0x-live-dot` · `.s0x-table` / `.s0x-row` / `.s0x-pos` /
+`.s0x-feat` · `.s0x-neon-rosa` / `.s0x-neon-teal` / `.s0x-glow-*`.
+
+**Known accessibility caveat:** Rosa 700 on Noir 900 measures ~3.2:1 — below
+WCAG AA for small text. It is used per the owner's spec for the decorative
+`.s0x-eyebrow` kicker only, always above a real Bone 50 heading. Do NOT use it
+for body copy or as the only copy in a region.
+
+**Lite mode is preserved** and on-palette (Bone 50 paper, Noir ink, Rosa 700
+accent, darkened Riptide). Only the neutral ramp flips; Rosa 700 and the fixed
+on-accent anchors are identical in both modes.
+
+**Third-party marks kept as-is** (deliberate, not an oversight): the social
+share buttons in `AnthemHub.tsx` retain TikTok / Instagram / Facebook / YouTube
+brand colors — those are the platforms' identity, not our chrome.
+
+**DEPLOYMENT BRAND NAME (owner directive 2026-08-04) — `brandName` + `wordmark`
+in `sportConfig.ts`.** LC26 leads with **"Leagues Cup 2026"** as the primary
+user-facing name (nav wordmark, headings, footers, share titles, `<title>`).
+This is a per-deployment override of the older BRANDING block's "in-app brand
+today remains plain podiumMetrics" line — that line still governs **WC26 and
+F1**, whose names are FIFA / Formula One marks and need explicit owner sign-off
+before becoming a product title. Never hardcode `"podiumMetrics"` into a
+surface again: import `BRAND_NAME` / `WORDMARK` / `BRAND_IS_PLATFORM`.
+Platform lineage moved, not dropped — the nav subline reads "podiumMetrics ·
+studio0x.io" and the sportOS strip reads "… — powered by podiumMetrics, part of
+sportOS by studio0x". Nothing claims to be official; SUM owns the LC26 marks.
+
+**VENUE COORDS ARE THE PREREQUISITE FOR WEATHER, NOT CITY STRINGS (8/4).**
+"Resolve Venues" used to resolve only venues belonging to matches with an empty
+`city`, so the 14 LC26 fixtures whose city the feed DID supply left their venues
+uncached — and it still returned `ok:true`. Weather backfill then geocoded them
+inline (api-football /venues + Nominatim + Open-Meteo, 8s each, sequential) and
+blew the 60s function limit. Check **`venuesWithCoords`** in the Resolve Venues
+response, not `matchesUpdated`. Weather chunking is now offset-based
+(`nextOffset`): a match that can't be stamped writes no row and would otherwise
+sit at the head of the queue forever — the old loop re-processed the same 8
+fixtures 25 times and then reported a failure that wasn't one. Zero rows created
+is a legitimate SUCCESS on an already-backfilled deployment.
+
+**`LEAGUES_CUP.branding` in `sportConfig.ts`** now carries the studio0x values
+(`primary` Rosa 700, `secondary` Noir 900, `accent` Riptide) with
+`styleGuideConfirmed: false` **intentionally** — these are studio0x's OWN
+confirmed brand colors, but the flag guards against presenting anything as the
+licensed Leagues Cup marks (SUM owns those). Don't flip it to `true`.
+
+---
+
+## SEGMENTED HATCH BARS (owner spec + reference image, 2026-08-05)
+
+Every smooth/gradient progress fill in the stats surfaces is now a **discrete
+segmented hatch bar**. One reusable component owns it:
+`src/components/ui/SegmentedBar.tsx` (geometry + data) backed by the `.seg-*`
+block in `globals.css` (every pixel of the look).
+
+```tsx
+<SegmentedBar value={73} maxValue={100} direction="ltr" color="cyan"
+              label="73%" segments={20} height={16} circuit />
+
+<SegmentedVersusBar home={62} away={38} homeLabel="62%" awayLabel="38%" />
+```
+
+- `SegmentedBar` — one fill. `direction: 'ltr' | 'rtl'`, `color: 'cyan' | 'red'`,
+  `circuit` wraps it in the neon circuit-board frame (`.s0x-circuit`).
+- `SegmentedVersusBar` — the opposing pair on ONE track: home fills cyan from
+  the left, away fills red from the right, meeting at the split point.
+  `normalize={false}` makes home/away literal track percentages instead of
+  shares, so any remainder stays unlit — that middle gap is how the three-way
+  Live Win Meter renders the DRAW probability.
+
+**The fill is never quantised.** The lit element's width is the exact
+percentage; `.seg-grid` paints the block gaps *on top* of both lit and unlit
+regions. Segmentation is a texture, not a rounding of the data — a 47% value is
+drawn at 47%.
+
+**⚠ PALETTE — the one place this deployment leaves the studio0x brand.**
+The owner specified the reference image's hexes literally:
+
+| Token | Value | Nearest brand token |
+|---|---|---|
+| `--seg-cyan` | `#00D9FF` | Riptide `#5DCBD1` |
+| `--seg-red` | `#E94560` | Rosa 700 `#CA358B` |
+| `--seg-plate` | `#1A1A2E` | Noir 900 `#0F0C0E` |
+
+`#1A1A2E` is a COOL indigo-black sitting inside otherwise WARM Noir surfaces —
+the bars read as a distinct instrument panel rather than blending in. That is a
+deliberate, owner-directed exception to the LC26 SKIN section's "no arbitrary
+colors" rule, isolated to three CSS variables so it is reversible: **to put the
+bars back on brand, change only those three values in `globals.css`.** No
+component file contains a bar hex — they reference `var(--seg-*)`. Keep it that
+way when adding surfaces.
+
+**Applied to:** Match DNA (Live Pressure, all six stat duels, the momentum
+timeline track, Clutch Index), LiveMatchCard (possession + every stat row),
+Live Win Meter, Power Rankings™, Upset Factor™, Goal Gravity™, Pressing
+Intensity Index™, Transition Danger Rating™, Club Contribution Index™, Club WC
+Impact™, Player Performance Index™, Elimination Proximity™, Tournament
+Records™, Tournament X-Metrics.
+
+**Lite mode** keeps the segment geometry and drops the plate/glow to light
+neutrals (`--seg-plate` → `#E9DFE4`), so the bars stay legible on Bone paper.
+
+**Provenance note:** this work was authored in one session but landed in commit
+`a24d5be` (a concurrent session's Roundtable commit swept up the in-progress
+files). The code is correct and verified; only the commit message is
+misleading. `git log -- worldcup/frontend/src/components/ui/SegmentedBar.tsx`
+will point at that commit rather than a bar-related one.
+
+---
+
+## EVENT-DRIVEN LIVE COMMENTARY (2026-08-05, worldcup lane)
+
+The Roundtable used to run on a metronome: a segment was written whenever a
+client polled and `MIN_REGEN_MS` (25s) had lapsed. A goal therefore waited out
+the segment on air (~60-90s of dialogue) plus a poll plus generation. It now
+runs on EVENTS.
+
+**The event bus finally has publishers.** `MatchMoment` existed and nothing wrote
+to it. `/api/cron/live-sync` now publishes through
+`src/lib/eventBus/publishFootball.ts`: match events (from the rows it already
+writes to MatchEventLog — **zero extra api-football calls**, gotcha #25) plus
+**lifecycle moments** (START/PERIOD_END/END). Lifecycle is the new capability —
+kick-off, half-time and full-time are `Match.status` flips with no feed event, so
+the booth was structurally incapable of reacting to them.
+
+**Breaking = a type allowlist, NOT a significance threshold**
+(`lib/roundtable360/breaking.ts`). With the LC26 rivalry amplifier, half-time
+scores 24 and a yellow card 26 — any threshold that lets HT interrupt also lets
+every yellow interrupt. Significance still decides WHICH moment leads. VAR is
+published and reaches the prompt but does not seize the mic (it arrives in
+bursts); revisit with live data.
+
+**Three cooperating triggers**, each with its own guard:
+1. `live-sync` breaks its poll loop early on a breaking moment and spends the
+   remaining invocation budget generating + rendering, so audio is ready before
+   any listener asks. Inline, not fire-and-forget: there is no `waitUntil` here
+   (no `@vercel/functions`), and post-response work dies on instance freeze.
+2. `generateEpisode` collapses the cooldown to `BREAKING_REGEN_MS` (8s) for an
+   uncovered cue. Not zero — goal→VAR→restart would otherwise buy three full
+   Claude+ElevenLabs renders in ten seconds.
+3. The player polls `/api/roundtable/cue` every 10s (two indexed queries, no
+   model call — it *cannot* trigger generation however often it is hit) and cuts
+   in **at a group boundary, never mid-burst**: a group is one stitched audio
+   object and clipping it reads as a bug, not urgency.
+
+**`cueIsCovered` is asked by two callers with different episodes on purpose:**
+the generator passes the LATEST episode ("has this been written about?"), the
+player passes the episode it is AIRING ("has the listener heard it?"). Those
+diverge for the ~20s a segment spends written-but-unplayed.
+
+**The full-whistle exception.** `getLiveMatches` is LIVE/HT only, so a match
+leaves the board the instant it goes FT and generation bailed with "no matches in
+play" — the full-time moment would be published, ranked, and never spoken.
+`buildFinalWhistleContext(fixture)` is the narrow reopening, reached ONLY via an
+uncovered END cue, so it yields exactly one segment per match and the station
+then goes quiet. Deliberately not a general "finished matches linger 15 minutes"
+rule, which would keep the show generating after every match. The client
+correspondingly plays an unplayed episode even when `onAir` is false.
+
+**Audio.** `BroadcastAudio.swellBed()` is the crowd's own reaction — bed gain to
+3.2× the listener's mixer setting, held 1.2s, decaying 5s — queued at the
+stinger duck's own restore time so the two never race on one AudioParam. It is
+proportional to the mixer setting, so turning the crowd down stays down. Red
+cards get no swell for the same reason they get no horn.
+
+**Still synthesised, still swappable:** the bed and stingers are generated in the
+browser (`NEXT_PUBLIC_STADIUM_BED_URL` / `NEXT_PUBLIC_STINGER_URL` override
+them). No Blob bytes were added — the store is at capacity and its WC26 audio may
+not be deleted.
+
+**No schema change** — `MatchMoment` was already in the schema, so nothing needed
+`db push`.
 
 ---
 

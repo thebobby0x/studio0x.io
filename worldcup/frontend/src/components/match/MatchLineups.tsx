@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import type { LineupsResponse, PlayerEntry, SubstitutionEvent } from "@/app/api/matches/[id]/lineups/route";
 
 const POS_ORDER = ["G", "D", "M", "F"];
@@ -112,6 +113,39 @@ export default function MatchLineups({ matchId }: { matchId: string }) {
           <TeamColumn side={data.away} subs={data.substitutions} align="right" />
         </div>
       </div>
+
+      {/* Substitutions as moment cards — Riptide accent, because a sub is a
+          procedural event, not a decisive one (goals and cards take Rosa). The
+          inline ↑minute markers above stay: they answer "did HE come on?",
+          these answer "what happened, and when?". */}
+      {data.substitutions.length > 0 && (
+        <div className="s0x-circuit s0x-hud-grid border-t border-s0x-border px-4 py-4">
+          <div className="relative flex items-center gap-2 mb-3">
+            <ArrowLeftRight size={11} className="text-s0x-teal" />
+            <span className="s0x-eyebrow">Substitutions</span>
+          </div>
+          <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[...data.substitutions]
+              .sort((a, b) => a.minute - b.minute)
+              .map((sub, i) => (
+                <div key={`${sub.minute}-${sub.playerIn}-${i}`} className="s0x-moment s0x-moment-teal">
+                  <ArrowLeftRight size={13} className="s0x-moment-icon shrink-0 text-s0x-teal" />
+                  <div className="min-w-0 flex-1">
+                    <div className="s0x-display text-[12px] font-bold text-s0x-text leading-tight truncate">
+                      {sub.playerIn}
+                    </div>
+                    <div className="s0x-mono text-[8px] text-s0x-muted mt-0.5 truncate">
+                      for {sub.playerOut} · {sub.team}
+                    </div>
+                  </div>
+                  <span className="s0x-data text-[11px] font-bold tabular-nums text-s0x-muted shrink-0">
+                    {sub.minute}&apos;
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

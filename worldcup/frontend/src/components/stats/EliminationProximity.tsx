@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
+import SegmentedBar from "@/components/ui/SegmentedBar";
 
 interface TeamRisk {
   tla: string;
@@ -161,8 +162,9 @@ export default function EliminationProximity({ group, limit = 8 }: { group?: str
                 <span className="text-[10px] text-slate-600">·</span>
                 <span className="text-[10px] text-slate-500">{t.remaining} left</span>
               </div>
-              <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden shrink-0">
-                <div className={`h-full rounded-full ${cfg.bar}`} style={{ width: `${t.dangerScore}%` }} />
+              <div className="w-16 shrink-0">
+                <SegmentedBar value={t.dangerScore} segments={8} height={8} color="red"
+                  ariaLabel={`${t.name} elimination danger ${Math.round(t.dangerScore)} percent`} />
               </div>
               <div className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${cfg.color}`}>
                 <Icon size={10} />

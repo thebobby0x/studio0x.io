@@ -1,60 +1,45 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Single source of truth for World Cup 2026 tournament dates + countdown
-// helpers. Every component that shows a date, a "days until" headline, or a
-// kickoff countdown MUST import from here so the numbers agree everywhere.
+// Single source of truth for tournament dates + countdown helpers. Every
+// component that shows a date, a "days until" headline, or a kickoff countdown
+// MUST import from here so the numbers agree everywhere.
 //
 // Before this module existed, bracket/schedule/banner/pulse each hardcoded their
 // own dates and rolled their own date math (some Math.ceil, some Math.floor),
 // which produced different countdowns for the same event in different areas.
+//
+// The DATES themselves moved to the deployment config on 8/4 (SPORT.calendar).
+// They were hardcoded to WC26's June–July windows, so the Leagues Cup
+// deployment classified its August club fixtures against World Cup knockout
+// windows — every LC26 fixture fell outside every window and the bracket/stage
+// surfaces had nothing to say. The exported names and semantics are unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type KnockoutRound =
-  | "Round of 32"
-  | "Round of 16"
-  | "Quarter-finals"
-  | "Semi-finals"
-  | "3rd Place Final"
-  | "Final";
+import { SPORT } from "@/lib/sportConfig";
 
-// All dates are UTC. These mirror the seeded fixture dates in the DB — do not
-// change them without re-seeding, since bracket round classification keys off
-// these exact windows.
-// CORRECTED 7/9 to the REAL fixture windows observed in the api-football feed
-// (the original estimates ran ~5 days late: actual R32 began Jun 28 19:00Z,
-// R16 ran Jul 4–7, and the first QF kicked off Jul 9 20:00Z — which the old
-// windows misclassified as R16 and, worse, dated before KNOCKOUT_START,
-// leaking late R32 results into group tables).
-export const TOURNAMENT_START = new Date("2026-06-11T00:00:00Z"); // opening match
-export const GROUP_STAGE_END = new Date("2026-06-28T06:00:00Z");  // last group games ~Jun 28 02:00Z
-export const KNOCKOUT_START = new Date("2026-06-28T12:00:00Z");   // R32 kicked off Jun 28 19:00Z
-export const FINAL_DATE = new Date("2026-07-19T12:00:00Z");
+/** Round labels are per-deployment now (WC26 has R32→Final; LC26's knockout
+ *  rounds are not published by the feed yet), so this is a plain string. */
+export type KnockoutRound = string;
 
-export const ROUND_DATES: { round: KnockoutRound; from: Date; to: Date }[] = [
-  { round: "Round of 32",     from: new Date("2026-06-28T12:00:00Z"), to: new Date("2026-07-04T12:00:00Z") },
-  { round: "Round of 16",     from: new Date("2026-07-04T12:00:01Z"), to: new Date("2026-07-08T23:59:59Z") },
-  { round: "Quarter-finals",  from: new Date("2026-07-09T00:00:00Z"), to: new Date("2026-07-12T23:59:59Z") },
-  { round: "Semi-finals",     from: new Date("2026-07-13T00:00:00Z"), to: new Date("2026-07-15T23:59:59Z") },
-  // CORRECTED 7/15 night: the real 3rd-place game (FRA-ENG, semi losers) kicks
-  // off ~Jul 19 00:xx Z (Jul 18 evening ET) — the old Jul 16-17 window missed
-  // it, so classifyRound labeled it "Final" (hero read "FINAL: France vs
-  // England" while the real final is ESP-ARG ~Jul 19 22:xx Z) and the hero
-  // TBD-padder minted a phantom "TBD v TBD" slot at the empty window's start.
-  // Jul 19 12:00Z splits the two real kickoffs cleanly with hours of margin.
-  { round: "3rd Place Final", from: new Date("2026-07-16T00:00:00Z"), to: new Date("2026-07-19T12:00:00Z") },
-  { round: "Final",           from: new Date("2026-07-19T12:00:01Z"), to: new Date("2026-07-20T23:59:59Z") },
-];
+const CAL = SPORT.calendar;
+
+export const TOURNAMENT_START = new Date(CAL.start); // opening event
+export const GROUP_STAGE_END = new Date(CAL.groupStageEnd);
+export const KNOCKOUT_START = new Date(CAL.knockoutStart);
+export const FINAL_DATE = new Date(CAL.end);
+
+export const ROUND_DATES: { round: KnockoutRound; from: Date; to: Date }[] =
+  CAL.rounds.map((r) => ({ round: r.round, from: new Date(r.from), to: new Date(r.to) }));
 
 export const ALL_ROUNDS: KnockoutRound[] = ROUND_DATES.map((r) => r.round);
 
-// Expected match counts per round (WC 2026 48-team format)
-export const ROUND_SIZES: Record<KnockoutRound, number> = {
-  "Round of 32": 16,
-  "Round of 16": 8,
-  "Quarter-finals": 4,
-  "Semi-finals": 2,
-  "3rd Place Final": 1,
-  "Final": 1,
-};
+/** Expected event counts per round (bracket padding). Empty when the deployment
+ *  has no published knockout structure — callers must handle a missing key. */
+export const ROUND_SIZES: Record<KnockoutRound, number> = Object.fromEntries(
+  CAL.rounds.filter((r) => r.size != null).map((r) => [r.round, r.size!]),
+);
+
+/** Total scheduled events for this deployment (WC26: 104, LC26 league phase: 54). */
+export const TOTAL_EVENTS = CAL.totalEvents;
 
 export function classifyRound(date: Date): KnockoutRound | null {
   for (const entry of ROUND_DATES) {

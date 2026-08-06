@@ -25,6 +25,9 @@ import LiveHero, { type HeroMatch } from "@/components/ui/LiveHero";
 import FinalWeekendSpotlight, { type SpotlightFixture } from "@/components/ui/FinalWeekendSpotlight";
 import FinalRoundtable from "@/components/news/FinalRoundtable";
 import MatchdayTape from "@/components/match/MatchdayTape";
+import RoundtableLive from "@/components/roundtable/RoundtableLive";
+import { storyScope } from "@/lib/storyScope";
+import { BRAND_NAME, SPORT } from "@/lib/sportConfig";
 
 // Cooldown so a sync that FAILS to create the missing rows (api-football
 // hiccup, DB error) can't turn every pageview into a 2-API-call sync storm.
@@ -250,7 +253,7 @@ function MatchListRow({ m, isFeatured, takeaway }: { m: Match; isFeatured: boole
     >
       <div className="flex items-center gap-3">
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <FlagImg tla={m.homeTeam.code} size={24} className="shrink-0" />
+        <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={24} className="shrink-0" />
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.homeTeam.name}
         </span>
@@ -264,7 +267,7 @@ function MatchListRow({ m, isFeatured, takeaway }: { m: Match; isFeatured: boole
         <span className="text-sm font-semibold text-slate-300 truncate group-hover:text-white transition-colors">
           {m.awayTeam.name}
         </span>
-        <FlagImg tla={m.awayTeam.code} size={24} className="shrink-0" />
+        <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={24} className="shrink-0" />
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {isLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
@@ -383,8 +386,8 @@ export default async function DashboardPage({
       fixture: m.fixture,
       date: new Date(m.date).toISOString(),
       status: m.status,
-      home: { name: m.homeTeam.name, code: m.homeTeam.code },
-      away: { name: m.awayTeam.name, code: m.awayTeam.code },
+      home: { name: m.homeTeam.name, code: m.homeTeam.code, logoUrl: m.homeTeam.logoUrl, afTeamId: m.homeTeam.afTeamId },
+      away: { name: m.awayTeam.name, code: m.awayTeam.code, logoUrl: m.awayTeam.logoUrl, afTeamId: m.awayTeam.afTeamId },
       homeScore: m.homeScore ?? 0,
       awayScore: m.awayScore ?? 0,
       elapsed: m.elapsed ?? 0,
@@ -450,17 +453,17 @@ export default async function DashboardPage({
       const liveOrNext = inProgress[0] ?? nextNs;
       if (liveOrNext) {
         const preview = await prisma.newsStory.findFirst({
-          where: { fixture: liveOrNext.fixture },
+          where: { fixture: liveOrNext.fixture, ...storyScope() },
           orderBy: { generatedAt: "desc" },
         });
         if (preview) return preview;
         const teamStory = await prisma.newsStory.findFirst({
-          where: { teamsInvolved: { hasSome: [liveOrNext.homeTeam.code, liveOrNext.awayTeam.code] } },
+          where: { teamsInvolved: { hasSome: [liveOrNext.homeTeam.code, liveOrNext.awayTeam.code] }, ...storyScope() },
           orderBy: { generatedAt: "desc" },
         });
         if (teamStory) return teamStory;
       }
-      return await prisma.newsStory.findFirst({ orderBy: { generatedAt: "desc" } });
+      return await prisma.newsStory.findFirst({ where: storyScope(), orderBy: { generatedAt: "desc" } });
     } catch {
       return null;
     }
@@ -492,6 +495,11 @@ export default async function DashboardPage({
       <LiveRefresh isLive={isAnyMatchLive} />
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {/* AI Live 360 Roundtable — leads the dashboard so it is visible on
+            desktop without scrolling. Config-gated (SPORT.roundtable): enabled
+            on LC26 only, so the frozen WC26 site is unchanged. */}
+        {SPORT.roundtable && <RoundtableLive />}
+
         {(spotlightThird || spotlightFinal) && (
           <FinalWeekendSpotlight third={spotlightThird} final={spotlightFinal} />
         )}
@@ -550,26 +558,32 @@ export default async function DashboardPage({
         )}
 
         {/* Compact header row */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-black text-slate-400 uppercase tracking-widest">Dashboard</h1>
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="s0x-eyebrow">Live Command Center</span>
+              <h1 className="s0x-display-hero text-2xl sm:text-3xl font-black text-s0x-text leading-none">
+                Dashboard
+              </h1>
+            </div>
             {liveMatches.length > 0 && (
-              <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full border border-red-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="s0x-live mb-1">
+                <span className="s0x-live-dot" />
                 {liveMatches.length} live
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* View toggle */}
-            <div className="flex items-center bg-brand-card border border-brand-border rounded-xl overflow-hidden">
+            {/* View toggle — secondary (Noir 800 + Noir 700 border); the
+                selected face is the Rosa 700 primary. */}
+            <div className="flex items-center bg-s0x-surface border border-s0x-border rounded-s0x overflow-hidden">
               <Link
                 href="/?view=tile"
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`s0x-mono flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold transition-colors ${
                   viewMode === "tile"
-                    ? "bg-white text-brand-dark"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-s0x-ink text-s0x-onink"
+                    : "text-s0x-muted hover:text-s0x-accent"
                 }`}
               >
                 <LayoutGrid size={12} />
@@ -577,10 +591,10 @@ export default async function DashboardPage({
               </Link>
               <Link
                 href="/?view=list"
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`s0x-mono flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold transition-colors ${
                   viewMode === "list"
-                    ? "bg-white text-brand-dark"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-s0x-ink text-s0x-onink"
+                    : "text-s0x-muted hover:text-s0x-accent"
                 }`}
               >
                 <List size={12} />
@@ -588,10 +602,7 @@ export default async function DashboardPage({
               </Link>
             </div>
 
-            <Link
-              href="/schedule"
-              className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-brand-border rounded-xl px-3 py-2 hover:border-slate-500 transition-all"
-            >
+            <Link href="/schedule" className="s0x-btn s0x-btn-secondary !hidden sm:!flex !rounded-s0x">
               <CalendarDays size={12} />
               Schedule
               <ChevronRight size={11} />
@@ -608,12 +619,12 @@ export default async function DashboardPage({
               <>
                 {isMatchLiveNow && (
                   <div className="flex items-center gap-3 -mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <span className="text-sm font-black text-white uppercase tracking-wider">
+                    <span className="w-2.5 h-2.5 rounded-full bg-s0x-ink animate-pulse shrink-0 shadow-glow-rosa" />
+                    <span className="s0x-display text-sm font-black text-s0x-text uppercase tracking-wider">
                       Match In Progress
                     </span>
-                    <div className="flex-1 h-px bg-red-900/40" />
-                    <span className="text-xs text-red-400 font-semibold">
+                    <div className="flex-1 h-px bg-gradient-to-r from-s0x-ink/60 to-transparent" />
+                    <span className="s0x-data text-xs text-s0x-teal font-semibold">
                       {featuredMatch.elapsed}&apos; played
                     </span>
                   </div>
@@ -636,9 +647,10 @@ export default async function DashboardPage({
             <LiveHero live={[]} upcoming={heroUpcoming} results={heroResults} hideCenter={isAnyMatchLive} />
 
             {/* All matches list */}
-            <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-brand-border text-xs font-semibold uppercase tracking-widest text-slate-500">
-                All Matches
+            <div className="s0x-card overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-s0x-border flex flex-col gap-1.5">
+                <span className="s0x-eyebrow">Fixtures</span>
+                <span className="s0x-display text-sm font-bold text-s0x-text">All Matches</span>
               </div>
               {matches.length === 0 ? (
                 <div className="px-4 py-8 text-center text-slate-600 text-sm">
@@ -806,7 +818,7 @@ export default async function DashboardPage({
                           className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 hover:bg-red-500/15 transition-colors group"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                          <FlagImg tla={m.homeTeam.code} size={20} className="shrink-0" />
+                          <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={20} className="shrink-0" />
                           <span className="text-sm font-semibold text-slate-300 truncate">
                             {m.homeTeam.name}
                           </span>
@@ -816,7 +828,7 @@ export default async function DashboardPage({
                           <span className="text-sm font-semibold text-slate-300 truncate">
                             {m.awayTeam.name}
                           </span>
-                          <FlagImg tla={m.awayTeam.code} size={20} className="shrink-0" />
+                          <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={20} className="shrink-0" />
                           <span className="ml-auto text-[10px] font-mono text-red-400 shrink-0">
                             {m.elapsed}&apos;
                           </span>
@@ -840,10 +852,10 @@ export default async function DashboardPage({
                               : "text-slate-400 hover:text-white"
                           }`}
                         >
-                          <FlagImg tla={m.homeTeam.code} size={14} className="shrink-0" />
+                          <FlagImg tla={m.homeTeam.code} logoUrl={m.homeTeam.logoUrl} afId={m.homeTeam.afTeamId} size={14} className="shrink-0" />
                           <span className="hidden sm:inline">{m.homeTeam.name}</span>
                           <span className="font-black tabular-nums">{m.homeScore ?? 0}–{m.awayScore ?? 0}</span>
-                          <FlagImg tla={m.awayTeam.code} size={14} className="shrink-0" />
+                          <FlagImg tla={m.awayTeam.code} logoUrl={m.awayTeam.logoUrl} afId={m.awayTeam.afTeamId} size={14} className="shrink-0" />
                         </Link>
                       ))}
                     </div>
@@ -889,7 +901,7 @@ export default async function DashboardPage({
                   />
                 )}
 
-                <CollapsibleSection title="Tournament Odds">
+                <CollapsibleSection eyebrow="Markets" title="Tournament Odds">
                   <TournamentOddsPanel
                     highlightTlas={[featuredMatch.homeTeam.code, featuredMatch.awayTeam.code]}
                     limit={12}
@@ -897,7 +909,7 @@ export default async function DashboardPage({
                 </CollapsibleSection>
 
                 {/* AI-generated tournament news */}
-                <CollapsibleSection title="Tournament News">
+                <CollapsibleSection eyebrow="Newsroom" title="Tournament News">
                   <Suspense fallback={<div className="h-48 rounded-xl bg-brand-card border border-brand-border animate-pulse" />}>
                     <TournamentStories />
                   </Suspense>
@@ -905,7 +917,7 @@ export default async function DashboardPage({
 
                 {/* All matches compact list */}
                 {matches.length > 1 && (
-                  <CollapsibleSection title="All Matches">
+                  <CollapsibleSection eyebrow="Fixtures" title="All Matches">
                     <div className="rounded-2xl bg-brand-card border border-brand-border overflow-hidden">
                       <div className="p-2 space-y-1">
                         {matches.map((m) => (
@@ -935,7 +947,7 @@ export default async function DashboardPage({
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Data refreshes every 5 seconds
+        studio0x.io · {BRAND_NAME} · Data refreshes every 5 seconds
       </footer>
     </div>
   );

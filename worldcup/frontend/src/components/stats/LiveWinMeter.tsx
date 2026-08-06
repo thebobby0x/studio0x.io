@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Activity } from "lucide-react";
+import { SegmentedVersusBar } from "@/components/ui/SegmentedBar";
 
 interface LiveProbs { home: number; draw: number; away: number }
 
@@ -11,11 +12,19 @@ interface LiveData {
   tournamentOdds: { home: number | null; away: number | null };
 }
 
-function ProbSegment({ prob, color, label }: { prob: number; color: string; label: string }) {
+function ProbSegment({ prob, tone, label }: { prob: number; tone: "cyan" | "red" | "neutral"; label: string }) {
+  const style = tone === "neutral"
+    ? undefined
+    : { color: `var(--seg-${tone})`, textShadow: `0 0 10px rgb(var(--seg-${tone}-glow) / .7)` };
   return (
     <div className="flex flex-col items-center gap-1 min-w-0">
-      <div className={`text-2xl font-black tabular-nums ${color}`}>{Math.round(prob * 100)}%</div>
-      <div className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{label}</div>
+      <div
+        className={`s0x-data text-2xl font-bold tabular-nums ${tone === "neutral" ? "text-s0x-muted" : ""}`}
+        style={style}
+      >
+        {Math.round(prob * 100)}%
+      </div>
+      <div className="s0x-mono text-[9px] text-s0x-muted truncate">{label}</div>
     </div>
   );
 }
@@ -75,16 +84,26 @@ export default function LiveWinMeter({ matchId }: { matchId: string }) {
       {/* Three-way probability */}
       <div className="px-6 py-5">
         <div className="grid grid-cols-3 gap-4 items-center">
-          <ProbSegment prob={probs.home} color="text-brand-green" label={homeTeam} />
-          <ProbSegment prob={probs.draw} color="text-slate-400" label="Draw" />
-          <ProbSegment prob={probs.away} color="text-amber-400" label={awayTeam} />
+          <ProbSegment prob={probs.home} tone="cyan" label={homeTeam} />
+          <ProbSegment prob={probs.draw} tone="neutral" label="Draw" />
+          <ProbSegment prob={probs.away} tone="red" label={awayTeam} />
         </div>
 
         {/* Visual bar */}
-        <div className="mt-4 flex h-3 rounded-full overflow-hidden gap-0.5">
-          <div className="bg-brand-green/70 transition-all duration-700 rounded-l-full" style={{ width: `${probs.home * 100}%` }} />
-          <div className="bg-slate-500/70 transition-all duration-700" style={{ width: `${probs.draw * 100}%` }} />
-          <div className="bg-amber-400/70 transition-all duration-700 rounded-r-full" style={{ width: `${probs.away * 100}%` }} />
+        <div className="mt-4">
+          {/* normalize={false}: home and away are literal shares of the track, so
+              the unlit middle band is exactly the DRAW probability. */}
+          <SegmentedVersusBar
+            home={probs.home * 100}
+            away={probs.away * 100}
+            normalize={false}
+            homeLabel={`${Math.round(probs.home * 100)}%`}
+            awayLabel={`${Math.round(probs.away * 100)}%`}
+            segments={28}
+            height={16}
+            circuit
+            ariaLabel={`Win probability: ${homeTeam} ${Math.round(probs.home * 100)}%, draw ${Math.round(probs.draw * 100)}%, ${awayTeam} ${Math.round(probs.away * 100)}%`}
+          />
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { AudioStream } from "@/lib/types";
 import { useAudio, type Track } from "@/lib/AudioContext";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 type Stream = AudioStream & { team: { code: string; name: string; flagEmoji: string } | null };
 type FilterMode = "all" | "team" | "fifa";
@@ -125,23 +126,14 @@ function buildShareLinks(stream: Stream, pageUrl: string) {
   ];
 }
 
+// One on-palette HUD wash for every anthem plate. This replaced a per-nation
+// flag-colour map: those were arbitrary hexes (several with a white band, which
+// the dark HUD skin forbids), and LC26 is a CLUB tournament — national flag
+// colours were the wrong vocabulary for it anyway. Team identity reads from the
+// crest/emoji and the title, not the plate.
 function teamGradient(code: string | undefined) {
-  if (!code) return "from-[#1e3a5f] via-[#c2860a] to-slate-900";
-  const map: Record<string, string> = {
-    MEX: "from-[#006847] via-[#ce1126] to-slate-900",
-    RSA: "from-[#007A4D] via-[#FFB612] to-[#002395]",
-    BIH: "from-[#002395] via-[#FFCC00] to-slate-900",
-    BRA: "from-[#009c3b] via-[#FFDF00] to-[#002776]",
-    ARG: "from-[#74acdf] via-white to-[#74acdf]",
-    USA: "from-[#B22234] via-white to-[#3C3B6E]",
-    CAN: "from-[#FF0000] via-white to-[#FF0000]",
-    ENG: "from-[#CF142B] via-white to-[#012169]",
-    FRA: "from-[#002395] via-white to-[#ED2939]",
-    ESP: "from-[#AA151B] via-[#F1BF00] to-[#AA151B]",
-    DEU: "from-[#000000] via-[#DD0000] to-[#FFCE00]",
-    POR: "from-[#006600] via-[#FF0000] to-[#FF0000]",
-  };
-  return map[code] ?? "from-brand-green via-brand-gold to-slate-800";
+  void code;
+  return "from-s0x-teal/25 via-s0x-surface to-s0x-ink/30";
 }
 
 export default function AnthemHub({
@@ -298,12 +290,23 @@ export default function AnthemHub({
     (showTeam ? teamStreams.length + sortedComingSoon.length : 0);
 
   if (!streams.length) {
+    // Reads as a product state ("coming soon"), not a failure. On club
+    // deployments the catalogue is DISCOVERED by walking a Drive folder tree, so
+    // an empty hub most often means the import hasn't run yet — that diagnosis
+    // belongs in /admin ("Discover Anthems"), not in a fan's face.
     return (
-      <div className="min-h-screen bg-brand-dark flex items-center justify-center">
-        <div className="text-center text-slate-500">
-          <Music2 size={48} className="mx-auto mb-4 opacity-30" />
-          <p>No anthems loaded yet.</p>
-          <Link href="/" className="text-brand-gold hover:underline text-sm mt-2 block">← Dashboard</Link>
+      <div className="min-h-screen bg-s0x-bg flex items-center justify-center px-6">
+        <div className="s0x-card s0x-hud-grid max-w-md w-full p-8 text-center">
+          <span className="s0x-scanline" aria-hidden="true" />
+          <Music2 size={40} className="mx-auto mb-4 text-s0x-teal/50" />
+          <p className="s0x-display text-s0x-text font-bold">Anthems coming soon</p>
+          <p className="text-xs text-s0x-muted mt-2">
+            Club anthems are still being produced. They&apos;ll appear here
+            automatically once they&apos;re imported.
+          </p>
+          <Link href="/" className="s0x-mono text-[10px] text-s0x-accent hover:text-s0x-teal transition-colors mt-5 inline-block">
+            ← Dashboard
+          </Link>
         </div>
       </div>
     );
@@ -361,6 +364,14 @@ export default function AnthemHub({
               <span>{formatTime(duration || current?.durationSecs || 0)}</span>
             </div>
           </div>
+
+          {/* Why nothing is playing. The shared player used to swallow every
+              failure, so a dead Blob URL was indistinguishable from a pause. */}
+          {audio.error && (
+            <div className="s0x-mono mb-4 text-center text-[10px] text-s0x-muted" role="status">
+              {audio.error}
+            </div>
+          )}
 
           {/* Playback controls */}
           <div className="flex items-center justify-center gap-7">
@@ -530,7 +541,7 @@ export default function AnthemHub({
                           <div className={`text-sm font-semibold truncate ${isActive ? "text-brand-green" : "text-white"}`}>
                             {s.title}
                           </div>
-                          <div className="text-xs text-slate-500">podiumMetrics</div>
+                          <div className="text-xs text-slate-500">{BRAND_NAME}</div>
                         </div>
                         {isActive && isPlaying && (
                           <span className="text-brand-green text-[10px] flex-shrink-0 animate-pulse">▶</span>

@@ -50,8 +50,7 @@ export default function LiveClock() {
   if (!display) return null;
 
   return (
-    <span className="tabular-nums text-[11px] text-slate-400 font-mono tracking-wide">
-      {display}
-    </span>
+    // HUD clock — Riptide is the live-data color.
+    <span className="s0x-data text-[11px] text-s0x-teal">{display}</span>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { Music2, ChevronLeft, Check, Plus, Save, Eye, EyeOff, Loader2, AlertCircle, Upload, Link2 } from "lucide-react";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 interface TeamWithAnthem {
   id: string;
@@ -76,7 +77,7 @@ export default function AnthemAdmin() {
     setForm({
       teamCode: team.code,
       audioUrl: team.anthem?.audioUrl ?? "",
-      title: team.anthem?.title ?? `${team.name} Anthem · podiumMetrics`,
+      title: team.anthem?.title ?? `${team.name} Anthem · ${BRAND_NAME}`,
       artistCredit: team.anthem?.artistCredit ?? "Suno AI × studio0x",
       durationSecs: team.anthem?.durationSecs ? String(team.anthem.durationSecs) : "",
       tiktokDeepLink: team.anthem?.tiktokDeepLink ?? "",
@@ -378,7 +379,7 @@ export default function AnthemAdmin() {
                     type="text"
                     value={form.title}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder={`${selected.name} Anthem · podiumMetrics`}
+                    placeholder={`${selected.name} Anthem · ${BRAND_NAME}`}
                     className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-green text-sm"
                   />
                 </div>

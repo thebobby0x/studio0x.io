@@ -9,6 +9,7 @@ import type { GroupStanding } from "@/app/api/standings/route";
 import { getFlag } from "@/lib/flags";
 import { KNOCKOUT_START } from "@/lib/tournament";
 import AppNav from "@/components/ui/AppNav";
+import FlagImg from "@/components/ui/FlagImg";
 
 interface Prediction { home: number; away: number }
 type Preds = Record<number, Prediction>;
@@ -483,8 +484,8 @@ export default function PredictPage() {
         <div
           className="rounded-2xl overflow-hidden mb-5"
           style={{
-            background: "linear-gradient(135deg, #1a1200 0%, #0f1420 60%)",
-            border: "1px solid #f5a62330",
+            background: "linear-gradient(135deg, #1D191C 0%, #0F0C0E 60%)",
+            border: "1px solid rgb(202 53 139 / 0.35)",
           }}
         >
           <div className="px-5 pt-5 pb-4">
@@ -620,8 +621,8 @@ export default function PredictPage() {
                           }}
                           className={`rounded-2xl overflow-hidden cursor-pointer transition-colors ${
                             pts > 0
-                              ? "border border-brand-gold/25 bg-[#0f1208]"
-                              : "border border-slate-800 bg-brand-card"
+                              ? "border border-s0x-ink/35 bg-s0x-surface"
+                              : "border border-s0x-border bg-s0x-bg"
                           }`}
                         >
                           <div
@@ -639,7 +640,7 @@ export default function PredictPage() {
                           <div className="px-4 py-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                <span className="text-2xl">{getFlag(m.homeTeam.tla)}</span>
+                                <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} logoUrl={m.homeTeam.logoUrl} size={26} />
                                 <div className="flex flex-col gap-0.5">
                                   <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
                                   {homePos && (
@@ -667,7 +668,7 @@ export default function PredictPage() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 flex-row-reverse">
-                                <span className="text-2xl">{getFlag(m.awayTeam.tla)}</span>
+                                <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} logoUrl={m.awayTeam.logoUrl} size={26} />
                                 <div className="flex flex-col gap-0.5 items-end">
                                   <span className="text-xs font-bold text-slate-400">{m.awayTeam.tla}</span>
                                   {awayPos && (
@@ -772,14 +773,14 @@ export default function PredictPage() {
                           </div>
                           <div className="px-4 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-2xl">{getFlag(m.homeTeam.tla)}</span>
+                              <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} logoUrl={m.homeTeam.logoUrl} size={26} />
                               <span className="text-xs font-bold text-slate-400">{m.homeTeam.tla}</span>
                             </div>
                             <span className="text-xl font-black text-white px-3 py-1.5 rounded-xl bg-slate-900">
                               {m.homeScore}–{m.awayScore}
                             </span>
                             <div className="flex items-center gap-2 flex-row-reverse">
-                              <span className="text-2xl">{getFlag(m.awayTeam.tla)}</span>
+                              <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} logoUrl={m.awayTeam.logoUrl} size={26} />
                               <span className="text-xs font-bold text-slate-400">{m.awayTeam.tla}</span>
                             </div>
                           </div>

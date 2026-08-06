@@ -15,6 +15,7 @@ import type { FlightArc } from "@/app/api/flight-paths/route";
 import type { CityTravelStats } from "@/app/api/travel-stats/route";
 import AppNav from "@/components/ui/AppNav";
 import { useUnits } from "@/lib/units";
+import { BRAND_NAME } from "@/lib/sportConfig";
 
 const WorldFlightMap = dynamic(
   () => import("@/components/map/WorldFlightMap"),
@@ -40,14 +41,18 @@ function arcDistanceMi(a: FlightArc): number {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) * 0.621371);
 }
 
-function fmtNum(n: number): string {
+// null = this deployment publishes no modelled value for the field (see
+// /api/travel-stats `model`). Render a dash, never a fabricated zero.
+function fmtNum(n: number | null | undefined): string {
+  if (n == null) return "—";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return `${n}`;
 }
 
-function fmtRevenue(n: number): string {
+function fmtRevenue(n: number | null | undefined): string {
+  if (n == null) return "—";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(0)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
@@ -160,31 +165,37 @@ function CityCard({
       {expanded && (
         <div className="border-t border-brand-border/60 px-4 py-3 space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <div className="flex items-center gap-2">
-              <Plane size={12} className="text-slate-500 shrink-0" />
-              <div>
-                <div className="text-[9px] text-slate-600">Est. intl flights/day</div>
-                <div className="text-xs font-semibold text-white">
-                  {city.intlFlightsPerDay.toLocaleString()}
+            {city.intlFlightsPerDay != null && (
+              <div className="flex items-center gap-2">
+                <Plane size={12} className="text-slate-500 shrink-0" />
+                <div>
+                  <div className="text-[9px] text-slate-600">Est. intl flights/day</div>
+                  <div className="text-xs font-semibold text-white">
+                    {city.intlFlightsPerDay.toLocaleString()}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users size={12} className="text-slate-500 shrink-0" />
-              <div>
-                <div className="text-[9px] text-slate-600">International fans</div>
-                <div className="text-xs font-semibold text-white">
-                  ~{city.intlSharePct}% of arrivals
+            )}
+            {city.intlSharePct != null && (
+              <div className="flex items-center gap-2">
+                <Users size={12} className="text-slate-500 shrink-0" />
+                <div>
+                  <div className="text-[9px] text-slate-600">International fans</div>
+                  <div className="text-xs font-semibold text-white">
+                    ~{city.intlSharePct}% of arrivals
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <DollarSign size={12} className="text-slate-500 shrink-0" />
-              <div>
-                <div className="text-[9px] text-slate-600">Est. hotel/night</div>
-                <div className="text-xs font-semibold text-white">~${city.hotelRateUsd}</div>
+            )}
+            {city.hotelRateUsd != null && (
+              <div className="flex items-center gap-2">
+                <DollarSign size={12} className="text-slate-500 shrink-0" />
+                <div>
+                  <div className="text-[9px] text-slate-600">Est. hotel/night</div>
+                  <div className="text-xs font-semibold text-white">~${city.hotelRateUsd}</div>
+                </div>
               </div>
-            </div>
+            )}
             <div className="flex items-center gap-2">
               <Thermometer size={12} className="text-slate-500 shrink-0" />
               <div>
@@ -208,12 +219,14 @@ function CityCard({
             </span>
           </div>
 
-          <div className="bg-blue-950/30 border border-blue-900/30 rounded-xl px-3 py-2">
-            <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">
-              Travel fact
+          {city.travelFact && (
+            <div className="bg-blue-950/30 border border-blue-900/30 rounded-xl px-3 py-2">
+              <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">
+                Travel fact
+              </div>
+              <div className="text-[11px] text-slate-400 leading-relaxed">{city.travelFact}</div>
             </div>
-            <div className="text-[11px] text-slate-400 leading-relaxed">{city.travelFact}</div>
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -221,18 +234,23 @@ function CityCard({
 }
 
 interface TravelData {
+  /** "wc-fan-origin" = the WC26 travel-economics projection is available.
+   *  "fixtures-only" = this competition has no published model, so every
+   *  modelled total below is null and the UI shows facts instead. */
+  model?: "wc-fan-origin" | "fixtures-only";
+  disclosure?: string | null;
   cities: CityTravelStats[];
   totals: {
     cities: number;
     matches: number;
-    estimatedRevenue: number;
-    revenueToDate?: number;
-    completedMatches?: number;
-    fansArrivingToday: number;
-    intlVisitors: number;
-    intlVisitorsToDate?: number;
-    economicImpact: number;
-    economicImpactToDate?: number;
+    estimatedRevenue: number | null;
+    revenueToDate?: number | null;
+    completedMatches?: number | null;
+    fansArrivingToday: number | null;
+    intlVisitors: number | null;
+    intlVisitorsToDate?: number | null;
+    economicImpact: number | null;
+    economicImpactToDate?: number | null;
   };
 }
 
@@ -277,7 +295,8 @@ export default function PulsePage() {
   const totalPersonMiles = arcs.reduce((s, a) => s + arcDistanceMi(a) * TEAM_PARTY_SIZE, 0);
 
   const todayCities = travel?.cities.filter((c) => c.hasMatchToday) ?? [];
-  const fansToday = todayCities.reduce((s, c) => s + c.peakArrivals, 0);
+  // null peakArrivals = no travel-economics model for this deployment.
+  const fansToday = todayCities.reduce((s, c) => s + (c.peakArrivals ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">
@@ -545,6 +564,26 @@ export default function PulsePage() {
                 </div>
               </div>
 
+              {/* Modelled economics — only rendered where a model exists for this
+                  competition. The projections below (fan multipliers, $/fan,
+                  ~1.5M visitors) are WC26 estimates; the API returns model
+                  "fixtures-only" and null totals elsewhere, and this panel is
+                  replaced by the honest disclosure line. */}
+              {travel.model === "fixtures-only" ? (
+                <div className="rounded-2xl bg-brand-card border border-brand-border p-4 mt-4">
+                  <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+                    Host cities
+                  </div>
+                  <div className="text-xs text-slate-400 leading-relaxed">
+                    {travel.disclosure}
+                  </div>
+                  <div className="mt-3 text-sm font-black text-white">
+                    {travel.totals.completedMatches ?? 0}
+                    <span className="text-slate-600 text-xs">/{travel.totals.matches} matches played</span>
+                    <span className="text-slate-600 text-xs"> · {travel.totals.cities} host cities</span>
+                  </div>
+                </div>
+              ) : (
               <div className="rounded-2xl bg-brand-card border border-brand-border p-4 mt-4">
                 <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">
                   Tournament running totals (modelled estimates)
@@ -559,7 +598,7 @@ export default function PulsePage() {
                       )}
                     </div>
                     <div className="text-[10px] text-slate-600">
-                      of {fmtRevenue(travel.cities.reduce((s, c) => s + c.totalEstimatedRevenue, 0))} projected
+                      of {fmtRevenue(travel.cities.reduce((s, c) => s + (c.totalEstimatedRevenue ?? 0), 0))} projected
                     </div>
                   </div>
                   <div>
@@ -583,13 +622,14 @@ export default function PulsePage() {
                     <div className="text-base font-black text-white">
                       ~$
                       {Math.round(
-                        travel.cities.reduce((s, c) => s + c.hotelRateUsd, 0) /
-                          travel.cities.length
+                        travel.cities.reduce((s, c) => s + (c.hotelRateUsd ?? 0), 0) /
+                          Math.max(1, travel.cities.length)
                       )}
                     </div>
                   </div>
                 </div>
               </div>
+              )}
             </>
           )}
         </div>
@@ -695,7 +735,7 @@ export default function PulsePage() {
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Flight paths refresh every 60s · Arrivals, flights,
+        studio0x.io · {BRAND_NAME} · Flight paths refresh every 60s · Arrivals, flights,
         hotel rates and revenue are modelled estimates from stadium capacity + travel baselines,
         not measured data
       </footer>

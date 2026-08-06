@@ -98,11 +98,32 @@ model Team {
   code        String        @unique
   flagEmoji   String
   groupStage  String
+  // Country as api-football spells it. Added 8/4 for club deployments: a club's
+  // badge comes from the country it plays in, NOT from its 3-letter code (which
+  // collides with nation TLAs — Columbus Crew emits "COL" and was rendering
+  // Colombia's flag). Empty for nation deployments, which key off the code.
+  country     String        @default("")
+  // api-football team id — the ONLY identifier the feed always supplies. Club
+  // feeds omit `team.code` for 14 of 36 Leagues Cup clubs, so code-keyed
+  // ingestion silently dropped their fixtures. Nullable for rows seeded before
+  // this field existed.
+  //
+  // Indexed, NOT @unique, on purpose: Vercel's build runs `prisma db push`
+  // without --accept-data-loss, and adding a unique constraint to a populated
+  // table makes push refuse and the deploy fail. Uniqueness is maintained by
+  // the sync (one row per feed team) and by Team.name being unique.
+  afTeamId    Int?
+  // Club crest URL from the api-football /teams feed. Added 8/4: a club has no
+  // national flag, so the crest IS its badge. Empty for nation deployments,
+  // which render a flag from the FIFA TLA.
+  logoUrl     String        @default("")
   anthem      AudioStream?
   homePlayers Player[]
   homeMatches Match[]       @relation("HomeTeam")
   awayMatches Match[]       @relation("AwayTeam")
   createdAt   DateTime      @default(now())
+
+  @@index([afTeamId])
 }
 
 model Player {
@@ -197,12 +218,22 @@ model PlayerMatchStat {
 model Match {
   id           String            @id @default(cuid())
   fixture      Int               @unique
+  // api-football league id this fixture belongs to. Added 8/4: the DB had no way
+  // to tell one tournament's rows from another's, so "clear the other
+  // tournament's data" was not expressible. 0 = seeded before this field
+  // existed (treated as unknown, never as "belongs to us").
+  leagueId     Int               @default(0)
   homeTeamId   String
   awayTeamId   String
   homeTeam     Team              @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeam     Team              @relation("AwayTeam", fields: [awayTeamId], references: [id])
   venue        String
   city         String
+  // api-football venue id. Added 8/5: the fixture feed omits `venue.city` for
+  // most Leagues Cup fixtures (40 of 54 had an empty city), and weather ingest
+  // needs COORDINATES, which the feed never supplies. The id lets us resolve the
+  // venue once via /venues and cache its city + geocoded lat/lng (see Venue).
+  venueId      Int?
   date         DateTime
   status       String            @default("NS")
   homeScore    Int               @default(0)
@@ -235,9 +266,15 @@ model NewsStory {
   teamsInvolved String[]           // team codes (TLAs) for flag display
   audioUrl      String?
   generatedAt   DateTime @default(now())
+  // Deployment id (worldcup | leaguescup | f1-2026) this story was written for.
+  // Added 8/4: LC26 shipped with World Cup copy because prompts hardcoded the
+  // tournament AND stories carried no provenance, so bad copy couldn't be
+  // identified or purged selectively. "" = written before this field existed.
+  tournamentId  String   @default("")
 
   @@index([date])
   @@index([fixture])
+  @@index([tournamentId])
 }
 
 // One canonical Roundtable episode per fixture (owner 7/18): persisting the
@@ -253,6 +290,49 @@ model RoundtableEpisode {
   itFactor    Json?              // panel gut-read intangibles per team (opinion, matchday special 7/18)
   promptRev   String   @default("v1") // pre-kickoff episodes regenerate when the script brief changes
   generatedAt DateTime @default(now())
+}
+
+// ── AI Live 360 Roundtable — the multi-match audio show ──────────────────────
+// RoundtableEpisode above is PER-FIXTURE (`fixture @unique`): one frozen pregame
+// episode per match. The 360 show is the opposite shape — a rolling broadcast
+// covering EVERY live fixture at once, regenerated every ~30-90s for as long as
+// anything is in play. So it gets its own table rather than a synthetic fixture
+// id squatting on the pregame archive's unique key.
+//
+// Rows are a broadcast LOG, not a cache: each is the script that actually aired
+// at that moment, which is what makes "what did the booth say when X happened?"
+// answerable after the fact. Additive-only — `prisma db push` in the Vercel build
+// creates it without touching any existing table.
+model Live360Episode {
+  id           String   @id @default(cuid())
+  tournamentId String // DeploymentConfig.id — scopes rows per deployment
+  fixtures     Int[] // every fixture this episode covered
+  lines        Json // [{ speaker, text }] — speaker is a persona key
+  matchContext Json // grounded snapshot fed to the model (scores, minutes, moments)
+  // Highest-significance moment this episode leads with, as `${fixture}|${momentKey}`.
+  // Drives the stinger cue AND stops the next episode re-leading with the same goal.
+  leadMomentKey String?
+  // Moment type behind leadMomentKey (GOAL / RED_CARD / …) — the stinger to fire.
+  leadMomentType String?
+  // Conversation groups: [{ index, lineIndexes, url, bytes }]. Each group is
+  // 2-4 lines rendered together and stored as ONE stitched audio object, so the
+  // client plays a burst of dialogue then holds 5s on the stadium bed.
+  groups       Json?
+  // "blob"   — every group rendered once and served from CDN (the normal path)
+  // "stream" — at least one group could not be stored (Blob at capacity); the
+  //            client synthesises those lines on demand instead. Degraded, not
+  //            broken, and always accompanied by a warning.
+  audioMode    String   @default("blob")
+  // Why the audio is degraded, if it is — the exact upstream reason per failed
+  // line/group. Persisted rather than returned once: on 8/5 every line in an
+  // episode failed to render and the surface still showed no warning at all,
+  // because the reasons only existed in the response of the request that
+  // generated them. A failure nobody can see is worse than no feature.
+  warnings     Json?
+  promptRev    String   @default("v1")
+  generatedAt  DateTime @default(now())
+
+  @@index([tournamentId, generatedAt])
 }
 
 model LiveMetric {
@@ -359,10 +439,47 @@ model MatchEventLog {
   detail      String
   team        String
   player      String?
+  // Assisting player on a goal (null for cards, subs, and unassisted goals).
+  assist      String?
   firstSeenAt DateTime @default(now())
 
   @@unique([fixture, eventKey])
   @@index([fixture])
+}
+
+// The event bus's durable moment stream — the sport-agnostic generalization of
+// MatchEventLog (the GoalEvent→MomentEvent migration flagged as highest-value).
+// EVERY live event (any sport) publishes a scored MatchMoment here; every
+// consumer (a match view, the Roundtable, the future 0x360 multiview) is a query
+// over this one table. `type` is a String on purpose: football moments publish
+// now, and F1 moment types (OVERTAKE/PIT_STOP/FASTEST_LAP) are a config swap with
+// NO schema change. `momentKey` keeps MatchEventLog's stable-dedup contract so
+// polling re-observation upserts instead of duplicating. tournamentId scopes rows
+// per deployment (worldcup/leaguescup/f1-2026).
+model MatchMoment {
+  id                 String    @id @default(cuid())
+  tournamentId       String
+  fixture            Int
+  matchId            String? // internal Match.id once resolved (optional)
+  momentKey          String // stable dedup: `${type}|${period}|${minute}|${detail}`
+  type               String // MomentType (union stored as string — F1-ready)
+  period             String?
+  minute             Int
+  clockLabel         String?
+  team               String?
+  entity             String? // player / driver
+  payload            Json? // type-specific, grounded-only detail
+  significance       Int       @default(0)
+  significanceReason String?
+  source             String    @default("real") // real | reconstructed
+  occurredAt         DateTime?
+  firstSeenAt        DateTime  @default(now())
+  publishedAt        DateTime  @default(now())
+
+  @@unique([tournamentId, fixture, momentKey])
+  @@index([tournamentId, fixture])
+  @@index([tournamentId, publishedAt])
+  @@index([tournamentId, significance])
 }
 
 // Heat vs. Outcomes (Cramp Watch™ aggregate, backlog §16): one row per fixture
@@ -384,6 +501,9 @@ model MatchWeather {
   // Catches wildfire smoke. null = service had no data — never fabricated.
   aqi               Float?
   pm25              Float?
+  // Kickoff-hour UV index (Open-Meteo air-quality service). Null = the service
+  // had no reading for that hour — never fabricated, same contract as aqi/pm25.
+  uvIndex           Float?
   // Outcome facts — null until the match is FT and events were ingested
   totalGoals        Int?
   lateGoals         Int?     // goals scored 75'+ (excl. missed pens)
@@ -392,4 +512,85 @@ model MatchWeather {
   capturedAt        DateTime @default(now())
 
   @@index([band])
+}
+
+// ── Team match statistics (api-football /fixtures/statistics) ────────────────
+// One row per fixture holding BOTH sides' team-level stats. Written by the
+// live-sync cron while a match is in play and rewritten from the post-match
+// pull, which is more complete (the provider fills blanks after FT).
+//
+// Every field is nullable on purpose: the provider omits stats it doesn't have
+// for a given fixture, and a missing stat must stay missing rather than being
+// coerced to 0 — "0 shots on target" and "the feed didn't report shots" are
+// different claims (CLAUDE.md CONTENT TRUTH). The UI must render null as "—".
+model MatchStats {
+  id                String   @id @default(cuid())
+  fixture           Int      @unique
+  matchId           String?  // internal Match.id once resolved
+
+  possessionHome    Int?     // percent
+  possessionAway    Int?
+
+  shotsTotalHome    Int?
+  shotsTotalAway    Int?
+  shotsOnHome       Int?
+  shotsOnAway       Int?
+  shotsOffHome      Int?
+  shotsOffAway      Int?
+  shotsBlockedHome  Int?
+  shotsBlockedAway  Int?
+
+  foulsHome         Int?
+  foulsAway         Int?
+  cornersHome       Int?
+  cornersAway       Int?
+  offsidesHome      Int?
+  offsidesAway      Int?
+
+  yellowHome        Int?
+  yellowAway        Int?
+  redHome           Int?
+  redAway           Int?
+
+  savesHome         Int?
+  savesAway         Int?
+
+  passAccuracyHome  Int?     // percent
+  passAccuracyAway  Int?
+
+  /// "live" while the match is in play, "final" once ingested after FT.
+  phase             String   @default("live")
+  capturedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([matchId])
+}
+
+// ── Venue metadata + coordinates ────────────────────────────────────────────
+// api-football gives a venue NAME on every fixture, a city on only some, and
+// coordinates on none. lib/venues.ts has exact coordinates, but only for the 16
+// World Cup stadiums — so on any other competition the weather ingest resolved
+// no venue and skipped every match (`skippedNoVenue`).
+//
+// This caches, per venue: the city/country from /venues, and lat/lng from
+// Open-Meteo's geocoding service. `source` records where the coordinates came
+// from so a city-level reading is never presented as stadium-exact.
+model Venue {
+  id          String   @id @default(cuid())
+  /// api-football venue id when known; name is the stable fallback key.
+  afVenueId   Int?     @unique
+  name        String   @unique
+  city        String   @default("")
+  country     String   @default("")
+  capacity    Int?
+  lat         Float?
+  lng         Float?
+  /// "venue-table" = exact stadium coords from lib/venues.ts.
+  /// "geocoded-city" = city centroid from Open-Meteo geocoding (approximate).
+  /// "unresolved" = looked up and found nothing; retried on a later run.
+  source      String   @default("unresolved")
+  resolvedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([city])
 }

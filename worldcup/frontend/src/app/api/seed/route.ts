@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getFlag } from "@/lib/flags";
 import { getVenueInfo } from "@/lib/venues";
 import { isAdminAuthed } from "@/lib/adminAuth";
+// Phase 1 extraction: league/season now come from the shared deployment config
+// (defaults to WC26's league 1 / season 2026 — behavior-identical here).
+import { AF_LEAGUE, AF_SEASON, SPORT } from "@/lib/sportConfig";
+import { resolveTeams, type FeedTeam } from "@/lib/teamIdentity";
 
 const AF_BASE  = "https://v3.football.api-sports.io";
-const AF_LEAGUE = 1;    // World Cup
-const AF_SEASON = 2026;
 
 const STATUS_MAP: Record<string, string> = {
   NS: "NS", "1H": "LIVE", HT: "HT", "2H": "LIVE",
@@ -16,21 +17,15 @@ const STATUS_MAP: Record<string, string> = {
   AWD: "FT", WO: "FT", SUSP: "LIVE", INT: "LIVE", LIVE: "LIVE",
 };
 
-// Static group assignments (api-football.com doesn't include group in fixture response)
-const TEAM_GROUPS: Record<string, string> = {
-  MEX: "A", RSA: "A", KOR: "A", CZE: "A",
-  CAN: "B", BIH: "B", QAT: "B", SUI: "B",
-  BRA: "C", MAR: "C", HAI: "C", SCO: "C",
-  USA: "D", PAR: "D", AUS: "D", TUR: "D",
-  GER: "E", CUW: "E", CUR: "E", CIV: "E", ECU: "E",
-  NED: "F", JPN: "F", SWE: "F", TUN: "F",
-  BEL: "G", EGY: "G", IRN: "G", NZL: "G",
-  ESP: "H", CPV: "H", KSA: "H", URU: "H",
-  FRA: "I", SEN: "I", IRQ: "I", NOR: "I",
-  ARG: "J", ALG: "J", AUT: "J", JOR: "J",
-  POR: "K", COD: "K", UZB: "K", COL: "K",
-  ENG: "L", CRO: "L", GHA: "L", PAN: "L",
-};
+// Static group assignments come from the deployment config (api-football.com
+// doesn't include group in the fixture response). Empty for formats without
+// groups — see sportConfig.teamGroups.
+const TEAM_GROUPS: Record<string, string> = SPORT.teamGroups;
+
+// The hardcoded SQUADS below are WC26 national-team rosters. They are seeded
+// ONLY on the World Cup deployment: writing Lionel Messi into a Leagues Cup DB
+// as an "Argentina" player would be fabricated data on a club competition.
+const SEED_NATIONAL_SQUADS = SPORT.id === "worldcup";
 
 // ── Hardcoded squads (11 starters per team) ──────────────────────────────────
 // Add more teams here as needed; all other teams get empty squads.
@@ -309,9 +304,18 @@ const MATCHUP_VENUES: Record<string, string> = {
   "PAN-ENG": "MetLife Stadium",          "CRO-GHA": "Lincoln Financial Field",
 };
 
+// WC26-only: MATCHUP_VENUES is keyed by NATION TLA pairs, and club codes collide
+// with them — "COL-POR" is Colombia v Portugal at Hard Rock Stadium in the WC26
+// map and Columbus Crew v Portland Timbers in the Leagues Cup feed. Off the World
+// Cup deployment this must never fire; the feed's own venue is authoritative.
 function matchupVenue(h: string, a: string): string | null {
+  if (SPORT.id !== "worldcup") return null;
   return MATCHUP_VENUES[`${h}-${a}`] ?? null;
 }
+
+/** Venue fallback when the feed supplies none. "World Cup Stadium" is a WC26 DB
+ *  sentinel (see CLAUDE.md) — never stamp it on another tournament's fixture. */
+const VENUE_FALLBACK = SPORT.id === "worldcup" ? "World Cup Stadium" : "";
 
 export const maxDuration = 300;
 
@@ -329,7 +333,7 @@ type AFFixture = {
 };
 
 type AFTeam = {
-  team: { id: number; name: string; code: string | null; logo: string | null };
+  team: { id: number; name: string; code: string | null; country: string | null; logo: string | null };
 };
 
 async function seed(req: Request) {
@@ -386,12 +390,23 @@ async function seed(req: Request) {
     );
     const teamsJson = teamsRes.ok ? await teamsRes.json() : { response: [] };
     const afTeams: AFTeam[] = teamsJson.response ?? [];
-    const teamCodeById = new Map<number, string>(
-      afTeams
-        .filter(t => t.team.code)
-        .map(t => [t.team.id, t.team.code!.toUpperCase()])
-    );
-    log.push(`Fetched ${afTeams.length} team records (${teamCodeById.size} with codes)`);
+
+    // Resolve every team the feed mentions — from /teams AND from the fixtures
+    // themselves, so a club /teams omits still resolves. Club deployments key off
+    // the api-football team id because `team.code` is absent for 14 of the 36
+    // Leagues Cup clubs; code-keyed resolution silently dropped their fixtures.
+    const feedTeams = new Map<number, FeedTeam>();
+    for (const t of afTeams) {
+      feedTeams.set(t.team.id, { id: t.team.id, name: t.team.name, code: t.team.code, country: t.team.country, logo: t.team.logo });
+    }
+    for (const f of afFixtures) {
+      for (const side of [f.teams.home, f.teams.away]) {
+        if (!feedTeams.has(side.id)) feedTeams.set(side.id, { id: side.id, name: side.name });
+      }
+    }
+    const resolved = resolveTeams([...feedTeams.values()]);
+    const teamCodeById = new Map<number, string>([...resolved].map(([id, t]) => [id, t.code]));
+    log.push(`Fetched ${afTeams.length} team records; resolved ${resolved.size} team identities (${SPORT.entityKind})`);
 
     // ── 2. Wipe MATCH data only (FK order). Teams and players are NOT wiped:
     // teams upsert by code below (stable IDs), so AudioStream.teamId links and
@@ -427,30 +442,55 @@ async function seed(req: Request) {
       };
     });
 
-    // ── 3. Collect all unique teams ──────────────────────────────────────────
-    const teamMeta = new Map<string, { name: string; group: string }>();
+    // ── 3/4. Upsert teams from the resolved identities ───────────────────────
+    // Group comes from the resolver (config-driven); on nation deployments a
+    // fixture-derived group still wins so knockout-only teams keep "KO".
+    const groupByCode = new Map<string, string>();
+    // "KO" means "in the tournament but not in a group" — meaningful only for a
+    // format that HAS groups. LC26 has none, so its teams carry no group at all.
+    const hasGroups = Object.keys(TEAM_GROUPS).length > 0;
     for (const m of fdMatches) {
-      const group = m.group ?? "KO";
-      if (m.homeTeam?.tla && !teamMeta.has(m.homeTeam.tla)) teamMeta.set(m.homeTeam.tla, { name: m.homeTeam.name, group });
-      if (m.awayTeam?.tla && !teamMeta.has(m.awayTeam.tla)) teamMeta.set(m.awayTeam.tla, { name: m.awayTeam.name, group });
+      const group = m.group ?? (hasGroups ? "KO" : "");
+      if (m.homeTeam?.tla && !groupByCode.has(m.homeTeam.tla)) groupByCode.set(m.homeTeam.tla, group);
+      if (m.awayTeam?.tla && !groupByCode.has(m.awayTeam.tla)) groupByCode.set(m.awayTeam.tla, group);
+    }
+    const teamsData = [...resolved.entries()].map(([afId, t]) => ({
+      afTeamId: afId,
+      code: t.code,
+      name: t.name,
+      flagEmoji: t.flagEmoji,
+      country: t.country,
+      logoUrl: t.logoUrl,
+      // Empty on a groupless format — never "KO", and never a stale WC letter.
+      groupStage: hasGroups ? (t.groupStage || groupByCode.get(t.code) || "KO") : "",
+    }));
+    // Free wanted codes held by a different team before reassigning any — same
+    // pre-pass as lib/fixtureSync.ts (Team.code is @unique and codes move).
+    const nameForCode = new Map(teamsData.map(t => [t.code, t.name]));
+    const held = await prisma.team.findMany({
+      where: { code: { in: [...nameForCode.keys()] } },
+      select: { id: true, code: true, name: true },
+    });
+    for (const row of held) {
+      if (nameForCode.get(row.code) === row.name) continue; // rightful owner
+      await prisma.team.update({ where: { id: row.id }, data: { code: `X-${row.id.slice(0, 8)}` } }).catch(() => {});
     }
 
-    // ── 4. Upsert teams ──────────────────────────────────────────────────────
-    const teamsData = [...teamMeta.entries()].map(([tla, meta]) => ({
-      code: tla,
-      name: meta.name,
-      flagEmoji: getFlag(tla),
-      groupStage: meta.group,
-    }));
-    await Promise.all(
-      teamsData.map(t =>
-        prisma.team.upsert({
-          where: { code: t.code },
-          create: t,
-          update: { name: t.name, flagEmoji: t.flagEmoji, groupStage: t.groupStage },
-        })
-      )
-    );
+    for (const t of teamsData) {
+      const { afTeamId, ...rest } = t;
+      // id → NAME → code. Name outranks code because this change reassigns
+      // codes; see the matching comment and the code-freeing pre-pass in
+      // lib/fixtureSync.ts.
+      const existing =
+        (await prisma.team.findFirst({ where: { afTeamId } })) ??
+        (await prisma.team.findUnique({ where: { name: t.name } })) ??
+        (await prisma.team.findUnique({ where: { code: t.code } }));
+      if (existing) {
+        await prisma.team.update({ where: { id: existing.id }, data: { ...rest, afTeamId } });
+      } else {
+        await prisma.team.create({ data: { ...rest, afTeamId } });
+      }
+    }
     // Ensure TBD sentinel team exists for knockout placeholder slots
     await prisma.team.upsert({
       where: { code: "TBD" },
@@ -463,13 +503,22 @@ async function seed(req: Request) {
     log.push(`Upserted ${teamsData.length} teams (+ TBD sentinel)`);
 
     // ── 5. Batch create players (skipDuplicates = idempotent) ────────────────
-    const playersData = Object.entries(SQUADS).flatMap(([tla, players]) => {
-      const teamId = teamIdByTla.get(tla);
-      if (!teamId) return [];
-      return players.map(p => ({ ...p, teamId }));
-    });
-    const { count: playerCount } = await prisma.player.createMany({ data: playersData, skipDuplicates: true });
-    log.push(`Upserted ${playersData.length} players (${playerCount} new) across ${Object.keys(SQUADS).length} squads`);
+    // WC26 national rosters only — see SEED_NATIONAL_SQUADS.
+    const playersData = SEED_NATIONAL_SQUADS
+      ? Object.entries(SQUADS).flatMap(([tla, players]) => {
+          const teamId = teamIdByTla.get(tla);
+          if (!teamId) return [];
+          return players.map(p => ({ ...p, teamId }));
+        })
+      : [];
+    const { count: playerCount } = playersData.length
+      ? await prisma.player.createMany({ data: playersData, skipDuplicates: true })
+      : { count: 0 };
+    log.push(
+      SEED_NATIONAL_SQUADS
+        ? `Upserted ${playersData.length} players (${playerCount} new) across ${Object.keys(SQUADS).length} squads`
+        : `Skipped hardcoded national squads (deployment is ${SPORT.id}, entity=${SPORT.entityKind}) — squads come from api-football`
+    );
 
     // ── 6. Batch create matches, then parallel update live/finished scores ───
     // NOTE: matches are created BEFORE anthems on purpose. The anthem pass does
@@ -482,9 +531,10 @@ async function seed(req: Request) {
     );
     const matchesCreateData = validMatches.map(m => ({
       fixture: m.id,
+      leagueId: AF_LEAGUE,
       homeTeamId: teamIdByTla.get(m.homeTeam.tla)!,
       awayTeamId: teamIdByTla.get(m.awayTeam.tla)!,
-      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? "World Cup Stadium",
+      venue: matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? VENUE_FALLBACK,
       city: (() => { const v = matchupVenue(m.homeTeam.tla, m.awayTeam.tla); return v ? (getVenueInfo(v)?.city ?? "") : (m.apiCity ?? ""); })(),
       date: new Date(m.utcDate),
       status: STATUS_MAP[m.status] ?? "NS",
@@ -496,9 +546,12 @@ async function seed(req: Request) {
 
     // Venue update pass — overwrites any previously stored placeholder with hardcoded values
     await Promise.all(validMatches.map(m => {
-      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? "World Cup Stadium";
-      const city = venue !== "World Cup Stadium" ? (getVenueInfo(venue)?.city ?? "") : "";
-      return prisma.match.updateMany({ where: { fixture: m.id }, data: { venue, city } });
+      const venue = matchupVenue(m.homeTeam.tla, m.awayTeam.tla) ?? m.apiVenue ?? VENUE_FALLBACK;
+      // Prefer OUR canonical city when the venue is known; else the feed's city.
+      const city = venue && venue !== "World Cup Stadium"
+        ? (getVenueInfo(venue)?.city ?? m.apiCity ?? "")
+        : "";
+      return prisma.match.updateMany({ where: { fixture: m.id }, data: { venue, city, leagueId: AF_LEAGUE } });
     }));
 
     // Update status/scores for non-scheduled matches in parallel
@@ -529,17 +582,25 @@ async function seed(req: Request) {
     });
     const matchDbIdByFixture = new Map(matchDbRows.map(r => [r.fixture, r.id]));
 
-    const marketsData = validMatches.flatMap(m => {
-      const matchId = matchDbIdByFixture.get(m.id);
-      if (!matchId) return [];
-      return [
-        { matchId, outcome: "home_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-HW`, price: 0.40 },
-        { matchId, outcome: "draw",     contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-TIE`, price: 0.25 },
-        { matchId, outcome: "away_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-AW`, price: 0.35 },
-      ];
-    });
-    await prisma.kalshiMarket.createMany({ data: marketsData, skipDuplicates: true });
-    log.push(`Upserted ${marketsData.length} Kalshi market records`);
+    // `KXFIFAGAME-<TLA>-<TLA>` is Kalshi's FIFA World Cup ticker family and the
+    // 0.40/0.25/0.35 prices are placeholders, not quotes. Minting those rows on a
+    // club competition would put an invented FIFA contract on a Leagues Cup game,
+    // so they are WC26-only; LC26 shows the real Kalshi market or nothing.
+    const marketsData = SPORT.id === "worldcup"
+      ? validMatches.flatMap(m => {
+          const matchId = matchDbIdByFixture.get(m.id);
+          if (!matchId) return [];
+          return [
+            { matchId, outcome: "home_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-HW`, price: 0.40 },
+            { matchId, outcome: "draw",     contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-TIE`, price: 0.25 },
+            { matchId, outcome: "away_win", contractSlug: `KXFIFAGAME-${m.homeTeam.tla}-${m.awayTeam.tla}-AW`, price: 0.35 },
+          ];
+        })
+      : [];
+    if (marketsData.length > 0) await prisma.kalshiMarket.createMany({ data: marketsData, skipDuplicates: true });
+    log.push(marketsData.length > 0
+      ? `Upserted ${marketsData.length} Kalshi market records`
+      : `Skipped placeholder Kalshi markets (WC26-only ticker family)`);
 
     // ── 9. Anthem hygiene (audit 7/20, CR-1) — PURGE stock placeholders ──────
     // The seed no longer creates anthem rows (real anthems are manifest-owned).
@@ -574,8 +635,8 @@ async function seed(req: Request) {
       a.sec{background:transparent;color:#f5a623;border:1px solid #f5a623}
     </style></head>
     <body>
-      <h1>✅ World Cup 2026 fully seeded</h1>
-      <p class="sub">All matches, teams, squads, anthems, and markets loaded from live data.</p>
+      <h1>✅ ${SPORT.eventName} fully seeded</h1>
+      <p class="sub">League ${AF_LEAGUE} · season ${AF_SEASON} — matches and teams loaded from live data.</p>
       <div class="log">${log.map(l => `<p>${l}</p>`).join("")}</div>
       <div class="links">
         <a href="/">← Live Dashboard</a>

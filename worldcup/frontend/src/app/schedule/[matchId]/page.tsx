@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
+import FlagImg from "@/components/ui/FlagImg";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { KNOCKOUT_START } from "@/lib/tournament";
@@ -17,6 +18,7 @@ import FatigueFactor from "@/components/stats/FatigueFactor";
 import MatchLineups from "@/components/match/MatchLineups";
 import MatchPlayerStats from "@/components/match/MatchPlayerStats";
 import MatchCommentary from "@/components/match/MatchCommentary";
+import RoundtableLive from "@/components/roundtable/RoundtableLive";
 import MatchPulse from "@/components/match/MatchPulse";
 import MatchMarkets from "@/components/match/MatchMarkets";
 import ShareButton from "@/components/ui/ShareButton";
@@ -24,6 +26,7 @@ import LiveAnthemButtons from "@/components/match/LiveAnthemButtons";
 import LiveRefresh from "@/components/ui/LiveRefresh";
 import { prisma } from "@/lib/prisma";
 import { getVenueInfo } from "@/lib/venues";
+import { BRAND_NAME, SPORT } from "@/lib/sportConfig";
 
 async function fetchSchedule(): Promise<ScheduleMatch[]> {
   try {
@@ -187,7 +190,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
                 text={
                   isLive ? `LIVE: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} (${m.status === "HT" ? "HT" : `${m.minute}'`}) · ${groupLabel} · studio0x.io` :
                   isDone ? `FT: ${m.homeTeam.name} ${m.homeScore ?? 0}–${m.awayScore ?? 0} ${m.awayTeam.name} · ${groupLabel} · studio0x.io` :
-                  `${m.homeTeam.name} vs ${m.awayTeam.name} · ${groupLabel} · podiumMetrics · studio0x.io`
+                  `${m.homeTeam.name} vs ${m.awayTeam.name} · ${groupLabel} · ${BRAND_NAME} · studio0x.io`
                 }
                 url={`/schedule/${m.id}`}
                 title={`${m.homeTeam.name} vs ${m.awayTeam.name}`}
@@ -199,7 +202,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-8 py-10">
             {/* Home */}
             <Link href={`/team/${m.homeTeam.tla}`} className="text-center group block">
-              <div className="text-6xl mb-3 select-none">{getFlag(m.homeTeam.tla)}</div>
+              <div className="mb-3 flex justify-center select-none">
+                <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={64} />
+              </div>
               <div className="text-xl font-black text-white group-hover:text-brand-gold transition-colors leading-tight">
                 {m.homeTeam.name}
               </div>
@@ -230,7 +235,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
             {/* Away */}
             <Link href={`/team/${m.awayTeam.tla}`} className="text-center group block">
-              <div className="text-6xl mb-3 select-none">{getFlag(m.awayTeam.tla)}</div>
+              <div className="mb-3 flex justify-center select-none">
+                <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={64} />
+              </div>
               <div className="text-xl font-black text-white group-hover:text-brand-gold transition-colors leading-tight">
                 {m.awayTeam.name}
               </div>
@@ -282,6 +289,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
         {venueInfo && venueFromDB?.venue && (
           <StadiumInfoCard venueName={venueFromDB.venue} venueInfo={venueInfo} />
         )}
+
+        {/* The Roundtable, on air. LIVE ONLY — the panel talks about matches in
+            play, so on a finished fixture it would be a card offering to tune
+            into someone else's game. The show itself stays the global
+            whip-around; passing this fixture only narrows what is allowed to
+            INTERRUPT it, so a goal elsewhere does not cut across the segment
+            you are listening to about this match. */}
+        {isLive && SPORT.roundtable && <RoundtableLive fixtures={[m.id]} />}
 
         {/* AI Commentary — shown for live and finished matches */}
         {(isLive || isDone) && <CommentaryPanel fixtureId={m.id} />}
@@ -451,7 +466,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       </main>
 
       <footer className="mt-16 border-t border-brand-border py-8 text-center text-xs text-slate-600">
-        studio0x.io · podiumMetrics · Data via api-football.com
+        studio0x.io · {BRAND_NAME} · Data via api-football.com
       </footer>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Play, Pause, SkipBack, SkipForward, Music2 } from "lucide-react";
 import { useAudio } from "@/lib/AudioContext";
-import { getFlag } from "@/lib/flags";
+import FlagImg from "@/components/ui/FlagImg";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -15,16 +15,19 @@ interface LiveMatch {
   awayScore: number;
   elapsed: number;
   status: string;
-  homeTeam: { name: string; flagEmoji: string; code: string };
-  awayTeam: { name: string; flagEmoji: string; code: string };
+  // afTeamId/logoUrl are the club-crest source. Team.flagEmoji is a COUNTRY flag
+  // on club deployments, which reads as "USA vs Mexico" rather than naming the
+  // two clubs — the crest is the badge that actually identifies a club.
+  homeTeam: { name: string; flagEmoji: string; code: string; afTeamId?: number | null; logoUrl?: string };
+  awayTeam: { name: string; flagEmoji: string; code: string; afTeamId?: number | null; logoUrl?: string };
 }
 
 interface ScheduleMatch {
   id: number;
   utcDate: string;
   status: "NS" | "LIVE" | "HT" | "FT";
-  homeTeam: { name: string; tla: string };
-  awayTeam: { name: string; tla: string };
+  homeTeam: { name: string; tla: string; afId?: number | null };
+  awayTeam: { name: string; tla: string; afId?: number | null };
   homeScore: number | null;
   awayScore: number | null;
 }
@@ -49,20 +52,29 @@ function LiveSection({ liveMatch }: { liveMatch: LiveMatch | null }) {
     return (
       <Link
         href={`/schedule/${liveMatch.fixture}`}
-        className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
       >
-        <span className="flex items-center gap-1.5 shrink-0 bg-red-500/15 px-2.5 py-1 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-xs font-black text-red-400 uppercase tracking-widest">LIVE</span>
+        {/* LIVE badge: Rosa 700 fill + Rosa glow. Clock value in Riptide. */}
+        <span className="s0x-live shrink-0 !py-1 !px-2 sm:!px-2.5 !text-[10px] sm:!text-xs">
+          <span className="s0x-live-dot !w-2 !h-2" />
+          LIVE
         </span>
-        <span className="flex items-center gap-2 text-lg sm:text-xl text-slate-200 font-medium">
-          <span className="text-2xl">{liveMatch.homeTeam.flagEmoji}</span>
-          <span className="font-black text-white tabular-nums">
+        {/* Every child is shrink-0 and the row never wraps.
+            Two bugs lived here on a 375px viewport:
+            1. the score box was allowed to shrink below its content and broke
+               "1–1" across two lines;
+            2. fixing that alone left the crest+score group squeezed to 59px while
+               its contents needed ~94px, so the crests overflowed and collided
+               with the minute.
+            The strip now keeps its intrinsic width and the row scrolls instead. */}
+        <span className="flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl text-s0x-text/90 font-medium shrink-0">
+          <FlagImg tla={liveMatch.homeTeam.code} logoUrl={liveMatch.homeTeam.logoUrl} afId={liveMatch.homeTeam.afTeamId} size={20} className="shrink-0" />
+          <span className="s0x-data font-bold text-s0x-text s0x-neon-rosa shrink-0 whitespace-nowrap tabular-nums">
             {liveMatch.homeScore}–{liveMatch.awayScore}
           </span>
-          <span className="text-2xl">{liveMatch.awayTeam.flagEmoji}</span>
+          <FlagImg tla={liveMatch.awayTeam.code} logoUrl={liveMatch.awayTeam.logoUrl} afId={liveMatch.awayTeam.afTeamId} size={20} className="shrink-0" />
         </span>
-        <span className="text-sm text-red-400 font-mono font-bold shrink-0">{minute}</span>
+        <span className="s0x-data text-xs sm:text-sm text-s0x-teal font-bold shrink-0 whitespace-nowrap tabular-nums">{minute}</span>
       </Link>
     );
   }
@@ -95,7 +107,7 @@ function PastResultsChips() {
 
   return (
     <div className="flex items-center gap-3 min-w-0">
-      <span className="hidden sm:inline shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-600">
+      <span className="s0x-mono hidden sm:inline shrink-0 text-[9px] font-semibold text-s0x-muted">
         Results
       </span>
       {recent.map((m, i) => (
@@ -105,12 +117,12 @@ function PastResultsChips() {
             href={`/schedule/${m.id}`}
             className="flex items-center gap-1.5 text-sm sm:text-base text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <span className="text-xl">{getFlag(m.homeTeam.tla)}</span>
-            <span className="text-slate-200 font-bold tabular-nums">
+            <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={20} />
+            <span className="s0x-data text-s0x-text font-bold shrink-0 whitespace-nowrap tabular-nums">
               {m.homeScore}–{m.awayScore}
             </span>
-            <span className="text-xl">{getFlag(m.awayTeam.tla)}</span>
-            <span className="ml-0.5 text-[10px] font-bold text-slate-500 uppercase">FT</span>
+            <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={20} />
+            <span className="s0x-mono ml-0.5 text-[9px] font-semibold text-s0x-muted">FT</span>
           </Link>
         </span>
       ))}
@@ -126,10 +138,17 @@ function AudioSection() {
   if (!current) {
     // Desktop-only: on mobile the anthem shortcut lives in the nav pill row —
     // this pill was overlapping the ticker text on small screens (owner 7/9).
+    // !hidden / sm:!flex, NOT hidden / sm:flex: the .s0x-btn component classes in
+    // globals.css are UNLAYERED, and unlayered CSS beats every @layer, so
+    // Tailwind's display utilities (in @layer utilities) silently lost to
+    // `.s0x-btn { display: inline-flex }`. The pill reappeared on mobile and
+    // squeezed the live score strip — the 7/9 bug, back. The ! modifier restores
+    // the intended cascade. Same treatment on the other s0x-btn + responsive
+    // display call site (app/page.tsx).
     return (
       <Link
         href="/anthems"
-        className="hidden sm:flex items-center gap-2 text-sm sm:text-base font-semibold text-brand-gold hover:text-amber-300 transition-colors shrink-0 bg-brand-gold/10 px-3.5 py-1.5 rounded-full border border-brand-gold/20"
+        className="s0x-btn s0x-btn-teal !hidden sm:!flex !text-[11px] !px-3.5 !py-1.5 shrink-0"
       >
         <Music2 size={16} />
         <span>Team Anthems</span>
@@ -138,8 +157,8 @@ function AudioSection() {
   }
 
   return (
-    <div className="flex items-center gap-2.5 shrink-0 min-w-0 bg-white/5 pl-3 pr-2 py-1.5 rounded-full border border-brand-border/60">
-      <span className="text-sm sm:text-base text-slate-200 font-semibold truncate max-w-[140px] flex items-center gap-1.5">
+    <div className="flex items-center gap-2.5 shrink-0 min-w-0 bg-s0x-teal/10 pl-3 pr-2 py-1.5 rounded-full border border-s0x-teal/40">
+      <span className="s0x-data text-sm text-s0x-teal font-semibold truncate max-w-[140px] flex items-center gap-1.5">
         <span className="text-lg">{current.flagEmoji}</span>
         {truncate(current.title, 16)}
       </span>
@@ -147,21 +166,21 @@ function AudioSection() {
         <button
           onClick={prev}
           aria-label="Previous track"
-          className="text-slate-400 hover:text-white transition-colors"
+          className="text-s0x-muted hover:text-s0x-teal transition-colors"
         >
           <SkipBack size={15} fill="currentColor" />
         </button>
         <button
           onClick={togglePlay}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className="w-7 h-7 rounded-full bg-brand-green text-brand-dark flex items-center justify-center hover:bg-green-400 transition-colors"
+          className="w-7 h-7 rounded-full bg-s0x-teal text-s0x-onink flex items-center justify-center transition-all hover:shadow-glow-teal"
         >
           {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
         </button>
         <button
           onClick={next}
           aria-label="Next track"
-          className="text-slate-400 hover:text-white transition-colors"
+          className="text-s0x-muted hover:text-s0x-teal transition-colors"
         >
           <SkipForward size={15} fill="currentColor" />
         </button>
@@ -204,7 +223,7 @@ export default function LiveMatchBanner() {
   void audioTrack;
 
   return (
-    <div className="bg-brand-dark/95 border-b border-brand-border/50 w-full">
+    <div className="bg-s0x-bg/95 border-b border-s0x-border w-full">
       <div className="max-w-7xl mx-auto flex justify-between items-center px-4 h-16 gap-4">
         {/* Left: live score or last-3-results chips. Scrolls horizontally on
             small screens instead of colliding with the audio pill. */}
@@ -213,7 +232,7 @@ export default function LiveMatchBanner() {
           {liveCount >= 2 && (
             <Link
               href="/?live=split"
-              className="hidden sm:flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-400 border border-red-500/20 rounded-full px-2.5 py-1 hover:bg-red-500/25 transition-colors shrink-0"
+              className="s0x-mono hidden sm:flex items-center gap-1 text-[9px] font-semibold bg-s0x-ink/15 text-s0x-accent border border-s0x-ink/40 rounded-full px-2.5 py-1 hover:bg-s0x-ink/25 transition-colors shrink-0"
             >
               +{liveCount - 1} more live
             </Link>

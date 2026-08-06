@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw, Thermometer } from "lucide-react";
+import { Shield, Eye, Music2, BarChart2, Newspaper, Users, ChevronRight, CheckCircle, Database, UserCheck, Sparkles, Activity, Trash2, BadgeDollarSign, RefreshCw, Thermometer, AlertTriangle, CalendarRange, TrendingUp, Rocket } from "lucide-react";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "WHITE_LABEL" | "USER";
 
@@ -33,8 +33,30 @@ const VIEW_OPTIONS = [
   { role: "USER" as Role,        label: "End User", description: "Public fan experience", color: "border-slate-500/50 bg-slate-500/5 hover:bg-slate-500/10" },
 ];
 
-export default function AdminDashboard({ users }: { users: User[] }) {
+export interface TournamentInfo {
+  id: string;
+  eventName: string;
+  /** SPORT.brandName — the deployment's primary user-facing name. */
+  brandName: string;
+  /** SPORT.entityKind — "nation" competitions have squads; clubs do not. */
+  entityKind: "nation" | "club" | "constructor";
+  leagueId: number;
+  season: number;
+  /** Fixtures this deployment expects (SPORT.calendar.totalEvents). */
+  expectedEvents: number;
+  /** Matches in the DB carrying THIS league's id. */
+  matchCount: number;
+  /** Matches that do NOT carry this league's id — another tournament's rows, or
+   *  rows seeded before the leagueId column existed. */
+  foreignMatchCount: number;
+  teamCount: number;
+  newsCount: number;
+  foreignNewsCount: number;
+}
+
+export default function AdminDashboard({ users, tournament }: { users: User[]; tournament: TournamentInfo }) {
   const [viewLoading, setViewLoading] = useState<Role | null>(null);
+  const [resetLog, setResetLog] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<Record<string, Role>>(
     Object.fromEntries(users.map((u) => [u.id, u.role]))
   );
@@ -71,6 +93,78 @@ export default function AdminDashboard({ users }: { users: User[] }) {
       setSeedStatus(s => ({ ...s, [key]: "error" }));
       setSeedDetail(d => ({ ...d, [key]: e instanceof Error ? e.message : "request failed" }));
     }
+  }
+
+  // ── Destructive-action gate (owner directive 8/5) ──────────────────────────
+  // Nothing is deleted without BK reviewing the exact list first. A destructive
+  // button's FIRST click runs the tool's dry run and prints what it would
+  // remove; only a SECOND click, while that preview is on screen, executes.
+  // `armed` holds the keys currently showing a reviewed preview.
+  const [armed, setArmed] = useState<Record<string, boolean>>({});
+
+  async function runDestructive(
+    key: string,
+    previewUrl: string,
+    confirmUrl: string,
+    method: "GET" | "POST" = "POST",
+  ) {
+    const isArmed = armed[key];
+    setSeedStatus(s => ({ ...s, [key]: "loading" }));
+    try {
+      const res = await fetch(isArmed ? confirmUrl : previewUrl, { method });
+      const json = await res.json().catch(() => null);
+      const detail = summarize(json) || `HTTP ${res.status}`;
+      setSeedStatus(s => ({ ...s, [key]: res.ok ? "done" : "error" }));
+      setSeedDetail(d => ({
+        ...d,
+        [key]: isArmed ? `DELETED — ${detail}` : `PREVIEW (nothing deleted) — ${detail} · click again to confirm`,
+      }));
+      setArmed(a => ({ ...a, [key]: res.ok && !isArmed }));
+    } catch (e) {
+      setSeedStatus(s => ({ ...s, [key]: "error" }));
+      setSeedDetail(d => ({ ...d, [key]: e instanceof Error ? e.message : "request failed" }));
+      setArmed(a => ({ ...a, [key]: false }));
+    }
+  }
+
+  // Full Reset — steps 1→4 in order, one request each.
+  //
+  // Sequential, not parallel: clearing must finish before seeding (or the seed's
+  // fresh rows get deleted), and news generation reads the fixtures the seed just
+  // wrote. One step per request also keeps each call inside the serverless
+  // function time limit — the same reason the anthem reimport is chunked
+  // (CLAUDE.md gotcha #18). Stops on the first failure rather than running the
+  // remaining destructive steps against a half-migrated database.
+  const RESET_STEPS: Array<{ label: string; url: string }> = [
+    { label: "1/4 Clear other-tournament data", url: "/api/admin/clear-foreign-data" },
+    { label: "2/4 Seed fixtures", url: "/api/admin/seed-fixtures" },
+    { label: "3/4 Regenerate news", url: "/api/admin/regenerate-news" },
+    { label: "4/4 Refresh odds", url: "/api/admin/refresh-odds" },
+  ];
+
+  async function runFullReset() {
+    setSeedStatus(s => ({ ...s, fullReset: "loading" }));
+    setResetLog([`Starting full reset for ${tournament.eventName} (league ${tournament.leagueId}, season ${tournament.season})…`]);
+    for (const step of RESET_STEPS) {
+      setResetLog(l => [...l, `▶ ${step.label}…`]);
+      try {
+        const res = await fetch(step.url, { method: "POST" });
+        const json = await res.json().catch(() => null);
+        const detail = summarize(json) || `HTTP ${res.status}`;
+        if (!res.ok) {
+          setResetLog(l => [...l, `✗ ${step.label} FAILED — ${detail}`, "Stopped. Fix the failure above, then re-run."]);
+          setSeedStatus(s => ({ ...s, fullReset: "error" }));
+          return;
+        }
+        setResetLog(l => [...l, `✓ ${step.label} — ${detail}`]);
+      } catch (e) {
+        setResetLog(l => [...l, `✗ ${step.label} FAILED — ${e instanceof Error ? e.message : "request failed"}`, "Stopped."]);
+        setSeedStatus(s => ({ ...s, fullReset: "error" }));
+        return;
+      }
+    }
+    setResetLog(l => [...l, "✓ Full reset complete. Reload this page to refresh the counts above."]);
+    setSeedStatus(s => ({ ...s, fullReset: "done" }));
   }
 
   type SeedTool = {
@@ -141,7 +235,7 @@ export default function AdminDashboard({ users }: { users: User[] }) {
           </div>
           <div>
             <h1 className="text-xl font-black text-white">Super Admin</h1>
-            <p className="text-xs text-slate-500">studio0x · podiumMetrics</p>
+            <p className="text-xs text-slate-500">studio0x · {tournament.brandName}</p>
           </div>
         </div>
 
@@ -167,6 +261,109 @@ export default function AdminDashboard({ users }: { users: User[] }) {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* ── Tournament Data ─────────────────────────────────────────────────
+            The recovery controls for "this deployment is showing another
+            tournament's data". Every button is scoped to the ACTIVE deployment
+            (leagueId / tournamentId), never to a hardcoded league. */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarRange size={14} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
+              Tournament Data — {tournament.eventName}
+            </h2>
+          </div>
+
+          {/* Live state, so the operator can see what a button will act on. */}
+          <div className="rounded-xl border border-brand-border bg-brand-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">League / season</div>
+              <div className="font-black text-white">{tournament.leagueId} · {tournament.season}</div>
+              <div className="text-[10px] text-slate-600">TOURNAMENT={tournament.id}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Fixtures in DB</div>
+              <div className={`font-black ${tournament.matchCount >= tournament.expectedEvents ? "text-brand-green" : "text-brand-gold"}`}>
+                {tournament.matchCount}
+                <span className="text-slate-600 text-[11px]">/{tournament.expectedEvents}</span>
+              </div>
+              <div className="text-[10px] text-slate-600">{tournament.teamCount} teams</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Other-tournament rows</div>
+              <div className={`font-black ${tournament.foreignMatchCount > 0 ? "text-red-400" : "text-brand-green"}`}>
+                {tournament.foreignMatchCount}
+              </div>
+              <div className="text-[10px] text-slate-600">matches (incl. unverified)</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">News stories</div>
+              <div className="font-black text-white">{tournament.newsCount}</div>
+              <div className={`text-[10px] ${tournament.foreignNewsCount > 0 ? "text-red-400" : "text-slate-600"}`}>
+                {tournament.foreignNewsCount} untagged/foreign
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {([
+              {
+                key: "clearForeign",
+                icon: AlertTriangle,
+                label: `1 · Clear non-${tournament.eventName} data`,
+                desc: `DESTRUCTIVE. Asks api-football which fixtures belong to league ${tournament.leagueId}/${tournament.season}, then deletes every match NOT in that set (plus its markets, metrics, player stats, weather, event logs, roundtable episodes and predictions), all moments and news not tagged "${tournament.id}", and any team left with no fixtures. Refuses to run if the feed returns zero fixtures.`,
+                action: () => runSeed("clearForeign", "/api/admin/clear-foreign-data", "POST"),
+              },
+              {
+                key: "seedFixtures",
+                icon: CalendarRange,
+                label: `2 · Seed ${tournament.eventName} fixtures`,
+                desc: `Pulls all fixtures for league ${tournament.leagueId}, season ${tournament.season} and upserts them. Non-destructive and safe to re-run. Teams resolve by api-football team id, so clubs with no 3-letter code are no longer skipped. Reports fixtures written and any that failed.`,
+                action: () => runSeed("seedFixtures", "/api/admin/seed-fixtures", "POST"),
+              },
+              {
+                key: "regenNews",
+                icon: Sparkles,
+                label: "3 · Regenerate news",
+                desc: `DESTRUCTIVE. Deletes this deployment's stories (and untagged legacy ones), then regenerates previews, match recaps and day round-ups with the ${tournament.eventName} prompt. Needed because normal generation SKIPS fixtures that already have a story — a fixed prompt never reaches old copy otherwise.`,
+                action: () => runSeed("regenNews", "/api/admin/regenerate-news", "POST"),
+              },
+              {
+                key: "refreshOdds",
+                icon: TrendingUp,
+                label: "4 · Refresh odds",
+                desc: "Clears the cached prediction-market data and any foreign-ticker market rows, then re-pulls for this deployment's configured market. If no market is listed for this competition, it says so — the odds panel shows an empty state rather than another tournament's prices.",
+                action: () => runSeed("refreshOdds", "/api/admin/refresh-odds", "POST"),
+              },
+            ] as SeedTool[]).map(renderSeedTool)}
+          </div>
+
+          {/* Full reset — runs 1→4 in order, streaming progress. Sequential on
+              purpose: each step depends on the previous one's DB state, and one
+              step per request keeps every call inside the function time limit. */}
+          <button
+            onClick={runFullReset}
+            disabled={seedStatus.fullReset === "loading"}
+            className="w-full text-left rounded-xl border border-brand-gold/40 bg-brand-gold/5 p-4 hover:border-brand-gold/70 transition-colors disabled:opacity-60"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Rocket size={14} className={seedStatus.fullReset === "done" ? "text-brand-green" : seedStatus.fullReset === "error" ? "text-red-400" : "text-brand-gold"} />
+              <div className="font-black text-white text-sm">5 · Run Full Reset</div>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Runs steps 1 → 4 in sequence for {tournament.eventName}. Destructive: clears
+              other-tournament data first, then reseeds fixtures, regenerates news and
+              refreshes odds. Progress appears below.
+            </div>
+            {resetLog.length > 0 && (
+              <div className="mt-3 rounded-lg bg-slate-950/60 p-3 space-y-1">
+                {resetLog.map((line, i) => (
+                  <div key={i} className="text-[10px] font-mono text-slate-400 break-words">{line}</div>
+                ))}
+              </div>
+            )}
+          </button>
         </section>
 
         {/* Seed Tools — 6 daily-driver buttons; rare/destructive tools live in the
@@ -195,18 +392,41 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 action: () => runSeed("news", "/api/news/generate?secret=wc2026studio0x", "POST"),
               },
               {
+                // NATION COMPETITIONS ONLY — hidden below on club deployments.
+                //
+                // The route is hardcoded to api-football league 1 (World Cup) and
+                // matches our teams by nation TLA. On a club deployment that is
+                // not merely useless, it is destructive: LC26 club codes COLLIDE
+                // with nation TLAs (COL = Columbus Crew and Colombia, POR =
+                // Portland Timbers and Portugal, CHI = Chicago Fire and Chile),
+                // so it would write World Cup national-team players into club
+                // squads. See CLAUDE.md "CLUB DEPLOYMENTS — the team-identity rule".
                 key: "fullSquads",
                 icon: Users,
                 label: "Seed Full Squads (Live API)",
-                desc: "Import all 26-man squads for all 48 WC teams from api-football. Populates the Leagues page with all called-up players.",
+                desc: `Import every 26-man squad for the ${tournament.eventName} nations from api-football. Populates the Leagues page with all called-up players.`,
                 action: () => runSeed("fullSquads", "/api/admin/seed-full-squads", "POST"),
               },
               {
-                key: "playersLive",
+                key: "seedTeams",
                 icon: UserCheck,
-                label: "Seed Clubs (Live API)",
-                desc: "Pull real club/caps/goals data from api-football for all WC 2026 players.",
-                action: () => runSeed("playersLive", "/api/admin/seed-players", "POST"),
+                label: "Seed Team Crests + Country",
+                desc: `Pulls /teams for league ${tournament.leagueId}, season ${tournament.season} and writes each team's crest URL and country. A club has no national flag — the crest IS its badge, and without this every club renders a blank placeholder. Non-destructive; safe to re-run.`,
+                action: () => runSeed("seedTeams", "/api/admin/seed-teams", "POST"),
+              },
+              {
+                key: "liveSync",
+                icon: Activity,
+                label: "Live Sync Now",
+                desc: "Pulls team statistics + match events for every match currently in play (possession, shots, fouls, corners, cards, saves, pass accuracy). Runs automatically every minute during match windows — this is the manual on-demand refresh. Costs 2 api-football calls per live match; zero when nothing is in play.",
+                action: () => runSeed("liveSync", "/api/cron/live-sync", "POST"),
+              },
+              {
+                key: "venueGeo",
+                icon: Thermometer,
+                label: "Resolve Venues (city + coords)",
+                desc: "Geocodes EVERY distinct venue (not just the ones on city-less fixtures) and caches the coordinates, then fills the empty Match.city values the fixture feed never supplied. Weather ingest needs the coordinates — check venuesWithCoords in the result. Run this before Backfill Match Weather.",
+                action: () => runSeed("venueGeo", "/api/admin/resolve-venues", "POST"),
               },
               {
                 key: "ingest",
@@ -219,32 +439,116 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                 key: "heatBackfill",
                 icon: Thermometer,
                 label: "Backfill Match Weather (Heat vs. Outcomes)",
-                desc: "Stamps every played match with its real kickoff-hour heat index + humidity (Open-Meteo archive) and FT outcome facts. Chunked; safe to re-run — only fills gaps. New matches auto-stamp nightly.",
+                desc: "Stamps every played match with its real kickoff-hour heat index + humidity (Open-Meteo archive) and FT outcome facts. Chunked; safe to re-run — only fills gaps. Matches whose venue has no coordinates are skipped and named in the result: run Resolve Venues, then re-run this. New matches auto-stamp nightly.",
                 action: async () => {
                   setSeedStatus(s => ({ ...s, heatBackfill: "loading" }));
+                  setSeedDetail(d => ({ ...d, heatBackfill: "" }));
                   try {
-                    // Chunks of 8 (1 weather + 1 events call per match) so no
-                    // single request nears the 60s Hobby function limit.
-                    let created = 0;
+                    // Chunks of 8 so no single request nears the 60s Hobby
+                    // function limit, walking `nextOffset` so matches that CAN'T
+                    // be stamped (unresolvable venue / no upstream reading) are
+                    // stepped over instead of re-tried on every iteration —
+                    // which is what made this loop spin 25 times and then report
+                    // a failure that wasn't one.
+                    let created = 0, skipped = 0, offset = 0;
+                    const unresolved = new Set<string>();
                     for (let guard = 0; guard < 25; guard++) {
-                      const res = await fetch("/api/admin/backfill-weather?count=8", { method: "POST" });
+                      const res = await fetch(`/api/admin/backfill-weather?count=8&offset=${offset}`, { method: "POST" });
                       if (!res.ok) throw new Error(`chunk failed (${res.status})`);
-                      const data = await res.json() as { created: number; outcomesAdded: number; remaining: number };
+                      const data = await res.json() as {
+                        created: number; outcomesAdded: number;
+                        skippedNoVenue: number; skippedNoData: number;
+                        nextOffset: number | null; unresolvedVenues?: string[];
+                      };
                       created += (data.created ?? 0) + (data.outcomesAdded ?? 0);
-                      if ((data.remaining ?? 0) === 0) break;
+                      skipped += (data.skippedNoVenue ?? 0) + (data.skippedNoData ?? 0);
+                      (data.unresolvedVenues ?? []).forEach(v => unresolved.add(v));
+                      if (data.nextOffset == null) break;
+                      offset = data.nextOffset;
                     }
-                    setSeedStatus(s => ({ ...s, heatBackfill: created > 0 ? "done" : "error" }));
-                  } catch {
+                    // Nothing to do is a SUCCESS, not a failure: this button is
+                    // idempotent and a fully-backfilled deployment legitimately
+                    // creates zero rows. Report the real numbers either way
+                    // (gotcha #26) — "✓ Done" alone masked the zero-row runs.
+                    setSeedDetail(d => ({ ...d, heatBackfill:
+                      `${created} stamped · ${skipped} skipped` +
+                      (unresolved.size ? ` · unresolved venues: ${[...unresolved].join(", ")} — run Resolve Venues` : "")
+                    }));
+                    setSeedStatus(s => ({ ...s, heatBackfill: "done" }));
+                  } catch (e) {
+                    setSeedDetail(d => ({ ...d, heatBackfill: e instanceof Error ? e.message : "request failed" }));
                     setSeedStatus(s => ({ ...s, heatBackfill: "error" }));
                   }
                   setTimeout(() => setSeedStatus(s => ({ ...s, heatBackfill: "idle" })), 6000);
                 },
               },
+                          {
+                key: "blobCleanup",
+                icon: Trash2,
+                label: "1 · Free Up Audio Storage (preview first)",
+                desc: "TWO-STEP: first click previews what would be removed, second click executes. Audio lives in VERCEL BLOB, not ElevenLabs — ElevenLabs synthesises and hands back bytes, it stores nothing for us, so clearing ElevenLabs history frees none of this. At the 1GB cap every write fails while reads keep working. SAFE SCOPE: deletes only this deployment's own namespaced narration cache plus orphaned anthem dupes. Un-namespaced legacy blobs are left alone — they predate namespacing and could belong to another deployment sharing this store. ONLY purge those (includeLegacy=CONFIRM_SHARED_OK) after confirming in the Vercel dashboard that this project has a DEDICATED Blob store.",
+                action: () => runDestructive(
+                  "blobCleanup",
+                  "/api/admin/blob-cleanup?secret=wc2026studio0x&dryRun=true",
+                  "/api/admin/blob-cleanup?secret=wc2026studio0x",
+                ),
+              },
+              {
+                key: "storyAudio",
+                icon: Music2,
+                label: "2 · Generate Audio for All Stories",
+                desc: "Synthesises narration for every story on this deployment and PERSISTS the URL on the row, so playback stops depending on a live TTS call. Chunked and idempotent — re-run to fill gaps. Stops immediately if Blob is at quota rather than burning ElevenLabs characters on writes that cannot land.",
+                action: async () => {
+                  setSeedStatus(s => ({ ...s, storyAudio: "loading" }));
+                  setSeedDetail(d => ({ ...d, storyAudio: "" }));
+                  try {
+                    let generated = 0, failed = 0, offset = 0;
+                    let blocker: string | null = null;
+                    let candidates = 0;
+                    for (let guard = 0; guard < 40; guard++) {
+                      const res = await fetch(`/api/admin/generate-story-audio?count=5&offset=${offset}`, { method: "POST" });
+                      if (!res.ok) throw new Error(`chunk failed (${res.status})`);
+                      const data = await res.json() as {
+                        candidates: number; generated: number; failed: number;
+                        nextOffset: number | null; blocker: string | null;
+                      };
+                      candidates = data.candidates ?? 0;
+                      generated += data.generated ?? 0;
+                      failed += data.failed ?? 0;
+                      if (data.blocker && !blocker) blocker = data.blocker;
+                      if (data.nextOffset == null) break;
+                      offset = data.nextOffset;
+                    }
+                    setSeedDetail(d => ({ ...d, storyAudio:
+                      `${generated}/${candidates} generated · ${failed} failed` + (blocker ? ` · ${blocker}` : "")
+                    }));
+                    // Zero to do is a success; only a real failure is an error.
+                    setSeedStatus(s => ({ ...s, storyAudio: failed > 0 ? "error" : "done" }));
+                  } catch (e) {
+                    setSeedDetail(d => ({ ...d, storyAudio: e instanceof Error ? e.message : "request failed" }));
+                    setSeedStatus(s => ({ ...s, storyAudio: "error" }));
+                  }
+                },
+              },
+              {
+                key: "audioHealth",
+                icon: Music2,
+                label: "Check Audio / TTS Chain",
+                desc: "Answers \"why is there no sound?\" with a fact. Reports Vercel Blob usage against the 1GB cap and how much is reclaimable, whether ElevenLabs is configured, and how many stories have persisted audio — then runs a real ~20-char synthesis round-trip so a full store is told apart from an unset key (they produce identical symptoms — gotcha #15).",
+                action: () => runSeed("audioHealth", "/api/admin/audio-health?synth=true", "POST"),
+              },
+              {
+                key: "discoverAnthems",
+                icon: Music2,
+                label: "Discover Anthems (dry run)",
+                desc: "Walks the Drive anthem folders and reports exactly what WOULD import — folders visited, file count per folder, and any filename whose club could not be matched. Writes nothing. Run this before a reimport, and first whenever a track is missing from the hub.",
+                action: () => runSeed("discoverAnthems", "/api/admin/batch-anthem?discover=true", "GET"),
+              },
               {
                 key: "resetAnthems",
                 icon: Music2,
-                label: "Wipe + Reimport ALL Anthems (Drive)",
-                desc: "Re-imports every manifest track fresh from Google Drive in small chunks, then prunes stale records — correct teams, flags and titles.",
+                label: "Reimport ALL Anthems (Drive)",
+                desc: "Imports every track for THIS deployment from Google Drive in small chunks, then prunes stale records. On club deployments the track list is discovered by walking the anthem folder tree (MLS / Liga MX / generic subfolders) — run \"Discover Anthems\" first to see what it will find. Import-then-prune: if discovery fails, nothing is imported and nothing is deleted.",
                 action: async () => {
                   setSeedStatus(s => ({ ...s, resetAnthems: "loading" }));
                   try {
@@ -269,7 +573,13 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                   setTimeout(() => setSeedStatus(s => ({ ...s, resetAnthems: "idle" })), 6000);
                 },
               },
-            ] as SeedTool[]).map(renderSeedTool)}
+            ] as SeedTool[])
+              // Squad seeding is a NATION-competition tool; on a club deployment
+              // it would import World Cup national squads into clubs whose codes
+              // collide with nation TLAs. Hidden rather than relabelled — there
+              // is no correct time to press it here.
+              .filter((t) => t.key !== "fullSquads" || tournament.entityKind === "nation")
+              .map(renderSeedTool)}
           </div>
 
           {/* Maintenance & Danger Zone — rare repairs + destructive resets, collapsed
@@ -288,7 +598,7 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                   key: "matches",
                   icon: Database,
                   label: "Re-seed Matches (Hard Reset)",
-                  desc: "DESTRUCTIVE: wipes and rebuilds all match data (stats/markets included). Teams, players and anthems are preserved. Use Sync Fixtures instead unless something is truly broken.",
+                  desc: "DESTRUCTIVE and NOT preview-gated — wipes and rebuilds all match data (stats/markets included) in one shot. Teams, players and anthems are preserved. Use Sync Fixtures instead unless something is truly broken.",
                   action: () => runSeed("matches", "/api/seed?secret=wc2026studio0x", "GET"),
                 },
                 {
@@ -302,11 +612,23 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                   key: "purge",
                   icon: Trash2,
                   label: "Purge & Regenerate Stories",
-                  desc: "DESTRUCTIVE: deletes all news stories, then regenerates from scratch.",
+                  desc: "DESTRUCTIVE — two-step. First click PREVIEWS how many stories would go (scoped to this deployment; nothing is deleted). Second click deletes and regenerates. Never removes another deployment's rows.",
                   action: async () => {
+                    // First click previews (purge-stories dry-runs without the
+                    // confirm token); second click deletes, then regenerates.
+                    if (!armed.purge) {
+                      setSeedStatus(s => ({ ...s, purge: "loading" }));
+                      const prev = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                      const pj = await prev.json().catch(() => null);
+                      setSeedStatus(s => ({ ...s, purge: prev.ok ? "done" : "error" }));
+                      setSeedDetail(d => ({ ...d, purge: `PREVIEW (nothing deleted) — ${summarize(pj)} · click again to confirm` }));
+                      setArmed(a => ({ ...a, purge: prev.ok }));
+                      return;
+                    }
+                    setArmed(a => ({ ...a, purge: false }));
                     setSeedStatus(s => ({ ...s, purge: "loading" }));
                     try {
-                      const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x", { method: "POST" });
+                      const del = await fetch("/api/admin/purge-stories?secret=wc2026studio0x&confirm=DELETE_STORIES", { method: "POST" });
                       if (!del.ok) throw new Error("purge failed");
                       const gen = await fetch("/api/news/generate?secret=wc2026studio0x", { method: "POST" });
                       setSeedStatus(s => ({ ...s, purge: gen.ok ? "done" : "error" }));
@@ -315,13 +637,6 @@ export default function AdminDashboard({ users }: { users: User[] }) {
                     }
                     setTimeout(() => setSeedStatus(s => ({ ...s, purge: "idle" })), 5000);
                   },
-                },
-                {
-                  key: "blobCleanup",
-                  icon: Trash2,
-                  label: "Free Up Blob Storage",
-                  desc: "Purges regenerable TTS/deep-dive caches + orphaned anthem dupes. Runs automatically each night — manual escape hatch if audio shows 'unavailable'.",
-                  action: () => runSeed("blobCleanup", "/api/admin/blob-cleanup?secret=wc2026studio0x", "POST"),
                 },
                 {
                   key: "relinkAnthems",

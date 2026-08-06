@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { classifyRound } from "@/lib/tournament";
+import { AF_LEAGUE, AF_SEASON, SPORT } from "@/lib/sportConfig";
+import { slugCode } from "@/lib/teamIdentity";
 
 const BASE   = "https://v3.football.api-sports.io";
-const LEAGUE = 1;    // World Cup
-const SEASON = 2026;
+const LEAGUE = AF_LEAGUE; // deployment config (worldcup 1 / leaguescup 772)
+const SEASON = AF_SEASON;
 const CACHE_TTL = 20_000; // 20s bulk schedule (reduced from 60s)
 const LIVE_TTL  = 15_000; // 10s live overlay — widened pre-final (7/19): 2,915 used at 17:30Z, worst-case ET+pens must fit in the 4,585 remaining
 
@@ -35,24 +37,24 @@ const STAGE_LABELS: Record<string, string> = {
   FINAL:           "Final",
 };
 
-// Static group assignments for WC 2026.
-// Group E lists both CUW and CUR — they are the SAME team (Curaçao); CUR is a
-// defensive alias for feeds that emit the non-FIFA code. Every group has
-// exactly four teams.
-const TEAM_GROUPS: Record<string, string> = {
-  MEX: "A", RSA: "A", KOR: "A", CZE: "A",
-  CAN: "B", BIH: "B", QAT: "B", SUI: "B",
-  BRA: "C", MAR: "C", HAI: "C", SCO: "C",
-  USA: "D", PAR: "D", AUS: "D", TUR: "D",
-  GER: "E", CUW: "E", CUR: "E", CIV: "E", ECU: "E",
-  NED: "F", JPN: "F", SWE: "F", TUN: "F",
-  BEL: "G", EGY: "G", IRN: "G", NZL: "G",
-  ESP: "H", CPV: "H", KSA: "H", URU: "H",
-  FRA: "I", SEN: "I", IRQ: "I", NOR: "I",
-  ARG: "J", ALG: "J", AUT: "J", JOR: "J",
-  POR: "K", COD: "K", UZB: "K", COL: "K",
-  ENG: "L", CRO: "L", GHA: "L", PAN: "L",
-};
+// Static group assignments come from the deployment config. WC26 keeps its
+// nation map; LC26's is empty (single league phase, no groups) — applying the WC
+// map to club codes is what labeled six Leagues Cup fixtures "Group K", because
+// Columbus Crew's feed code "COL" is Colombia's FIFA TLA.
+const TEAM_GROUPS: Record<string, string> = SPORT.teamGroups;
+
+/**
+ * Feed team → display code. Nation deployments trust the feed's FIFA TLA;
+ * club deployments derive a code, because the feed omits `team.code` for 14 of
+ * the 36 Leagues Cup clubs (every one of them rendered with a blank badge) and
+ * the codes it does emit collide with nation TLAs.
+ */
+function resolveTla(t: { name: string; code?: string | null }, nameToCode: Map<string, string>): string {
+  const fromDb = nameToCode.get(t.name.toLowerCase());
+  if (fromDb) return fromDb.toUpperCase();
+  if (SPORT.feedCodesAreNationTlas) return (t.code ?? "").toUpperCase();
+  return slugCode(t.name);
+}
 
 interface AFFixture {
   fixture: { id: number; date: string; status: { short: string; elapsed: number | null } };
@@ -74,8 +76,11 @@ export interface ScheduleMatch {
   stageLabel: string;
   group: string;
   matchday: number;
-  homeTeam: { name: string; tla: string };
-  awayTeam: { name: string; tla: string };
+  // `afId` is the api-football team id. Club deployments need it because a
+  // club has no meaningful national flag — its badge is the crest at
+  // media.api-sports.io/football/teams/<afId>.png. Null when unknown.
+  homeTeam: { name: string; tla: string; afId: number | null };
+  awayTeam: { name: string; tla: string; afId: number | null };
   homeScore: number | null;
   awayScore: number | null;
   // Shootout scores — null unless the game was decided on penalties. Needed so
@@ -140,8 +145,8 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
   try {
     const dbMatches = await prisma.match.findMany({
       include: {
-        homeTeam: { select: { name: true, code: true, groupStage: true } },
-        awayTeam: { select: { name: true, code: true, groupStage: true } },
+        homeTeam: { select: { name: true, code: true, groupStage: true, afTeamId: true } },
+        awayTeam: { select: { name: true, code: true, groupStage: true, afTeamId: true } },
       },
       orderBy: { date: "asc" },
     });
@@ -183,8 +188,8 @@ async function synthesizeFromDb(): Promise<ScheduleMatch[]> {
         stageLabel: STAGE_LABELS[stage] ?? stage,
         group,
         matchday,
-        homeTeam: { name: m.homeTeam.name, tla: homeTla },
-        awayTeam: { name: m.awayTeam.name, tla: awayTla },
+        homeTeam: { name: m.homeTeam.name, tla: homeTla, afId: m.homeTeam.afTeamId },
+        awayTeam: { name: m.awayTeam.name, tla: awayTla, afId: m.awayTeam.afTeamId },
         // LIVE/HT scores are real (maintained by the per-match live route) —
         // nulling them rendered a live 0-2 as 0-0 on the hero (7/14 FRA-ESP).
         homeScore: m.status !== "NS" ? m.homeScore : null,
@@ -315,8 +320,8 @@ export async function GET() {
             const gsMatch  = round.match(/^Group Stage - (\d+)$/i);
             const stage    = gsMatch ? "GROUP_STAGE" : (ROUND_TO_STAGE[round] ?? round);
             const matchday = gsMatch ? parseInt(gsMatch[1], 10) : 0;
-            const homeTla  = (f.teams.home.code ?? nameToCode.get(f.teams.home.name.toLowerCase()) ?? "").toUpperCase();
-            const awayTla  = (f.teams.away.code ?? nameToCode.get(f.teams.away.name.toLowerCase()) ?? "").toUpperCase();
+            const homeTla  = resolveTla(f.teams.home, nameToCode);
+            const awayTla  = resolveTla(f.teams.away, nameToCode);
             const group    = TEAM_GROUPS[homeTla] ?? TEAM_GROUPS[awayTla] ?? "";
             const status   = (STATUS_MAP[f.fixture.status.short] ?? "NS") as ScheduleMatch["status"];
 
@@ -330,8 +335,8 @@ export async function GET() {
               stageLabel: STAGE_LABELS[stage] ?? stage,
               group,
               matchday,
-              homeTeam:   { name: f.teams.home.name, tla: homeTla },
-              awayTeam:   { name: f.teams.away.name, tla: awayTla },
+              homeTeam:   { name: f.teams.home.name, tla: homeTla, afId: f.teams.home.id },
+              awayTeam:   { name: f.teams.away.name, tla: awayTla, afId: f.teams.away.id },
               homeScore:  f.goals.home,
               awayScore:  f.goals.away,
               penHome:    f.score?.penalty?.home ?? null,

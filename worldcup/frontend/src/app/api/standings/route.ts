@@ -4,6 +4,7 @@ import { GET as scheduleGET } from "@/app/api/schedule/route";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { getFlag } from "@/lib/flags";
 import { NextResponse } from "next/server";
+import { SPORT } from "@/lib/sportConfig";
 
 export interface TeamStanding {
   tla: string;
@@ -28,6 +29,11 @@ function emptyTeam(tla: string, name: string): TeamStanding {
   return { tla, name, flag: getFlag(tla), p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
 }
 
+// A groupless competition still has a table — it just has one. Keyed by a
+// stable label so the UI heading reads sensibly instead of "Group ?".
+const HAS_GROUPS = Object.keys(SPORT.teamGroups).length > 0;
+const LEAGUE_TABLE_KEY = "League Phase";
+
 export async function GET() {
   try {
     const res = await scheduleGET();
@@ -44,7 +50,9 @@ export async function GET() {
     for (const m of finished) {
       if (m.homeScore === null || m.awayScore === null) continue;
 
-      const grp = m.group || "?";
+      // Formats without groups (LC26: one league phase) put every team in a
+      // single table. Falling back to "?" produced a table headed "Group ?".
+      const grp = m.group || (HAS_GROUPS ? "?" : LEAGUE_TABLE_KEY);
       if (!groups.has(grp)) groups.set(grp, new Map());
       const teams = groups.get(grp)!;
 
