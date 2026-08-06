@@ -33,7 +33,7 @@ import {
   missingVoices,
   type Speaker360,
 } from "./personas";
-import { renderEpisodeGroups, type RenderedGroup } from "./render";
+import { renderEpisodeGroups, apiKeyProblem, type RenderedGroup } from "./render";
 
 /** Bump when the brief changes — episodes are a log, so this only labels rows. */
 export const PROMPT_REV_360 = "v1";
@@ -239,14 +239,43 @@ async function callClaude(ctx: Live360Context, recentlyCovered: string[]): Promi
  * on read so fixing the env var clears the warning without regenerating.
  */
 export function standingWarnings(): string[] {
+  const out: string[] = [];
+
+  // The credential check comes first because it is the one failure that takes
+  // EVERY line down at once, and it is invisible otherwise — the whole show is
+  // silent while the transcript scrolls normally (LC26, 8/5).
+  const keyProblem = apiKeyProblem(process.env.ELEVENLABS_API_KEY);
+  if (keyProblem) out.push(keyProblem);
+
   const missing = missingVoices();
-  if (missing.length === 0) return [];
-  return [
-    `No ElevenLabs voice configured for: ${missing
-      .map((k) => PERSONAS_360[k].name)
-      .join(", ")}. Those lines appear in the transcript but will not be spoken — ` +
-      `set ELEVENLABS_VOICE_${missing[0].toUpperCase()}. A voice is never substituted.`,
-  ];
+  if (missing.length > 0) {
+    out.push(
+      `No ElevenLabs voice configured for: ${missing
+        .map((k) => PERSONAS_360[k].name)
+        .join(", ")}. Those lines appear in the transcript but will not be spoken — ` +
+        `set ELEVENLABS_VOICE_${missing[0].toUpperCase()}. A voice is never substituted.`,
+    );
+  }
+  return out;
+}
+
+/**
+ * Combine warning sets, deduped and bounded.
+ *
+ * A failed render produces one warning PER LINE, so a total outage yields a
+ * dozen near-identical lines. Collapsing them keeps the surface readable while
+ * still naming the cause.
+ */
+function mergeWarnings(...sets: string[][]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of sets.flat()) {
+    if (seen.has(w)) continue;
+    seen.add(w);
+    out.push(w);
+  }
+  if (out.length <= 4) return out;
+  return [...out.slice(0, 4), `…and ${out.length - 4} more of the same kind.`];
 }
 
 /** The newest episode for this deployment, or null. */
@@ -266,7 +295,10 @@ export async function latestEpisode(): Promise<Episode360 | null> {
       leadMomentType: row.leadMomentType,
       groups: (row.groups as unknown as RenderedGroup[]) ?? [],
       audioMode: row.audioMode === "stream" ? "stream" : "blob",
-      warnings: standingWarnings(),
+      // Standing (config) warnings are recomputed so fixing the env var clears
+      // them immediately; the render warnings are the STORED ones from when this
+      // episode was made, deduped against the standing set.
+      warnings: mergeWarnings(standingWarnings(), (row.warnings as unknown as string[]) ?? []),
       generatedAt: row.generatedAt.toISOString(),
     };
   } catch {
@@ -337,11 +369,16 @@ export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateRe
     const grouping = groupLines(lines);
     const render = await renderEpisodeGroups(row.id, lines, grouping);
 
+    const warnings = mergeWarnings(standingWarnings(), render.warnings);
+
     await prisma.live360Episode.update({
       where: { id: row.id },
       data: {
         groups: render.groups as unknown as Prisma.InputJsonValue,
         audioMode: render.audioMode,
+        // Stored, not just returned: every later reader needs to know why this
+        // episode has no audio, not only the request that discovered it.
+        warnings: render.warnings as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -354,7 +391,7 @@ export async function generateEpisode(fixtureIds?: number[]): Promise<GenerateRe
       leadMomentType: row.leadMomentType,
       groups: render.groups,
       audioMode: render.audioMode,
-      warnings: [...standingWarnings(), ...render.warnings],
+      warnings,
       generatedAt: row.generatedAt.toISOString(),
     } satisfies Episode360;
   })();

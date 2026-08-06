@@ -49,6 +49,36 @@ export interface RenderableLine {
   text: string;
 }
 
+/**
+ * Catch a malformed ElevenLabs key BEFORE spending three HTTP attempts on it.
+ *
+ * Found the hard way on 2026-08-05: the LC26 deployment's key did not start with
+ * `sk_`, so every ElevenLabs call on the whole site returned
+ * `invalid_api_key_prefix` — the roundtable, story narration and commentary all
+ * silently produced no audio. The upstream 400 says exactly what is wrong, but
+ * it was buried three fallback attempts deep inside a route that only logged.
+ * ElevenLabs keys are `sk_`-prefixed, so this is a cheap, certain check, and the
+ * message it produces names the fix instead of describing a symptom.
+ *
+ * Returns null when the key LOOKS well-formed — this validates shape only, never
+ * whether the key is authorised. Never include the key itself in the message.
+ */
+export function apiKeyProblem(key: string | undefined): string | null {
+  if (!key) return "ELEVENLABS_API_KEY is not set on this deployment.";
+  const k = key.trim();
+  if (k !== key) {
+    return "ELEVENLABS_API_KEY has leading/trailing whitespace — re-paste it in the Vercel env settings.";
+  }
+  if (!k.startsWith("sk_")) {
+    return (
+      "ELEVENLABS_API_KEY is malformed: ElevenLabs keys start with 'sk_' and this one does not, " +
+      "so every audio request is rejected with invalid_api_key_prefix. Set a current key " +
+      "(ElevenLabs → Profile → API Keys) in this deployment's Vercel environment."
+    );
+  }
+  return null;
+}
+
 // ── MP3 assembly ─────────────────────────────────────────────────────────────
 //
 // Joining the group's lines needs (a) clean segment boundaries and (b) real
@@ -164,6 +194,8 @@ export interface RenderFailure {
 export async function renderLine(line: RenderableLine): Promise<Buffer | RenderFailure> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return { speaker: line.speaker, reason: "ELEVENLABS_API_KEY not set" };
+  const keyProblem = apiKeyProblem(apiKey);
+  if (keyProblem) return { speaker: line.speaker, reason: keyProblem };
 
   const voiceId = ROUNDTABLE_VOICES[line.speaker];
   if (!voiceId) {

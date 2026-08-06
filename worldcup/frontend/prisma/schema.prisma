@@ -323,6 +323,12 @@ model Live360Episode {
   //            client synthesises those lines on demand instead. Degraded, not
   //            broken, and always accompanied by a warning.
   audioMode    String   @default("blob")
+  // Why the audio is degraded, if it is — the exact upstream reason per failed
+  // line/group. Persisted rather than returned once: on 8/5 every line in an
+  // episode failed to render and the surface still showed no warning at all,
+  // because the reasons only existed in the response of the request that
+  // generated them. A failure nobody can see is worse than no feature.
+  warnings     Json?
   promptRev    String   @default("v1")
   generatedAt  DateTime @default(now())
 

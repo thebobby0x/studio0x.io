@@ -125,10 +125,14 @@ export default function RoundtableLive() {
   const [speaking, setSpeaking] = useState<{ line: Line360; index: number } | null>(null);
   const [nextSpeaker, setNextSpeaker] = useState<Speaker360 | null>(null);
   const [status, setStatus] = useState<string>("");
+  /** True once consecutive bursts have produced no speech at all. */
+  const [audioDown, setAudioDown] = useState(false);
 
   const audio = useRef<BroadcastAudio | null>(null);
   const running = useRef(false);
   const abort = useRef<AbortController | null>(null);
+  /** Consecutive bursts that produced no audio. Two in a row = chain is down. */
+  const mutedRuns = useRef(0);
   /** Episodes whose stinger has already fired — a goal is announced once. */
   const stung = useRef(new Set<string>());
 
@@ -237,20 +241,30 @@ export default function RoundtableLive() {
         if (group.url) {
           ok = await engine.playLine(groupUrl(ep.id, group.index), abort.current.signal);
         }
+        if (ok) mutedRuns.current = 0;
         if (!ok && running.current) {
           // Fallback: the group was never stored (Blob at capacity) or its
           // object would not decode. The transcript is in hand, so stream the
           // lines individually and space them ourselves — same conversation,
           // more expensive delivery.
+          let spokeAny = false;
           for (const li of group.lineIndexes) {
             if (!running.current) return;
             const line = ep.lines[li];
             if (!line) continue;
             setSpeaking({ line, index: li });
             abort.current = new AbortController();
-            await engine.playLine(lineUrl(line), abort.current.signal);
+            if (await engine.playLine(lineUrl(line), abort.current.signal)) spokeAny = true;
             await engine.silence(INTRA_GROUP_GAP_MS);
           }
+          // Nothing at all came out — neither the stored group nor any of its
+          // lines. Count it: a run of these means the audio chain is down, not
+          // that one line glitched, and the listener deserves to be told rather
+          // than left with crowd noise and a scrolling transcript (LC26, 8/5:
+          // an invalid API key produced exactly that, silently).
+          mutedRuns.current = spokeAny ? 0 : mutedRuns.current + 1;
+          if (spokeAny) setAudioDown(false);
+          else if (mutedRuns.current >= 2) setAudioDown(true);
         }
 
         // The natural pause — crowd only. The last thing said stays on screen
@@ -340,9 +354,15 @@ export default function RoundtableLive() {
       {/* A missing voice id or a full Blob store degrades the show quietly at
           runtime. Silence with no explanation reads as a bug, so it is stated
           on the surface rather than buried in a server log. */}
-      {(data?.warnings.length ?? 0) > 0 && (
-        <div className="border-b border-s0x-ink/40 bg-s0x-ink/10 px-4 py-2">
-          {data!.warnings.map((w, i) => (
+      {((data?.warnings.length ?? 0) > 0 || audioDown) && (
+        <div className="space-y-1 border-b border-s0x-ink/40 bg-s0x-ink/10 px-4 py-2">
+          {audioDown && (data?.warnings.length ?? 0) === 0 && (
+            <p className="s0x-mono text-[10px] leading-relaxed text-s0x-accent">
+              ⚠ The panel is muted — speech synthesis is not responding. The transcript and the
+              stadium feed continue below.
+            </p>
+          )}
+          {data?.warnings.map((w, i) => (
             <p key={i} className="s0x-mono text-[10px] leading-relaxed text-s0x-accent">
               ⚠ {w}
             </p>
