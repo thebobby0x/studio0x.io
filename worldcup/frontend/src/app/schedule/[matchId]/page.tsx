@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Trophy, CalendarDays, ArrowLeft, MapPin, Clock } from "lucide-react";
 import AppNav from "@/components/ui/AppNav";
+import FlagImg from "@/components/ui/FlagImg";
 import { getFlag } from "@/lib/flags";
 import type { ScheduleMatch } from "@/app/api/schedule/route";
 import { KNOCKOUT_START } from "@/lib/tournament";
@@ -200,7 +201,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-8 py-10">
             {/* Home */}
             <Link href={`/team/${m.homeTeam.tla}`} className="text-center group block">
-              <div className="text-6xl mb-3 select-none">{getFlag(m.homeTeam.tla)}</div>
+              <div className="mb-3 flex justify-center select-none">
+                <FlagImg tla={m.homeTeam.tla} afId={m.homeTeam.afId} size={64} />
+              </div>
               <div className="text-xl font-black text-white group-hover:text-brand-gold transition-colors leading-tight">
                 {m.homeTeam.name}
               </div>
@@ -231,7 +234,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
 
             {/* Away */}
             <Link href={`/team/${m.awayTeam.tla}`} className="text-center group block">
-              <div className="text-6xl mb-3 select-none">{getFlag(m.awayTeam.tla)}</div>
+              <div className="mb-3 flex justify-center select-none">
+                <FlagImg tla={m.awayTeam.tla} afId={m.awayTeam.afId} size={64} />
+              </div>
               <div className="text-xl font-black text-white group-hover:text-brand-gold transition-colors leading-tight">
                 {m.awayTeam.name}
               </div>

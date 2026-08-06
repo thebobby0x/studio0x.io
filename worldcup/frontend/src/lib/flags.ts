@@ -44,9 +44,14 @@ const F: Record<string, string> = {
 import { SPORT } from "@/lib/sportConfig";
 
 export function getFlag(tla: string | undefined | null): string {
-  if (!tla) return "🏳️";
-  if (!SPORT.feedCodesAreNationTlas) return "🏳️";
-  return F[tla.toUpperCase()] ?? "🏳️";
+  if (!tla) return "";
+  // Club deployments: a 3-letter code is a CLUB, not a nation, so no flag is
+  // correct here. This used to return the white-flag emoji, which rendered a
+  // literal 🏳️ next to every club on every emoji-only surface. Empty string is
+  // the honest answer — callers that need a visual use <FlagImg>, which falls
+  // back to a monogram. Never a country's flag, and never a white one either.
+  if (!SPORT.feedCodesAreNationTlas) return "";
+  return F[tla.toUpperCase()] ?? "";
 }
 
 /** Nation-flag lookup that ignores the deployment gate. For the rare surface

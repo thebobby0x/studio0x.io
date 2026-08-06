@@ -150,7 +150,9 @@ export default function TournamentOddsPanel({ highlightTlas = [], limit = 16 }: 
       <div>
         {visible.map((m, i) => {
           const isHighlighted = m.tla ? highlightSet.has(m.tla.toUpperCase()) : false;
-          const flag = m.tla ? getFlag(m.tla) : "🏳";
+          // Was `: "🏳"` — the same white-flag placeholder, hardcoded. On a club
+          // deployment getFlag() now returns "" and so does this.
+          const flag = m.tla ? getFlag(m.tla) : "";
           return (
             <div
               key={m.team}
